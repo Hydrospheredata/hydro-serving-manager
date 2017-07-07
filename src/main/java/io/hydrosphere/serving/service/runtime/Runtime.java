@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.clouddriver;
+package io.hydrosphere.serving.service.runtime;
 
 import lombok.Data;
 

@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.clouddriver;
+package io.hydrosphere.serving.service.runtime;
 
 import java.util.List;
 
@@ -18,4 +18,6 @@ public interface RuntimeDeployService {
     List<Runtime> runtimeList();
 
     List<RuntimeInstance> runtimeInstances(String runtimeName);
+
+    void deleteRuntime(String runtimeId);
 }

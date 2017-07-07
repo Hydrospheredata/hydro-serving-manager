@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.clouddriver;
+package io.hydrosphere.serving.service.runtime;
 
 import java.util.List;
 import java.util.Optional;
