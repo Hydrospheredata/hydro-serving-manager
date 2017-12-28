@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.connector
+package io.hydrosphere.serving.manager.connector
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -7,7 +7,8 @@ import akka.http.scaladsl.model.{HttpRequest, Uri}
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
-import io.hydrosphere.serving.model.{Application, CommonJsonSupport}
+import io.hydrosphere.serving.manager.controller.CommonJsonSupport
+import io.hydrosphere.serving.manager.model.Application
 
 import scala.concurrent.Future
 

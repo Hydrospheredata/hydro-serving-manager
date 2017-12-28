@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.model_api
+package io.hydrosphere.serving.manager.model.api
 
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature

@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.controller
+package io.hydrosphere.serving.manager.controller
 
 /**
   *

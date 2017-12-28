@@ -1,12 +1,13 @@
-package io.hydrosphere.serving.model
+package io.hydrosphere.serving.manager.controller
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.model_api.ContractOps.{FieldDescription, SignatureDescription}
-import io.hydrosphere.serving.model_api.ModelType
+import io.hydrosphere.serving.manager.model._
+import io.hydrosphere.serving.manager.model.api.ContractOps.{FieldDescription, SignatureDescription}
+import io.hydrosphere.serving.manager.model.api.ModelType
 import io.hydrosphere.serving.tensorflow.types.DataType
 import org.apache.logging.log4j.scala.Logging
 import spray.json._

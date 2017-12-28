@@ -1,6 +1,6 @@
-package io.hydrosphere.serving.connector
+package io.hydrosphere.serving.manager.connector
 
-import io.hydrosphere.serving.model.{Application, ModelService}
+import io.hydrosphere.serving.manager.model.{Application, ModelService}
 
 trait ToPipelineStages[A] {
 

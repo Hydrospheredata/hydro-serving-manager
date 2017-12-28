@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.model_api
+package io.hydrosphere.serving.manager.model.api
 
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.tensorflow.tensor_info.TensorInfo
@@ -6,7 +6,7 @@ import io.hydrosphere.serving.tensorflow.tensor_shape.TensorShapeProto
 import io.hydrosphere.serving.tensorflow.types.DataType
 
 object ModelContractBuilders {
-  import ContractOps.Implicits._
+  import io.hydrosphere.serving.manager.model.api.ContractOps.Implicits._
 
   def createUnknownTensorShape(): TensorShapeProto = {
     TensorShapeProto(unknownRank = true)

@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.util
+package io.hydrosphere.serving.manager.util
 
 import java.io._
 

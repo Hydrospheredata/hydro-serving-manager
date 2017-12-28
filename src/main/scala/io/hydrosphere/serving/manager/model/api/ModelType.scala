@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.model_api
+package io.hydrosphere.serving.manager.model.api
 
 sealed trait ModelType {
   def toTag: String
