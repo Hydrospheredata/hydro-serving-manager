@@ -3,7 +3,7 @@ import Keys._
 
 object Common {
   val basicSettings = Seq(
-    version := sys.props.getOrElse("appVersion", IO.read(file("../version")).trim),
+    version := sys.props.getOrElse("appVersion", IO.read(file("version")).trim),
     scalaVersion := "2.12.8",
     publishArtifact := false,
     organization := "io.hydrosphere.serving",
