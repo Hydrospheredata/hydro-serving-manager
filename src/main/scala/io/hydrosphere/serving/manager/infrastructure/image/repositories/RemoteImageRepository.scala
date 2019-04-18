@@ -31,7 +31,7 @@ class RemoteImageRepository[F[_]: Sync](
 
   override def getImage(name: String, tag: String): DockerImage = {
     DockerImage(
-      name = s"${conf.host}/$name",
+      name = s"${conf.host}/${conf.imagePrefix.getOrElse("")}$name",
       tag = tag
     )
   }

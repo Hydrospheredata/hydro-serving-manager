@@ -16,7 +16,8 @@ object DockerRepositoryConfiguration {
     host: String,
     username: Option[String],
     password: Option[String],
-    pullHost: Option[String]
+    pullHost: Option[String],
+    imagePrefix: Option[String]
   ) extends  DockerRepositoryConfiguration
 
 }
