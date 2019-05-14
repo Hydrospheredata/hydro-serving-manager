@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.it.service
 
-import cats.data.EitherT
+import cats.data.{EitherT, OptionT}
 import cats.effect.IO
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
@@ -52,7 +52,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
 
   describe("Application service") {
     it("should create a simple application") {
-      eitherTAssert {
+      ioAssert {
         val create = CreateApplicationRequest(
           "simple-app",
           None,
@@ -67,7 +67,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           Option.empty
         )
         for {
-          appResult <- EitherT(managerServices.appService.create(create))
+          appResult <- managerServices.appService.create(create)
         } yield {
           println(appResult)
           assert(appResult.started.name === "simple-app")
@@ -82,7 +82,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
     }
 
     it("should create a multi-service stage") {
-      eitherTAssert {
+      ioAssert {
         val appRequest = CreateApplicationRequest(
           name = "MultiServiceStage",
           namespace = None,
@@ -122,7 +122,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           )
         )
         for {
-          app <- EitherT(managerServices.appService.create(appRequest))
+          app <- managerServices.appService.create(appRequest)
         } yield {
           println(app)
           assert(app.started.name === appRequest.name)
@@ -162,19 +162,20 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           )
         ))
       )
-      eitherTAssert {
+      ioAssert {
         for {
-          app <- EitherT(managerServices.appService.create(appRequest))
-          _ <- EitherT.liftF(app.completed.get)
-          appNew <- EitherT(managerServices.appService.update(UpdateApplicationRequest(
+          app <- managerServices.appService.create(appRequest)
+          _ <- app.completed.get
+          appNew <- managerServices.appService.update(UpdateApplicationRequest(
             app.started.id,
             app.started.name,
             app.started.namespace,
             appRequest.executionGraph,
             Option.empty
-          )))
-          finishedNew <- EitherT.liftF(appNew.completed.get)
-          gotNewApp <- EitherT.fromOptionF(managerRepositories.applicationRepository.get(appNew.started.id), DomainError.notFound(s"${appNew.started.id} app not found"))
+          ))
+          finishedNew <- appNew.completed.get
+          gotNewApp <- OptionT(managerRepositories.applicationRepository.get(appNew.started.id))
+            .getOrElse(throw new IllegalArgumentException("no applicaiton"))
         } yield {
           assert(finishedNew === gotNewApp)
           assert(appNew.started.kafkaStreaming.isEmpty, appNew)
@@ -183,7 +184,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
     }
 
     it("should create and update an application contract") {
-      eitherTAssert {
+      ioAssert {
         val appRequest = CreateApplicationRequest(
           name = "contract_app",
           namespace = None,
@@ -202,7 +203,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           kafkaStreaming = None
         )
         for {
-          app <- EitherT(managerServices.appService.create(appRequest))
+          app <- managerServices.appService.create(appRequest)
           newGraph = ExecutionGraphRequest(
             stages = List(
               PipelineStageRequest(
@@ -215,15 +216,16 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
               )
             )
           )
-          appNew <- EitherT(managerServices.appService.update(UpdateApplicationRequest(
+          appNew <- managerServices.appService.update(UpdateApplicationRequest(
             app.started.id,
             app.started.name,
             app.started.namespace,
             newGraph,
             Option.empty
-          )))
+          ))
 
-          gotNewApp <- EitherT.fromOptionF(managerRepositories.applicationRepository.get(appNew.started.id), DomainError.notFound("app not found"))
+          gotNewApp <- OptionT(managerRepositories.applicationRepository.get(appNew.started.id))
+            .getOrElse(throw DomainError.notFound("app not found"))
         } yield {
           assert(appNew.started === gotNewApp, gotNewApp)
         }

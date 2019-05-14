@@ -5,16 +5,15 @@ import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableStatus}
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import spray.json._
 
 
 trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   
-  implicit val servableStatus = new RootJsonFormat[ServableStatus] {
+  implicit val servableStatus = new RootJsonFormat[Servable.Status] {
     
-    implicit val running = jsonFormat2(ServableStatus.Running.apply)
+    implicit val running = jsonFormat2(Servable.Status.Running.apply)
   
     object Keys {
       val Running = "running"
@@ -22,27 +21,27 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       val Stopped = "stopped"
     }
     
-    override def read(json: JsValue): ServableStatus = {
+    override def read(json: JsValue): Servable.Status = {
       val obj = json.asJsObject
       obj.fields.get("type") match {
         case Some(JsString(x)) => x match {
           case Keys.Running => running.read(obj)
-          case Keys.Starting => ServableStatus.Starting
-          case Keys.Stopped => ServableStatus.Stopped
+          case Keys.Starting => Servable.Status.Starting
+          case Keys.Stopped => Servable.Status.Stopped
           case x => throw new DeserializationException(s"Invalid type field: $x")
         }
         case x => throw new DeserializationException(s"Invalid type field: $x")
       }
     }
     
-    override def write(obj: ServableStatus): JsValue = {
+    override def write(obj: Servable.Status): JsValue = {
       obj  match {
-        case ServableStatus.Starting => JsObject("type" -> JsString(Keys.Starting))
-        case r: ServableStatus.Running =>
+        case Servable.Status.Starting => JsObject("type" -> JsString(Keys.Starting))
+        case r: Servable.Status.Running =>
           val body = running.write(r).asJsObject
           val fields = body.fields + ("type" -> JsString(Keys.Running))
           JsObject(fields)
-        case ServableStatus.Stopped => JsObject("type" -> JsString(Keys.Stopped))
+        case Servable.Status.Stopped => JsObject("type" -> JsString(Keys.Stopped))
       }
     }
   }

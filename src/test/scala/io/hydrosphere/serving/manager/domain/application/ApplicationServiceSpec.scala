@@ -3,6 +3,7 @@ package io.hydrosphere.serving.manager.domain.application
 import java.time.LocalDateTime
 
 import cats.effect.IO
+import cats.syntax.option._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
@@ -12,7 +13,7 @@ import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent, DiscoveryHub}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService, ServableStatus}
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.grpc.entities.ServingApp
 import io.hydrosphere.serving.tensorflow.types.DataType
 import org.mockito.Matchers
@@ -71,7 +72,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[Servable] = {
             IO.pure(
-              Servable(1, name + modelVersionId.toString, ServableStatus.Starting)
+              Servable(1, name + modelVersionId.toString, Servable.Status.Starting)
             )
           }
 
@@ -95,10 +96,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
         ))
         val createReq = CreateApplicationRequest("test", None, graph, Option.empty)
         applicationService.create(createReq).map { res =>
-          assert(res.isRight, res)
-          val app = res.right.get
-          assert(app.started.name === "test")
-          assert(app.started.status === ApplicationStatus.Assembling)
+          assert(res.started.name === "test")
+          assert(res.started.status === ApplicationStatus.Assembling)
           // build will fail nonetheless
         }
       }
@@ -152,9 +151,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         ))
         val createReq = CreateApplicationRequest("test", None, graph, Option.empty)
         applicationService.create(createReq).flatMap { res =>
-          assert(res.isRight, res)
-          val app = res.right.get
-          app.completed.get.map { x =>
+          res.completed.get.map { x =>
             assert(x.status === ApplicationStatus.Failed)
           }
         }
@@ -191,7 +188,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             Servable(
               modelVersionId = modelVersionId,
               serviceName = name + modelVersionId,
-              status = ServableStatus.Running("imaginaryhost", 6969)
+              status = Servable.Status.Running("imaginaryhost", 6969)
             )
           }
         }
@@ -221,8 +218,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         )
         val createReq = CreateApplicationRequest("test", None, graph, Option.empty)
         applicationService.create(createReq).flatMap { res =>
-          val app = res.right.get
-          app.completed.get.map { finished =>
+          res.completed.get.map { finished =>
             assert(finished.name === "test")
             assert(finished.status === ApplicationStatus.Ready)
             assert(appChanged.nonEmpty)
@@ -233,40 +229,30 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
     it("should rebuild on update") {
       ioAssert {
+        val ogApp = Application(
+          id = 1,
+          name = "test",
+          namespace = None,
+          status = ApplicationStatus.Assembling,
+          signature = signature.copy(signatureName = "test"),
+          executionGraph = ApplicationExecutionGraph(Seq(
+            PipelineStage(Seq(
+              ModelVariant(modelVersion, 100)
+            ), signature)
+          )),
+          kafkaStreaming = List.empty
+        )
+        var app = Option(ogApp)
         val appRepo = mock[ApplicationRepository[IO]]
-        when(appRepo.get(Matchers.any[Long]())).thenReturn(IO(Some(
-          Application(
-            id = 1,
-            name = "test",
-            namespace = None,
-            status = ApplicationStatus.Assembling,
-            signature = signature.copy(signatureName = "test"),
-            executionGraph = ApplicationExecutionGraph(Seq(
-              PipelineStage(Seq(
-                ModelVariant(modelVersion, 100)
-              ), signature)
-            )),
-            kafkaStreaming = List.empty
-          )
-        )))
-        when(appRepo.get(Matchers.any[String]())).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(IO(
-          Application(
-            id = 1,
-            name = "test",
-            namespace = None,
-            status = ApplicationStatus.Assembling,
-            signature = signature.copy(signatureName = "test"),
-            executionGraph = ApplicationExecutionGraph(Seq(
-              PipelineStage(Seq(
-                ModelVariant(modelVersion, 100)
-              ), signature)
-            )),
-            kafkaStreaming = List.empty
-          )
-        ))
+        when(appRepo.get(Matchers.anyLong())).thenReturn(IO(app))
+        when(appRepo.get(Matchers.anyString())).thenReturn(IO(app))
+        when(appRepo.create(Matchers.any())).thenReturn(IO(ogApp))
         when(appRepo.applicationsWithCommonServices(Matchers.any(), Matchers.any())).thenReturn(IO(Seq.empty))
         when(appRepo.update(Matchers.any())).thenReturn(IO(1))
+        when(appRepo.delete(Matchers.any())).thenReturn(IO{
+          app = None
+          1
+        })
 
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(Matchers.any[Long]())).thenReturn(IO(Some(modelVersion)))
@@ -275,11 +261,11 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[Servable] = {
             IO.pure(
-              Servable(1, name + modelVersionId.toString, ServableStatus.Starting)
+              Servable(1, name + modelVersionId.toString, Servable.Status.Starting)
             )
           }
 
-          override def stop(name: String): IO[Unit] = ???
+          override def stop(name: String): IO[Unit] = IO.unit
         }
 
         val apps = ListBuffer.empty[ServingApp]
@@ -307,9 +293,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
         )
         val updateReq = UpdateApplicationRequest(1, "test", None, graph, Option.empty)
         applicationService.update(updateReq).map { res =>
-          val app = res.right.get
-          assert(app.started.name === "test")
-          assert(app.started.status === ApplicationStatus.Assembling)
+          assert(res.started.name === "test")
+          assert(res.started.status === ApplicationStatus.Assembling)
         }
       }
     }
