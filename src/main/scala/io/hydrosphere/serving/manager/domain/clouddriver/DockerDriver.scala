@@ -6,7 +6,7 @@ import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContai
 import com.spotify.docker.client.messages._
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableStatus}
+import io.hydrosphere.serving.manager.domain.servable.Servable
 
 import scala.collection.JavaConverters._
 import scala.util.Try
@@ -81,16 +81,13 @@ class DockerDriver[F[_]](
   
     (mName, mMvId).mapN((name, mvId) => {
       val host = Internals.extractIpAddress(c.networkSettings(), config.networkName)
-      val status = ServableStatus.Running(host, DefaultConstants.DEFAULT_APP_PORT)
+      val status = Servable.Status.Running(host, DefaultConstants.DEFAULT_APP_PORT)
       Servable(mvId, name, status)
     })
   }
-  
-  
 }
 
 object DockerDriver {
-  
   
   object Internals {
   
@@ -134,6 +131,4 @@ object DockerDriver {
       byNetworkName.getOrElse(settings.ipAddress())
     }
   }
-  
-  
 }

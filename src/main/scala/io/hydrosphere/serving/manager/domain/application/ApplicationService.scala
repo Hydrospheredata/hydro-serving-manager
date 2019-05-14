@@ -11,7 +11,7 @@ import io.hydrosphere.serving.manager.discovery.DiscoveryHub
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.{InvalidRequest, NotFound}
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService, ServableStatus}
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.grpc.entities.ServingApp
 import io.hydrosphere.serving.manager.{domain, grpc}
 import io.hydrosphere.serving.model.api.TensorExampleGenerator
@@ -67,11 +67,11 @@ object ApplicationService extends Logging {
       } yield jsonData
     }
 
-    private def startServices(application: Application, versionsToDeploy: List[ModelVersion], existingVersions: List[Servable]): F[Application] = {
+    private def startServices(application: Application, versionsToDeploy: List[ModelVersion]): F[Application] = {
       val finished = for {
         deployedServables <- versionsToDeploy.traverse(mv => servableService.deploy(mv.servableName, mv.id, mv.image))
         finishedApp = application.copy(status = ApplicationStatus.Ready)
-        translated <- F.fromEither(Internals.toServingApp(finishedApp, deployedServables ++ existingVersions))
+        translated <- F.fromEither(Internals.toServingApp(finishedApp, deployedServables))
         _ <- discoveryHub.added(translated)
         _ <- applicationRepository.update(finishedApp)
       } yield finishedApp
@@ -99,7 +99,7 @@ object ApplicationService extends Logging {
         versions <- versionRepository.get(keySet.toSeq)
         createdApp <- applicationRepository.create(app)
         df <- Deferred[F, Application]
-        _ <- startServices(createdApp, versions.toList, List.empty).flatMap(df.complete).start
+        _ <- startServices(createdApp, versions.toList).flatMap(df.complete).start
       } yield ApplicationBuildResult(createdApp, df)
     }
 
@@ -119,6 +119,7 @@ object ApplicationService extends Logging {
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find application id ${appRequest.id}")))
 
         _ <- delete(oldApplication.name)
+
         newApplication <- create(
           CreateApplicationRequest(
             name = appRequest.name,
@@ -261,7 +262,7 @@ object ApplicationService extends Logging {
 
     def toGServable(mv: ModelVariant, servables: Map[Long, Servable]): Either[Throwable, GServable] = {
       servables.get(mv.modelVersion.id) match {
-        case Some(Servable(_, _, ServableStatus.Running(host, port))) => GServable(host, port, mv.weight, Some(modelVersionToGrpcEntity(mv.modelVersion))).asRight
+        case Some(Servable(_, _, Servable.Status.Running(host, port))) => GServable(host, port, mv.weight, Some(modelVersionToGrpcEntity(mv.modelVersion))).asRight
         case Some(s) => new Exception(s"Invalid servable state for ${mv.modelVersion.model.name}:${mv.modelVersion.id} - $s").asLeft // TODO what about starting servables?
         case None => new Exception(s"Could not find servable for  ${mv.modelVersion.model.name}:${mv.modelVersion.id}").asLeft
       }
