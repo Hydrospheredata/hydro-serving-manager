@@ -14,20 +14,20 @@ trait ServableService[F[_]] {
 }
 
 object ServableService {
-  
+
   def apply[F[_]](
-    cloudDriver: CloudDriver[F]
+    cloudDriver: CloudDriver[F],
   )(implicit F: Sync[F]): ServableService[F] =
     new ServableService[F] with Logging {
-  
-      override def deploy(name: String, modelVersionId: Long, image: DockerImage): F[Servable] = {
-        cloudDriver.run(name, modelVersionId, image).onError {
-          case NonFatal(ex) =>
-            Sync[F].delay(logger.error(ex))
-        }
-      }
-      
-      override def stop(name: String): F[Unit] = cloudDriver.remove(name)
 
-  }
+      override def deploy(name: String, modelVersionId: Long, image: DockerImage): F[Servable] = {
+        cloudDriver.run(name, modelVersionId, image)
+          .onError {
+            case NonFatal(ex) =>
+              Sync[F].delay(logger.error(ex))
+          }
+      }
+
+      override def stop(name: String): F[Unit] = cloudDriver.remove(name)
+    }
 }

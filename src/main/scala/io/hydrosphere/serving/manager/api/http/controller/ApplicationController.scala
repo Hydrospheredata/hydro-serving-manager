@@ -38,7 +38,7 @@ class ApplicationController[F[_]: Effect](
   ))
   def getApp = path("application" / Segment) { appName =>
     get {
-      completeFRes(appService.get(appName))
+      completeF(appService.get(appName))
     }
   }
 
@@ -55,8 +55,8 @@ class ApplicationController[F[_]: Effect](
   def create = path("application") {
     post {
       entity(as[CreateApplicationRequest]) { r =>
-        completeFRes(
-          appService.create(r).map(_.right.map(_.started))
+        completeF(
+          appService.create(r).map(_.started)
         )
       }
     }
@@ -75,8 +75,8 @@ class ApplicationController[F[_]: Effect](
   def update = pathPrefix("application") {
     put {
       entity(as[UpdateApplicationRequest]) { r =>
-        completeFRes(
-          appService.update(r).map(_.right.map(_.started))
+        completeF(
+          appService.update(r).map(_.started)
         )
       }
     }
@@ -93,7 +93,7 @@ class ApplicationController[F[_]: Effect](
   ))
   def deleteApplicationByName = delete {
     path("application" / Segment) { appName =>
-      completeFRes(appService.delete(appName))
+      completeF(appService.delete(appName))
     }
   }
 
@@ -109,7 +109,7 @@ class ApplicationController[F[_]: Effect](
   ))
   def generateInputsForApp = pathPrefix("application" / "generateInputs" / Segment) { appName =>
     get {
-      completeFRes(
+      completeF(
         appService.generateInputs(appName)
       )
     }
