@@ -3,6 +3,7 @@ package io.hydrosphere.serving.manager.domain.application
 import java.time.LocalDateTime
 
 import cats.effect.IO
+import cats.syntax.option._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
@@ -228,40 +229,30 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
     it("should rebuild on update") {
       ioAssert {
+        val ogApp = Application(
+          id = 1,
+          name = "test",
+          namespace = None,
+          status = ApplicationStatus.Assembling,
+          signature = signature.copy(signatureName = "test"),
+          executionGraph = ApplicationExecutionGraph(Seq(
+            PipelineStage(Seq(
+              ModelVariant(modelVersion, 100)
+            ), signature)
+          )),
+          kafkaStreaming = List.empty
+        )
+        var app = Option(ogApp)
         val appRepo = mock[ApplicationRepository[IO]]
-        when(appRepo.get(Matchers.any[Long]())).thenReturn(IO(Some(
-          Application(
-            id = 1,
-            name = "test",
-            namespace = None,
-            status = ApplicationStatus.Assembling,
-            signature = signature.copy(signatureName = "test"),
-            executionGraph = ApplicationExecutionGraph(Seq(
-              PipelineStage(Seq(
-                ModelVariant(modelVersion, 100)
-              ), signature)
-            )),
-            kafkaStreaming = List.empty
-          )
-        )))
-        when(appRepo.get(Matchers.any[String]())).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(IO(
-          Application(
-            id = 1,
-            name = "test",
-            namespace = None,
-            status = ApplicationStatus.Assembling,
-            signature = signature.copy(signatureName = "test"),
-            executionGraph = ApplicationExecutionGraph(Seq(
-              PipelineStage(Seq(
-                ModelVariant(modelVersion, 100)
-              ), signature)
-            )),
-            kafkaStreaming = List.empty
-          )
-        ))
+        when(appRepo.get(Matchers.anyLong())).thenReturn(IO(app))
+        when(appRepo.get(Matchers.anyString())).thenReturn(IO(app))
+        when(appRepo.create(Matchers.any())).thenReturn(IO(ogApp))
         when(appRepo.applicationsWithCommonServices(Matchers.any(), Matchers.any())).thenReturn(IO(Seq.empty))
         when(appRepo.update(Matchers.any())).thenReturn(IO(1))
+        when(appRepo.delete(Matchers.any())).thenReturn(IO{
+          app = None
+          1
+        })
 
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(Matchers.any[Long]())).thenReturn(IO(Some(modelVersion)))
@@ -274,7 +265,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           }
 
-          override def stop(name: String): IO[Unit] = ???
+          override def stop(name: String): IO[Unit] = IO.unit
         }
 
         val apps = ListBuffer.empty[ServingApp]
