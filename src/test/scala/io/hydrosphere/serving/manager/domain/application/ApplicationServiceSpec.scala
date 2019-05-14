@@ -12,7 +12,7 @@ import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent, DiscoveryHub}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService, ServableStatus}
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.grpc.entities.ServingApp
 import io.hydrosphere.serving.tensorflow.types.DataType
 import org.mockito.Matchers
@@ -71,7 +71,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[Servable] = {
             IO.pure(
-              Servable(1, name + modelVersionId.toString, ServableStatus.Starting)
+              Servable(1, name + modelVersionId.toString, Servable.Status.Starting)
             )
           }
 
@@ -95,10 +95,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
         ))
         val createReq = CreateApplicationRequest("test", None, graph, Option.empty)
         applicationService.create(createReq).map { res =>
-          assert(res.isRight, res)
-          val app = res.right.get
-          assert(app.started.name === "test")
-          assert(app.started.status === ApplicationStatus.Assembling)
+          assert(res.started.name === "test")
+          assert(res.started.status === ApplicationStatus.Assembling)
           // build will fail nonetheless
         }
       }
@@ -152,9 +150,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         ))
         val createReq = CreateApplicationRequest("test", None, graph, Option.empty)
         applicationService.create(createReq).flatMap { res =>
-          assert(res.isRight, res)
-          val app = res.right.get
-          app.completed.get.map { x =>
+          res.completed.get.map { x =>
             assert(x.status === ApplicationStatus.Failed)
           }
         }
@@ -191,7 +187,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             Servable(
               modelVersionId = modelVersionId,
               serviceName = name + modelVersionId,
-              status = ServableStatus.Running("imaginaryhost", 6969)
+              status = Servable.Status.Running("imaginaryhost", 6969)
             )
           }
         }
@@ -221,8 +217,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         )
         val createReq = CreateApplicationRequest("test", None, graph, Option.empty)
         applicationService.create(createReq).flatMap { res =>
-          val app = res.right.get
-          app.completed.get.map { finished =>
+          res.completed.get.map { finished =>
             assert(finished.name === "test")
             assert(finished.status === ApplicationStatus.Ready)
             assert(appChanged.nonEmpty)
@@ -275,7 +270,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[Servable] = {
             IO.pure(
-              Servable(1, name + modelVersionId.toString, ServableStatus.Starting)
+              Servable(1, name + modelVersionId.toString, Servable.Status.Starting)
             )
           }
 
@@ -307,9 +302,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
         )
         val updateReq = UpdateApplicationRequest(1, "test", None, graph, Option.empty)
         applicationService.update(updateReq).map { res =>
-          val app = res.right.get
-          assert(app.started.name === "test")
-          assert(app.started.status === ApplicationStatus.Assembling)
+          assert(res.started.name === "test")
+          assert(res.started.status === ApplicationStatus.Assembling)
         }
       }
     }
