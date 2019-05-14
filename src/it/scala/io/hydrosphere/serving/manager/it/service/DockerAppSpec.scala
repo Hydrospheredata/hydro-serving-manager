@@ -52,7 +52,7 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
 
   describe("Application and Servable service") {
     it("should delete unused servables after deletion") {
-      eitherTAssert {
+      ioAssert {
         val create = CreateApplicationRequest(
           "simple-app",
           None,
@@ -67,12 +67,12 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
           Option.empty
         )
         for {
-          appResult <- EitherT(managerServices.appService.create(create))
-          _ <- EitherT.liftF(appResult.completed.get)
-          preCont <- EitherT.liftF(IO(dockerClient.listContainers()))
-          _ <- EitherT.liftF(IO.pure(Thread.sleep(10000)))
-          _ <- EitherT(managerServices.appService.delete(appResult.started.name))
-          cont <- EitherT.liftF(IO(dockerClient.listContainers()))
+          appResult <- managerServices.appService.create(create)
+          _ <- appResult.completed.get
+          preCont <- IO(dockerClient.listContainers())
+          _ <- IO.pure(Thread.sleep(10000))
+          _ <- managerServices.appService.delete(appResult.started.name)
+          cont <- IO(dockerClient.listContainers())
         } yield {
           println("App containers:")
           preCont.forEach(println)

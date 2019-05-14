@@ -1,7 +1,9 @@
 package io.hydrosphere.serving.manager.domain
 
-sealed trait DomainError extends Throwable with Product with Serializable {
+sealed trait DomainError extends Throwable {
   def message: String
+
+  override def getMessage: String = message
 }
 
 object DomainError {

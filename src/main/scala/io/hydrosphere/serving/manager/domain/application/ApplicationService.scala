@@ -133,12 +133,15 @@ object ApplicationService extends Logging {
 
     def checkApplicationName(name: String): F[String] = {
       for {
-        _ <- F.fromOption(
-          ApplicationValidator.name(name),
-          InvalidRequest(s"Application name $name contains invalid symbols. It should only contain latin letters, numbers '-' and '_'")
-        )
-        _ <- OptionT(applicationRepository.get(name))
-          .getOrElseF(F.raiseError(InvalidRequest(s"Application with name $name already exists")))
+        _ <- ApplicationValidator.name(name) match {
+          case Some(_) => F.unit
+          case None => F.raiseError[Unit](InvalidRequest(s"Application name $name contains invalid symbols. It should only contain latin letters, numbers '-' and '_'"))
+        }
+        maybeApp <- applicationRepository.get(name)
+        _ <- maybeApp match {
+          case Some(_) => F.raiseError[Unit](InvalidRequest(s"Application with name $name already exists"))
+          case None => F.unit
+        }
       } yield name
     }
 
