@@ -1,19 +1,22 @@
 package io.hydrosphere.serving.manager.domain.application
 
+import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
+import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
+
 trait ApplicationRepository[F[_]] {
-  def create(entity: Application): F[Application]
+  def create(entity: GenericApplication): F[GenericApplication]
 
-  def get(id: Long): F[Option[Application]]
+  def get(id: Long): F[Option[GenericApplication]]
 
-  def get(name: String): F[Option[Application]]
+  def get(name: String): F[Option[GenericApplication]]
 
-  def update(value: Application): F[Int]
+  def update(value: GenericApplication): F[Int]
 
   def delete(id: Long): F[Int]
 
-  def all(): F[Seq[Application]]
+  def all(): F[List[GenericApplication]]
 
-  def applicationsWithCommonServices(keysSet: Set[Long], applicationId: Long): F[Seq[Application]]
+  def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): F[Seq[GenericApplication]]
 
-  def findVersionsUsage(versionIdx: Long): F[Seq[Application]]
+  def findVersionsUsage(versionIdx: Long): F[Seq[GenericApplication]]
 }

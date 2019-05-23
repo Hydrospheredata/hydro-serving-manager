@@ -14,10 +14,11 @@ import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, ModelService, ModelVersionMetadata}
-import io.hydrosphere.serving.manager.domain.model_build.{BuildResult, ModelVersionBuilder}
+import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{FetcherResult, ModelFetcher}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, ModelUnpacker}
+import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.tensorflow.TensorShape
 import io.hydrosphere.serving.tensorflow.types.DataType
 import org.mockito.Matchers
@@ -81,7 +82,7 @@ class ModelServiceSpec extends GenericUnitTest {
 
         val versionBuilder = mock[ModelVersionBuilder[Id]]
         when(versionBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
-          BuildResult(modelVersion, new Deferred[Id, ModelVersion] {
+          DeferredResult(modelVersion, new Deferred[Id, ModelVersion] {
             override def get: Id[ModelVersion] = modelVersion
 
             override def complete(a: ModelVersion): Id[Unit] = Unit
@@ -179,7 +180,7 @@ class ModelServiceSpec extends GenericUnitTest {
 
         val versionService = mock[ModelVersionBuilder[Id]]
         when(versionService.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
-          BuildResult(modelVersion, new Deferred[Id, ModelVersion] {
+          DeferredResult(modelVersion, new Deferred[Id, ModelVersion] {
             override def get: Id[ModelVersion] = modelVersion
 
             override def complete(a: ModelVersion): Id[Unit] = Unit

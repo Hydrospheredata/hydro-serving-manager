@@ -5,7 +5,7 @@ import com.spotify.docker.client.messages.RegistryAuth
 import com.spotify.docker.client.{DockerClient, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerRepositoryConfiguration
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
-import io.hydrosphere.serving.manager.util.docker.{DockerClientHelper, DockerRegistryAuth}
+import io.hydrosphere.serving.manager.infrastructure.docker.{DockerClientHelper, DockerRegistryAuth}
 
 class RemoteImageRepository[F[_]: Sync](
   dockerClient: DockerClient,

@@ -5,17 +5,38 @@ import akka.stream.Materializer
 import cats.effect._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.domain.servable.Servable
 
 import scala.concurrent.ExecutionContext
 
+object CloudInstance {
+
+  sealed trait Status
+
+  object Status {
+
+    case object Starting extends Status
+
+    final case class Running(host: String, port: Int) extends Status
+
+    case object Stopped extends Status
+
+  }
+
+}
+
+case class CloudInstance(
+  modelVersionId: Long,
+  name: String,
+  status: CloudInstance.Status
+)
+
 trait CloudDriver[F[_]] {
-  
-  def instances: F[List[Servable]]
-  
-  def instance(name: String): F[Option[Servable]]
-  
-  def run(name: String, modelVersionId: Long, image: DockerImage): F[Servable]
+
+  def instances: F[List[CloudInstance]]
+
+  def instance(name: String): F[Option[CloudInstance]]
+
+  def run(name: String, modelVersionId: Long, image: DockerImage): F[CloudInstance]
   
   def remove(name: String): F[Unit]
 }

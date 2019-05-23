@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import cats.data.NonEmptyList
 import org.apache.logging.log4j.scala.Logging
 import scalapb._
 import spray.json._
@@ -53,6 +54,22 @@ trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with 
     override def write(obj: Throwable): JsValue = JsString(obj.getMessage)
 
     override def read(json: JsValue): Throwable = throw DeserializationException("Can't deserealize exceptions")
+  }
+
+  implicit def nonEmptyListFormat[T: JsonFormat] = new RootJsonFormat[NonEmptyList[T]] {
+    override def read(json: JsValue): NonEmptyList[T] = json match {
+      case JsArray(elems) =>
+        val parsedElems = elems.map(_.convertTo[T]).toList
+        NonEmptyList.fromList(parsedElems) match {
+          case Some(r) => r
+          case None => throw DeserializationException("An array is required to be non-empty")
+        }
+      case _ => throw DeserializationException("Incorrect JSON. A non-empty array is expected.")
+    }
+
+    override def write(obj: NonEmptyList[T]): JsValue = {
+      JsArray(obj.map(_.toJson).toList.toVector)
+    }
   }
 
   implicit def enumFormat[T <: scala.Enumeration](enum: T) = new RootJsonFormat[T#Value] {

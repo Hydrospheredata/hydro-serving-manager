@@ -11,10 +11,11 @@ import io.hydrosphere.serving.manager.domain.image.{ImageBuilder, ImageRepositor
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
+import io.hydrosphere.serving.manager.util.DeferredResult
 import org.apache.logging.log4j.scala.Logging
 
 trait ModelVersionBuilder[F[_]]{
-  def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[BuildResult[F]]
+  def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion]]
 }
 
 object ModelVersionBuilder {
@@ -25,12 +26,12 @@ object ModelVersionBuilder {
     modelVersionService: ModelVersionService[F],
     storageOps: StorageOps[F]
   ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] with Logging {
-    override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[BuildResult[F]] = {
+    override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion]] = {
       for {
         init <- initialVersion(model, metadata)
         deferred <- Deferred[F, ModelVersion]
         fbr <- handleBuild(init, modelFileStructure).flatMap(deferred.complete).start
-      } yield BuildResult(init, deferred)
+      } yield DeferredResult(init, deferred)
     }
 
     def initialVersion(model: Model, metadata: ModelVersionMetadata) = {

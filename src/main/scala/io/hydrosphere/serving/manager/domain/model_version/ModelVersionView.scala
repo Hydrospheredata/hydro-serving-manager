@@ -3,7 +3,7 @@ package io.hydrosphere.serving.manager.domain.model_version
 import java.time.LocalDateTime
 
 import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain.application.Application
+import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
@@ -24,7 +24,7 @@ case class ModelVersionView(
 )
 
 object ModelVersionView {
-  def fromVersion(modelVersion: ModelVersion, applications: Seq[Application]) = {
+  def fromVersion(modelVersion: ModelVersion, applications: Seq[GenericApplication]) = {
     ModelVersionView(
       id = modelVersion.id,
       image = modelVersion.image,

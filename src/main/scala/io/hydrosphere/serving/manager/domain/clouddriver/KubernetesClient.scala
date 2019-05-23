@@ -5,7 +5,6 @@ import cats.effect._
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import org.apache.logging.log4j.scala.Logging
 import skuber.Container.PullPolicy
@@ -20,8 +19,8 @@ trait KubernetesClient[F[_]] {
   def services: F[List[skuber.Service]]
   def deployments: F[List[Deployment]]
   
-  def runDeployment(name: String, servable: Servable, dockerImage: DockerImage): F[Deployment]
-  def runService(name: String, servable: Servable): F[skuber.Service]
+  def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage): F[Deployment]
+  def runService(name: String, servable: CloudInstance): F[skuber.Service]
   
   def removeDeployment(name: String): F[Unit]
   def removeService(name: String): F[Unit]
@@ -45,13 +44,13 @@ object KubernetesClient {
       AsyncUtil.futureAsync(underlying.list[DeploymentList]).map(_.toList)
     }
 
-    override def runDeployment(name: String, servable: Servable, dockerImage: DockerImage): F[Deployment] = {
+    override def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage): F[Deployment] = {
       import LabelSelector.dsl._
       
       val dockerRepoHost = dockerRepoConf.pullHost.getOrElse(dockerRepoConf.host)
       val image = dockerImage.replaceUser(dockerRepoHost).toTry.get
       val pod = Pod.Template.Spec(
-        metadata = ObjectMeta(name = servable.serviceName),
+        metadata = ObjectMeta(name = servable.name),
         spec = Some(Pod.Spec().addImagePullSecretRef(config.kubeRegistrySecretName))
       )
         .addContainer(Container("model", image.fullName).exposePort(DefaultConstants.DEFAULT_APP_PORT).withImagePullPolicy(PullPolicy.Always).setEnvVar(DefaultConstants.ENV_APP_PORT, DefaultConstants.DEFAULT_APP_PORT.toString))
@@ -59,7 +58,7 @@ object KubernetesClient {
           CloudDriver.Labels.ServiceName -> name,
           CloudDriver.Labels.ModelVersionId -> servable.modelVersionId.toString
         ))
-      val deployment = apps.v1.Deployment(metadata = ObjectMeta(name = servable.serviceName, labels = Map(
+      val deployment = apps.v1.Deployment(metadata = ObjectMeta(name = servable.name, labels = Map(
           CloudDriver.Labels.ServiceName -> name,
           CloudDriver.Labels.ModelVersionId -> servable.modelVersionId.toString
         )
@@ -79,8 +78,8 @@ object KubernetesClient {
       } yield dpl
     }
 
-    override def runService(name: String, servable: Servable): F[skuber.Service] = {
-      val service = skuber.Service(metadata = ObjectMeta(name = servable.serviceName))
+    override def runService(name: String, servable: CloudInstance): F[skuber.Service] = {
+      val service = skuber.Service(metadata = ObjectMeta(name = servable.name))
         .withSelector(CloudDriver.Labels.ServiceName -> name)
         .exposeOnPort(skuber.Service.Port("grpc", Protocol.TCP, DefaultConstants.DEFAULT_APP_PORT))
         .addLabels(Map(

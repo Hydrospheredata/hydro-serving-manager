@@ -2,6 +2,7 @@ package io.hydrosphere.serving.manager.config
 
 import java.nio.file.Path
 
+import cats.effect.Sync
 import cats.syntax.either._
 import com.amazonaws.regions.Regions
 import pureconfig.ConfigReader
@@ -24,5 +25,7 @@ object ManagerConfiguration {
       .leftMap(e => CannotConvert(str, "Region", e.getMessage))
   }
 
-  def load = pureconfig.loadConfig[ManagerConfiguration]
+  def load[F[_]](implicit F: Sync[F]): F[ManagerConfiguration] = F.delay {
+    pureconfig.loadConfigOrThrow[ManagerConfiguration]
+  }
 }

@@ -44,7 +44,7 @@ class HostSelectorController[F[_]: Effect](
   ))
   def createHostSelector = pathPrefix("hostSelector") {
     entity(as[CreateHostSelector]) { r =>
-      completeFRes(
+      completeF(
         hostSelectorService.create(r.name, r.placeholder)
       )
     }
@@ -61,7 +61,7 @@ class HostSelectorController[F[_]: Effect](
   ))
   def deleteHostSelector = delete {
     pathPrefix("hostSelector" / Segment) { envName =>
-      completeFRes(hostSelectorService.delete(envName))
+      completeF(hostSelectorService.delete(envName))
     }
   }
 
@@ -77,7 +77,7 @@ class HostSelectorController[F[_]: Effect](
   ))
   def getHostSelector = get {
     pathPrefix("hostSelector" / Segment) { envName =>
-      completeFRes(hostSelectorService.get(envName))
+      completeF(hostSelectorService.get(envName))
     }
   }
 

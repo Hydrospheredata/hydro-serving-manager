@@ -49,7 +49,7 @@ class ModelController[F[_]: Effect](
   ))
   def getModel = pathPrefix("model" / LongNumber) { id =>
     get {
-      completeFRes {
+      completeF {
         modelManagementService.get(id)
       }
     }
@@ -70,10 +70,9 @@ class ModelController[F[_]: Effect](
       getFileWithMeta[F, ModelUploadMetadata, ModelVersion] {
         case (Some(file), Some(meta)) =>
           logger.info(s"Upload request path=$file, metadata=$meta")
-          modelManagementService.uploadModel(file, meta)
-            .map(x => x.right.map(_.startedVersion))
-        case (None, _) => Effect[F].pure(Left(InvalidRequest("Couldn't find a payload in request")))
-        case (_, None) => Effect[F].pure(Left(InvalidRequest("Couldn't find a metadata in request")))
+          modelManagementService.uploadModel(file, meta).map(x => x.started)
+        case (None, _) => Effect[F].raiseError(InvalidRequest("Couldn't find a payload in request"))
+        case (_, None) => Effect[F].raiseError(InvalidRequest("Couldn't find a metadata in request"))
       }
     }
   }
@@ -105,7 +104,7 @@ class ModelController[F[_]: Effect](
   ))
   def getModelVersions = path("model" / "version" / Segment / LongNumber) { (name, version) =>
     get {
-      completeFRes(
+      completeF(
         modelVersionManagementService.get(name, version)
       )
     }
@@ -122,7 +121,7 @@ class ModelController[F[_]: Effect](
   ))
   def deleteModel = pathPrefix("model" / LongNumber) { modelId =>
     delete {
-      completeFRes {
+      completeF {
         modelManagementService.deleteModel(modelId)
       }
     }

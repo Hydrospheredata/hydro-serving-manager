@@ -3,7 +3,10 @@ package io.hydrosphere.serving.manager.infrastructure.db.repository
 import cats.effect.Async
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.db.Tables
+import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application._
+import io.hydrosphere.serving.manager.domain.application.graph.ExecutionGraphAdapter
+import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.infrastructure.db.DatabaseService
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import io.hydrosphere.serving.manager.util.AsyncUtil
@@ -21,22 +24,24 @@ class DBApplicationRepository[F[_]: Async](
   import databaseService._
   import databaseService.driver.api._
 
-  override def create(entity: Application): F[Application] = AsyncUtil.futureAsync {
-    db.run(
-      Tables.Application returning Tables.Application += Tables.ApplicationRow(
-        id = entity.id,
-        applicationName = entity.name,
-        namespace = entity.namespace,
-        status = entity.status.toString,
-        applicationContract = entity.signature.toProtoString,
-        executionGraph = entity.executionGraph.toJson.toString(),
-        servablesInStage = entity.executionGraph.stages.flatMap(s => s.modelVariants.map(_.modelVersion.id.toString)).toList,
-        kafkaStreams = entity.kafkaStreaming.map(p => p.toJson.toString()).toList
-      )
-    ).map(s => mapFromDb(s))
+  override def create(entity: GenericApplication): F[GenericApplication] = AsyncUtil.futureAsync {
+    val status = flatten(entity)
+    val elem = Tables.ApplicationRow(
+      id = entity.id,
+      applicationName = entity.name,
+      namespace = entity.namespace,
+      status = status.status,
+      applicationContract = entity.signature.toProtoString,
+      executionGraph = status.graph.toJson.compactPrint,
+      usedServables = List.empty,
+      kafkaStreams = entity.kafkaStreaming.map(p => p.toJson.toString()),
+      statusMessage = status.message
+    )
+    db.run(Tables.Application returning Tables.Application += elem)
+      .map(s => mapFromDb(s))
   }
 
-  override def get(id: Long): F[Option[Application]] = AsyncUtil.futureAsync {
+  override def get(id: Long): F[Option[GenericApplication]] = AsyncUtil.futureAsync {
     db.run(
       Tables.Application
         .filter(_.id === id)
@@ -52,56 +57,58 @@ class DBApplicationRepository[F[_]: Async](
     )
   }
 
-  override def all(): F[Seq[Application]] = AsyncUtil.futureAsync {
+  override def all(): F[List[GenericApplication]] = AsyncUtil.futureAsync {
     db.run(
       Tables.Application
         .result
-    ).map(s => s.map(ss => mapFromDb(ss)))
+    ).map(s => s.map(ss => mapFromDb(ss)).toList)
   }
 
-  override def update(value: Application): F[Int] = AsyncUtil.futureAsync {
+  override def update(value: GenericApplication): F[Int] = AsyncUtil.futureAsync {
     val query = for {
       serv <- Tables.Application if serv.id === value.id
     } yield (
       serv.applicationName,
       serv.executionGraph,
-      serv.servablesInStage,
+      serv.usedServables,
       serv.kafkaStreams,
       serv.namespace,
       serv.applicationContract,
-      serv.status
+      serv.status,
+      serv.statusMessage
     )
-
+    val status = flatten(value)
     db.run(query.update((
       value.name,
-      value.executionGraph.toJson.toString(),
-      value.executionGraph.stages.flatMap(s => s.modelVariants.map(_.modelVersion.id.toString)).toList,
-      value.kafkaStreaming.map(_.toJson.toString).toList,
+      status.graph.toJson.compactPrint,
+      List.empty,
+      value.kafkaStreaming.map(_.toJson.toString),
       value.namespace,
       value.signature.toProtoString,
-      value.status.toString
+      status.status,
+      status.message
     )))
   }
 
-  override def applicationsWithCommonServices(versionIdx: Set[Long], applicationId: Long): F[Seq[Application]] = AsyncUtil.futureAsync {
+  override def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): F[Seq[GenericApplication]] = AsyncUtil.futureAsync {
     db.run(
       Tables.Application
         .filter { p =>
-          p.servablesInStage @> versionIdx.map(_.toString).toList && p.id =!= applicationId
+          p.usedServables @> servables.map(_.fullName).toList && p.id =!= applicationId
         }
         .result
     ).map(s => s.map(mapFromDb))
   }
 
-  override def findVersionsUsage(versionIdx: Long): F[Seq[Application]] = AsyncUtil.futureAsync {
+  override def findVersionsUsage(versionIdx: Long): F[Seq[GenericApplication]] = AsyncUtil.futureAsync {
     db.run {
       Tables.Application
-        .filter(a => a.servablesInStage @> List(versionIdx.toString))
+        .filter(a => a.usedServables @> List(versionIdx.toString))
         .result
     }.map(_.map(mapFromDb))
   }
 
-  override def get(name: String): F[Option[Application]] = AsyncUtil.futureAsync {
+  override def get(name: String): F[Option[GenericApplication]] = AsyncUtil.futureAsync {
     db.run(
       Tables.Application
         .filter(_.applicationName === name)
@@ -114,18 +121,30 @@ object DBApplicationRepository extends CompleteJsonProtocol {
 
   import spray.json._
 
-  def mapFromDb(dbType: Option[Tables.Application#TableElementType]): Option[Application] =
+  def mapFromDb(dbType: Option[Tables.Application#TableElementType]): Option[GenericApplication] =
     dbType.map(r => mapFromDb(r))
 
-  def mapFromDb(dbType: Tables.Application#TableElementType): Application = {
+  def mapFromDb(dbType: Tables.Application#TableElementType): GenericApplication = {
     Application(
       id = dbType.id,
       name = dbType.applicationName,
-      executionGraph = dbType.executionGraph.parseJson.convertTo[ApplicationExecutionGraph],
       signature = ModelSignature.fromAscii(dbType.applicationContract),
       kafkaStreaming = dbType.kafkaStreams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
       namespace = dbType.namespace,
-      status = ApplicationStatus.withName(dbType.status)
+      status = dbType.executionGraph.parseJson.convertTo[Application.Status]
     )
+  }
+
+  case class FlattenedStatus(status: String, message: Option[String], graph: ExecutionGraphAdapter)
+
+  def flatten(app: GenericApplication) = {
+    app.status match {
+      case Application.Assembling(versionGraph) =>
+        FlattenedStatus("Assembling", None, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
+      case Application.Failed(versionGraph, reason) =>
+        FlattenedStatus("Failed", reason, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
+      case Application.Ready(servableGraph) =>
+        FlattenedStatus("Ready", None, ExecutionGraphAdapter.fromServablePipeline(servableGraph))
+    }
   }
 }

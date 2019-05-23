@@ -7,25 +7,26 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusC
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
-import cats.effect.Effect
+import cats.effect.{Async, Effect}
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import io.hydrosphere.serving.BuildInfo
 import io.hydrosphere.serving.manager.api.http.controller.host_selector.HostSelectorController
 import io.hydrosphere.serving.manager.api.http.controller.{AkkaHttpControllerDsl, ApplicationController, SwaggerDocController}
-import io.hydrosphere.serving.manager.{ManagerRepositories, ManagerServices}
+import io.hydrosphere.serving.manager.{Repositories, Services}
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelController
 import org.apache.logging.log4j.scala.Logging
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+import io.hydrosphere.serving.manager.util.AsyncUtil
 import spray.json._
 
 import scala.collection.immutable.Seq
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpApiServer[F[_]: Effect](
-  managerRepositories: ManagerRepositories[F],
-  managerServices: ManagerServices[F],
+  managerRepositories: Repositories[F],
+  managerServices: Services[F],
   managerConfiguration: ManagerConfiguration
 )(
   implicit val system: ActorSystem,
@@ -70,14 +71,18 @@ class HttpApiServer[F[_]: Effect](
   def routes: Route = CorsDirectives.cors(
     CorsSettings.defaultSettings.copy(allowedMethods = Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))
   ) {
-    pathPrefix("health") { complete("OK") } ~
-    pathPrefix("api") {
-      controllerRoutes ~
-        pathPrefix("buildinfo") { complete(HttpResponse(
-          status = StatusCodes.OK,
-          entity = HttpEntity(ContentTypes.`application/json`, BuildInfo.toJson)
-        ))}
-    } ~ pathPrefix("swagger") {
+    pathPrefix("health") {
+      complete("OK")
+    } ~
+      pathPrefix("api") {
+        controllerRoutes ~
+          pathPrefix("buildinfo") {
+            complete(HttpResponse(
+              status = StatusCodes.OK,
+              entity = HttpEntity(ContentTypes.`application/json`, BuildInfo.toJson)
+            ))
+          }
+      } ~ pathPrefix("swagger") {
       path(Segments) { segs =>
         val path = segs.mkString("/")
         getFromResource(s"swagger/$path")
@@ -85,7 +90,7 @@ class HttpApiServer[F[_]: Effect](
     }
   }
 
-  def start(): Future[Http.ServerBinding] = {
+  def start(): F[Http.ServerBinding] = AsyncUtil.futureAsync {
     Http().bindAndHandle(routes, "0.0.0.0", managerConfiguration.application.port)
   }
 }

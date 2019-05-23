@@ -6,7 +6,6 @@ import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContai
 import com.spotify.docker.client.messages._
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.domain.servable.Servable
 
 import scala.collection.JavaConverters._
 import scala.util.Try
@@ -19,7 +18,7 @@ class DockerDriver[F[_]](
   
   import DockerDriver._
   
-  override def instances: F[List[Servable]] = {
+  override def instances: F[List[CloudInstance]] = {
     client.listContainers.map(all => {
       all.map(containerToInstance).collect({ case Some(v) => v })
     })
@@ -32,14 +31,14 @@ class DockerDriver[F[_]](
     client.listContainers(query).map(_.headOption)
   }
   
-  override def instance(name: String): F[Option[Servable]] =
+  override def instance(name: String): F[Option[CloudInstance]] =
     containerOf(name).map(_.flatMap(containerToInstance))
   
   override def run(
     name: String,
     modelVersionId: Long,
     image: DockerImage
-  ): F[Servable] = {
+  ): F[CloudInstance] = {
     val container = Internals.mkContainerConfig(name, modelVersionId, image, config)
     for {
       creation <- client.createContainer(container, None)
@@ -53,7 +52,7 @@ class DockerDriver[F[_]](
             case None => ""
           }
           val msg = s"Running docker container for $name (${creation.id()}) failed. Warnings: \n $warnings"
-          F.raiseError(new RuntimeException(msg))
+          F.raiseError[CloudInstance](new RuntimeException(msg))
       }
     } yield out
   }
@@ -68,12 +67,12 @@ class DockerDriver[F[_]](
             RemoveContainerParam.removeVolumes(true),
           )
           client.removeContainer(c.id, params)
-        case None => F.raiseError(new Exception(s"Could not find container for $name"))
+        case None => F.raiseError[Unit](new Exception(s"Could not find container for $name"))
       }
     } yield ()
   }
   
-  private def containerToInstance(c: Container): Option[Servable] = {
+  private def containerToInstance(c: Container): Option[CloudInstance] = {
     val labels = c.labels().asScala
   
     val mName = labels.get(CloudDriver.Labels.ServiceName)
@@ -81,8 +80,8 @@ class DockerDriver[F[_]](
   
     (mName, mMvId).mapN((name, mvId) => {
       val host = Internals.extractIpAddress(c.networkSettings(), config.networkName)
-      val status = Servable.Status.Running(host, DefaultConstants.DEFAULT_APP_PORT)
-      Servable(mvId, name, status)
+      val status = CloudInstance.Status.Running(host, DefaultConstants.DEFAULT_APP_PORT)
+      CloudInstance(mvId, name, status)
     })
   }
 }

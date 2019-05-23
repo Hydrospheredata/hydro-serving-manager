@@ -15,7 +15,8 @@ import io.hydrosphere.serving.manager._
 import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
-import io.hydrosphere.serving.manager.discovery.{DiscoveryHub, ObservedDiscoveryHub}
+import io.hydrosphere.serving.manager.discovery.ObservedDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.application.{ApplicationDiscoveryHub, ObservedApplicationDiscoveryHub}
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
@@ -55,19 +56,19 @@ trait FullIntegrationSpec extends DatabaseAccessIT
 
   def configuration = originalConfiguration.right.get
 
-  var managerRepositories: ManagerRepositories[IO] = _
+  var managerRepositories: Repositories[IO] = _
   var cloudDriver: CloudDriver[IO] = _
-  var managerServices: ManagerServices[IO] = _
-  var discoveryHub: ObservedDiscoveryHub[IO] = _
+  var managerServices: Services[IO] = _
+  var discoveryHub: ObservedApplicationDiscoveryHub[IO] = _
   var managerApi: HttpApiServer[IO] = _
   var managerGRPC: Server = _
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     cloudDriver = CloudDriver.fromConfig[IO](configuration.cloudDriver, configuration.dockerRepository)
-    managerRepositories = new ManagerRepositories[IO](configuration)
+    managerRepositories = new Repositories[IO](configuration)
     val discoveryHubIO = for {
-      observed <- DiscoveryHub.observed[IO]
+      observed <- ApplicationDiscoveryHub.observed[IO]
       instances <- cloudDriver.instances
       apps <- managerRepositories.applicationRepository.all()
       _ <- IO(logger.info(s"$instances"))
@@ -84,7 +85,7 @@ trait FullIntegrationSpec extends DatabaseAccessIT
 
     discoveryHub = discoveryHubIO.unsafeRunSync()
 
-    managerServices = new ManagerServices[IO](
+    managerServices = new Services[IO](
       discoveryHub,
       managerRepositories,
       configuration,
@@ -92,7 +93,7 @@ trait FullIntegrationSpec extends DatabaseAccessIT
       DockerClientConfig(),
       cloudDriver
     )
-    managerRepositories = new ManagerRepositories(configuration)
+    managerRepositories = new Repositories(configuration)
     managerApi = new HttpApiServer(managerRepositories, managerServices, configuration)
     managerGRPC = GrpcApiServer[IO](managerRepositories, managerServices, configuration, discoveryHub)
     managerApi.start()

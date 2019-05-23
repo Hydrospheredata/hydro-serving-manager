@@ -51,13 +51,6 @@ private[keras] object ModelConfigParser extends Logging {
     }
   }
 
-  //  case class JsonFile(jsonPath: Path) extends ModelConfigParser {
-  //    def importModel: Option[ModelMetadata] = {
-  //      val jsonModelConfig = Source.fromFile(jsonPath.toFile).mkString
-  //      JsonString(jsonModelConfig, jsonPath.toString, "unknown").importModel
-  //    }
-  //  }
-
   case class JsonString[F[_] : Monad](modelConfigJson: String, name: String, version: String) extends ModelConfigParser[F] {
 
     import spray.json._

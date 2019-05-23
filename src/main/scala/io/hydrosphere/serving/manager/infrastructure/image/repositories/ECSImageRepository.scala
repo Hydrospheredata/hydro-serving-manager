@@ -8,7 +8,7 @@ import com.amazonaws.services.ecr.{AmazonECR, AmazonECRClientBuilder}
 import com.spotify.docker.client.{DockerClient, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerRepositoryConfiguration
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
-import io.hydrosphere.serving.manager.util.docker.{DockerClientHelper, DockerRegistryAuth}
+import io.hydrosphere.serving.manager.infrastructure.docker.{DockerClientHelper, DockerRegistryAuth}
 
 class ECSImageRepository[F[_]: Sync](
   dockerClient: DockerClient,

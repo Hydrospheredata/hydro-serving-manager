@@ -21,7 +21,7 @@ case class ModelVersionMetadata(
 )
 
 object ModelVersionMetadata {
-  def combineMetadata(fetcherResult: Option[FetcherResult], upload: ModelUploadMetadata, hs: Option[HostSelector]) = {
+  def combineMetadata(fetcherResult: Option[FetcherResult], upload: ModelUploadMetadata, hs: Option[HostSelector]): ModelVersionMetadata = {
     val contract = upload.contract
       .orElse(fetcherResult.map(_.modelContract))
       .getOrElse(ModelContract.defaultInstance)

@@ -9,11 +9,14 @@ import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent.{AppRemoved, AppStarted}
-import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent, DiscoveryHub}
+import io.hydrosphere.serving.manager.discovery.DiscoveryHub
+import io.hydrosphere.serving.manager.discovery.application.{ApplicationEvent, ApplicationDiscoveryHub}
+import io.hydrosphere.serving.manager.domain.application.graph.{ModelVersion, ModelVersionGraph, PipelineStage}
+import io.hydrosphere.serving.manager.domain.application.requests.{CreateApplicationRequest, ExecutionGraphRequest, ModelVariantRequest, PipelineStageRequest, UpdateApplicationRequest}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
+import io.hydrosphere.serving.manager.domain.servable.{GenericServable, ServableService}
 import io.hydrosphere.serving.manager.grpc.entities.ServingApp
 import io.hydrosphere.serving.tensorflow.types.DataType
 import org.mockito.Matchers
@@ -58,9 +61,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
             namespace = None,
             status = ApplicationStatus.Assembling,
             signature = signature.copy(signatureName = "test"),
-            executionGraph = ApplicationExecutionGraph(Seq(
+            executionGraph = ModelVersionGraph(Seq(
               PipelineStage(Seq(
-                ModelVariant(modelVersion, 100)
+                ModelVersion(modelVersion, 100)
               ), signature)
             )),
             kafkaStreaming = List.empty
@@ -70,16 +73,16 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         when(versionRepo.get(Seq(1L))).thenReturn(IO(Seq(modelVersion)))
         val servableService = new ServableService[IO] {
-          override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[Servable] = {
+          override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[GenericServable] = {
             IO.pure(
-              Servable(1, name + modelVersionId.toString, Servable.Status.Starting)
+              Servable(1, name + modelVersionId.toString, GenericServable.Status.Starting)
             )
           }
 
           override def stop(name: String): IO[Unit] = ???
         }
 
-        val discoveryHub = mock[DiscoveryHub[IO]]
+        val discoveryHub = mock[ApplicationDiscoveryHub[IO]]
         val applicationService = ApplicationService[IO](
           appRepo,
           versionRepo,
@@ -115,9 +118,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
             namespace = None,
             status = ApplicationStatus.Assembling,
             signature = signature.copy(signatureName = "test"),
-            executionGraph = ApplicationExecutionGraph(Seq(
+            executionGraph = ModelVersionGraph(Seq(
               PipelineStage(Seq(
-                ModelVariant(modelVersion, 100)
+                ModelVersion(modelVersion, 100)
               ), signature)
             )),
             kafkaStreaming = List.empty
@@ -129,12 +132,12 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           override def stop(name: String): IO[Unit] = ???
 
-          override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[Servable] = {
+          override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[GenericServable] = {
             IO.raiseError(new RuntimeException("Test error"))
           }
         }
 
-        val discoveryHub = mock[DiscoveryHub[IO]]
+        val discoveryHub = mock[ApplicationDiscoveryHub[IO]]
         val applicationService = ApplicationService(
           appRepo,
           versionRepo,
@@ -170,9 +173,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
             namespace = None,
             status = ApplicationStatus.Assembling,
             signature = signature.copy(signatureName = "test"),
-            executionGraph = ApplicationExecutionGraph(Seq(
+            executionGraph = ModelVersionGraph(Seq(
               PipelineStage(Seq(
-                ModelVariant(modelVersion, 100)
+                ModelVersion(modelVersion, 100)
               ), signature)
             )),
             kafkaStreaming = List.empty
@@ -184,18 +187,18 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           override def stop(name: String): IO[Unit] = ???
 
-          override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[Servable] = IO.pure {
+          override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[GenericServable] = IO.pure {
             Servable(
               modelVersionId = modelVersionId,
-              serviceName = name + modelVersionId,
-              status = Servable.Status.Running("imaginaryhost", 6969)
+              nameSuffix = name + modelVersionId,
+              status = GenericServable.Status.Running("imaginaryhost", 6969)
             )
           }
         }
 
         val appChanged = ListBuffer.empty[ServingApp]
-        val discoveryHub = new DiscoveryHub[IO] {
-          override def update(e: DiscoveryEvent): IO[Unit] = e match {
+        val discoveryHub = new ApplicationDiscoveryHub[IO] {
+          override def update(e: ApplicationEvent): IO[Unit] = e match {
             case AppStarted(app) => IO(appChanged += app)
             case _ => IO.unit
           }
@@ -235,9 +238,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
           namespace = None,
           status = ApplicationStatus.Assembling,
           signature = signature.copy(signatureName = "test"),
-          executionGraph = ApplicationExecutionGraph(Seq(
+          executionGraph = ModelVersionGraph(Seq(
             PipelineStage(Seq(
-              ModelVariant(modelVersion, 100)
+              ModelVersion(modelVersion, 100)
             ), signature)
           )),
           kafkaStreaming = List.empty
@@ -259,9 +262,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(versionRepo.get(Matchers.any[Seq[Long]]())).thenReturn(IO(Seq(modelVersion)))
 
         val servableService = new ServableService[IO] {
-          override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[Servable] = {
+          override def deploy(name: String, modelVersionId: Long, image: DockerImage): IO[GenericServable] = {
             IO.pure(
-              Servable(1, name + modelVersionId.toString, Servable.Status.Starting)
+              Servable(1, name + modelVersionId.toString, GenericServable.Status.Starting)
             )
           }
 
@@ -269,8 +272,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
         }
 
         val apps = ListBuffer.empty[ServingApp]
-        val eventPublisher = new DiscoveryHub[IO] {
-          override def update(e: DiscoveryEvent): IO[Unit] = e match {
+        val eventPublisher = new ApplicationDiscoveryHub[IO] {
+          override def update(e: ApplicationEvent): IO[Unit] = e match {
             case AppStarted(app) => IO(apps += app)
             case AppRemoved(id) => IO(apps --= apps.filter(_.id == id.toString))
           }
