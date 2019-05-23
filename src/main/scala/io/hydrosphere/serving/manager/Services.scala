@@ -62,9 +62,9 @@ class Services[F[_]: ConcurrentEffect](
 
   val imageRepository: ImageRepository[F] = ImageRepository.fromConfig(dockerClient, progressHandler, managerConfiguration.dockerRepository)
 
-  val hostSelectorService: HostSelectorService[F] = HostSelectorService[F](managerRepositories.hostSelectorRepository)
+  implicit val hostSelectorService: HostSelectorService[F] = HostSelectorService[F](managerRepositories.hostSelectorRepository)
 
-  val versionService: ModelVersionService[F] = ModelVersionService[F](
+  implicit val versionService: ModelVersionService[F] = ModelVersionService[F](
     modelVersionRepository = managerRepositories.modelVersionRepository,
     applicationRepo = managerRepositories.applicationRepository,
   )
@@ -81,7 +81,7 @@ class Services[F[_]: ConcurrentEffect](
 
   val servableMonitor: ServableMonitor[F] = ServableMonitor.default[F](predictionCtor, cloudDriverService)
 
-  val servableService: ServableService[F] = ServableService[F](
+  implicit val servableService: ServableService[F] = ServableService[F](
     cloudDriverService,
     managerRepositories.servableRepository,
     nameGen,
@@ -91,7 +91,7 @@ class Services[F[_]: ConcurrentEffect](
 
   val graphComposer = VersionGraphComposer.apply
 
-  val appService: ApplicationService[F] = ApplicationService[F](
+  implicit val appService: ApplicationService[F] = ApplicationService[F](
     applicationRepository = managerRepositories.applicationRepository,
     versionRepository = managerRepositories.modelVersionRepository,
     servableService = servableService,
@@ -99,7 +99,7 @@ class Services[F[_]: ConcurrentEffect](
     graphComposer
   )
 
-  val modelService: ModelService[F] = ModelService[F](
+  implicit val modelService: ModelService[F] = ModelService[F](
     modelRepository = managerRepositories.modelRepository,
     modelVersionService = versionService,
     modelVersionRepository = managerRepositories.modelVersionRepository,

@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager.api.http.controller
 
-import akka.http.scaladsl.server.Directives._
 import cats.effect.Effect
 import cats.syntax.functor._
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
@@ -11,8 +10,8 @@ import javax.ws.rs.Path
 
 @Path("/api/v2/application")
 @Api(produces = "application/json", tags = Array("Application"))
-class ApplicationController[F[_]: Effect](
-  appService: ApplicationService[F],
+class ApplicationController[F[_]: Effect]()(
+  implicit appService: ApplicationService[F],
   appRepository: ApplicationRepository[F]
 ) extends AkkaHttpControllerDsl {
 

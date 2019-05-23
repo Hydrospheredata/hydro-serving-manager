@@ -1,7 +1,6 @@
 package io.hydrosphere.serving.manager.api.http.controller.model
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import cats.effect.Effect
@@ -16,13 +15,12 @@ import javax.ws.rs.Path
 
 @Path("/api/v2/model")
 @Api(produces = "application/json", tags = Array("Model and Model Versions"))
-class ModelController[F[_]: Effect](
-  modelManagementService: ModelService[F],
+class ModelController[F[_]: Effect]()(
+  implicit modelManagementService: ModelService[F],
   modelRepo: ModelRepository[F],
-  modelVersionManagementService: ModelVersionService[F]
-)(
-  implicit val system: ActorSystem,
-  val materializer: ActorMaterializer,
+  modelVersionManagementService: ModelVersionService[F],
+  system: ActorSystem,
+  materializer: ActorMaterializer,
 ) extends AkkaHttpControllerDsl {
   implicit val ec = system.dispatcher
 

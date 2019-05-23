@@ -4,8 +4,7 @@ import java.nio.file.{Files, Path}
 
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.http.scaladsl.server.{Directives, ExceptionHandler, Route}
 import akka.stream.Materializer
 import akka.stream.scaladsl.FileIO
 import cats.effect.Effect
@@ -21,7 +20,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Logging {
+trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Logging {
 
   import AkkaHttpControllerDsl._
 

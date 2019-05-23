@@ -11,10 +11,11 @@ import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.ExecutionContext
 
-class DBServableRepository[F[_]](modelVersionRepository: DBModelVersionRepository[F])(
+class DBServableRepository[F[_]](
   implicit F: Async[F],
   executionContext: ExecutionContext,
-  databaseService: DatabaseService
+  databaseService: DatabaseService,
+  modelVersionRepository: DBModelVersionRepository[F]
 ) extends ServableRepository[F] with Logging {
 
   import DBServableRepository._

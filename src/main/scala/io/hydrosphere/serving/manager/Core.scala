@@ -43,7 +43,7 @@ object Core extends Logging {
       apps <- repositories.applicationRepository.all()
       needToDiscover = apps.flatMap { app =>
         app.status match {
-          case _: Application.Ready => // TODO what about other apps?
+          case _: Application.Ready =>
             Internals.toServingApp(app.asInstanceOf[ReadyApp]) :: Nil
           case _ => Nil
         }

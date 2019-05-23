@@ -11,15 +11,15 @@ import scala.concurrent.ExecutionContext
 class Repositories[F[_]: Async](config: ManagerConfiguration)(implicit executionContext: ExecutionContext) {
   implicit val dataService: DatabaseService = new DatabaseService(parseDatabase(config.database))
 
-  val modelRepository = new DBModelRepository[F]
+  implicit val modelRepository = new DBModelRepository[F]
 
-  val modelVersionRepository = new DBModelVersionRepository[F]
+  implicit val modelVersionRepository = new DBModelVersionRepository[F]
 
-  val applicationRepository = new DBApplicationRepository[F]
+  implicit val applicationRepository = new DBApplicationRepository[F]
 
-  val hostSelectorRepository = new DBHostSelectorRepository[F]
+  implicit val hostSelectorRepository = new DBHostSelectorRepository[F]
 
-  val servableRepository = new DBServableRepository[F](modelVersionRepository)
+  implicit val servableRepository = new DBServableRepository[F]
 
   private def parseDatabase(hikariConfiguration: HikariConfiguration): HikariConfig = {
     val hikariConfig = new HikariConfig()
