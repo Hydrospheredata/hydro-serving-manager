@@ -24,6 +24,7 @@ import org.apache.logging.log4j.scala.Logging
 import spray.json.JsObject
 
 import scala.concurrent.ExecutionContext
+import cats.Monad
 
 trait ApplicationService[F[_]] {
   def generateInputs(name: String): F[JsObject]
@@ -61,10 +62,19 @@ object ApplicationService extends Logging {
               for {
                 version <- OptionT(versionRepository.get(m.modelVersionId))
                   .map(Variant(_, m.weight))
-                  .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find modelversion $m")))
+                  .getOrElseF(
+                    F.raiseError(
+                      DomainError
+                        .notFound(s"Can't find modelversion $m")
+                    )
+                  )
                 _ <- version.item.status match {
                   case ModelVersionStatus.Released => F.unit
-                  case x => F.raiseError[Unit](DomainError.invalidRequest(s"Can't deploy non-released ModelVersion: ${version.item.fullName} - $x"))
+                  case x =>
+                    F.raiseError[Unit](
+                      DomainError
+                        .invalidRequest(s"Can't deploy non-released ModelVersion: ${version.item.fullName} - $x")
+                    )
                 }
               } yield version
             }
@@ -72,21 +82,22 @@ object ApplicationService extends Logging {
         }
         graphOrError = graphComposer.compose(versions)
         graph <- F.fromEither(graphOrError)
-      } yield Application(
-        id = 0,
-        name = name,
-        namespace = namespace,
-        signature = graph.pipelineSignature,
-        kafkaStreaming = kafkaStreaming.getOrElse(List.empty),
-        status = Application.Assembling(graph.stages)
-      )
+      } yield
+        Application(
+          id = 0,
+          name = name,
+          namespace = namespace,
+          signature = graph.pipelineSignature,
+          kafkaStreaming = kafkaStreaming.getOrElse(List.empty),
+          status = Application.Assembling(graph.stages)
+        )
     }
 
     def generateInputs(name: String): F[JsObject] = {
       for {
-        app <- get(name)
+        app        <- get(name)
         tensorData <- F.delay(TensorExampleGenerator(app.signature).inputs)
-        jsonData <- F.delay(TensorJsonLens.mapToJson(tensorData))
+        jsonData   <- F.delay(TensorJsonLens.mapToJson(tensorData))
       } yield jsonData
     }
 
@@ -102,27 +113,33 @@ object ApplicationService extends Logging {
           } yield ExecutionNode(variants, stage.signature)
         }
         finishedApp = app.copy(status = Application.Ready(deployedServables))
-        translated = Internals.toServingApp(finishedApp)
+        translated  = Internals.toServingApp(finishedApp)
         _ <- discoveryHub.added(translated)
       } yield finishedApp.asRight[FailedApp]
 
       F.handleErrorWith(finished) { x =>
         for {
           _ <- F.delay(logger.error(s"ModelVersion deployment exception", x))
-        } yield app.copy(status = Application.Failed(app.status.versionGraph, Option(x.getMessage))).asLeft[ReadyApp]
+        } yield
+          app
+            .copy(
+              status = Application
+                .Failed(app.status.versionGraph, Option(x.getMessage))
+            )
+            .asLeft[ReadyApp]
       }
     }
 
-    def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
+    def create(req: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
       for {
-        composedApp <- composeApp(appRequest.name, appRequest.namespace, appRequest.executionGraph, appRequest.kafkaStreaming)
-        appId <- applicationRepository.create(composedApp.generic).map(_.id)
+        composedApp <- composeApp(req.name, req.namespace, req.executionGraph, req.kafkaStreaming)
+        appId       <- applicationRepository.create(composedApp.generic).map(_.id)
         app = composedApp.copy(id = appId)
         df <- Deferred[F, GenericApplication]
         _ <- (for {
           genericApp <- startServices(app).map {
             case Right(x) => x.generic
-            case Left(x) => x.generic
+            case Left(x)  => x.generic
           }
           _ <- applicationRepository.update(genericApp)
         } yield ()).start
@@ -132,8 +149,8 @@ object ApplicationService extends Logging {
     def delete(name: String): F[GenericApplication] = {
       for {
         app <- get(name)
-        _ <- discoveryHub.removed(app.id)
-        _ <- applicationRepository.delete(app.id)
+        _   <- discoveryHub.removed(app.id)
+        _   <- applicationRepository.delete(app.id)
         _ <- app.status match {
           case Application.Ready(graph) =>
             graph.traverse { s =>
@@ -141,7 +158,8 @@ object ApplicationService extends Logging {
                 servableService.stop(ss.item.generic.fullName)
               }.void
             }.void
-          case _ => F.unit // TODO do we need to delete servables that don't run?
+          case _ =>
+            F.unit // TODO do we need to delete servables that don't run?
         }
       } yield app
     }
@@ -149,7 +167,12 @@ object ApplicationService extends Logging {
     def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
       for {
         oldApplication <- OptionT(applicationRepository.get(appRequest.id))
-          .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find application id ${appRequest.id}")))
+          .getOrElseF(
+            F.raiseError(
+              DomainError
+                .notFound(s"Can't find application id ${appRequest.id}")
+            )
+          )
 
         _ <- delete(oldApplication.name)
 
@@ -168,11 +191,17 @@ object ApplicationService extends Logging {
       for {
         _ <- ApplicationValidator.name(name) match {
           case Some(_) => F.unit
-          case None => F.raiseError[Unit](InvalidRequest(s"Application name $name contains invalid symbols. It should only contain latin letters, numbers '-' and '_'"))
+          case None =>
+            F.raiseError[Unit](
+              InvalidRequest(
+                s"Application name $name contains invalid symbols. It should only contain latin letters, numbers '-' and '_'"
+              )
+            )
         }
         maybeApp <- applicationRepository.get(name)
         _ <- maybeApp match {
-          case Some(_) => F.raiseError[Unit](InvalidRequest(s"Application with name $name already exists"))
+          case Some(_) =>
+            F.raiseError[Unit](InvalidRequest(s"Application with name $name already exists"))
           case None => F.unit
         }
       } yield name
@@ -188,39 +217,35 @@ object ApplicationService extends Logging {
 
     import io.hydrosphere.serving.manager.grpc.entities.{Servable => GServable, Stage => GStage}
 
-    def toServingApp(
-      app: ReadyApp,
-    ): ServingApp = {
+    def toServingApp(app: ReadyApp): ServingApp = {
       val stages = toGStages(app)
 
-      val contract = ModelContract(
-        modelName = app.name,
-        predict = Some(app.signature)
-      )
+      val contract = ModelContract(modelName = app.name, predict = Some(app.signature))
 
-      ServingApp(
-        app.id.toString,
-        app.name,
-        contract.some,
-        stages.toList
-      )
+      ServingApp(app.id.toString, app.name, contract.some, stages.toList)
     }
 
-    def modelVersionToGrpcEntity(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion = grpc.entities.ModelVersion(
-      id = mv.id,
-      version = mv.modelVersion,
-      modelType = "",
-      status = mv.status.toString,
-      selector = mv.hostSelector.map(s => grpc.entities.HostSelector(s.id, s.name)),
-      model = Some(grpc.entities.Model(mv.model.id, mv.model.name)),
-      contract = Some(ModelContract(mv.modelContract.modelName, mv.modelContract.predict)),
-      image = Some(grpc.entities.DockerImage(mv.image.name, mv.image.tag)),
-      imageSha = mv.image.sha256.getOrElse(""),
-      runtime = Some(grpc.entities.DockerImage(mv.runtime.name, mv.runtime.tag))
-    )
+    def modelVersionToGrpcEntity(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion =
+      grpc.entities.ModelVersion(
+        id = mv.id,
+        version = mv.modelVersion,
+        modelType = "",
+        status = mv.status.toString,
+        selector = mv.hostSelector.map(s => grpc.entities.HostSelector(s.id, s.name)),
+        model = Some(grpc.entities.Model(mv.model.id, mv.model.name)),
+        contract = Some(ModelContract(mv.modelContract.modelName, mv.modelContract.predict)),
+        image = Some(grpc.entities.DockerImage(mv.image.name, mv.image.tag)),
+        imageSha = mv.image.sha256.getOrElse(""),
+        runtime = Some(grpc.entities.DockerImage(mv.runtime.name, mv.runtime.tag))
+      )
 
     def toGServable(mv: Variant[OkServable]): GServable = {
-      GServable(mv.item.status.host, mv.item.status.port, mv.weight, Some(modelVersionToGrpcEntity(mv.item.modelVersion)))
+      GServable(
+        mv.item.status.host,
+        mv.item.status.port,
+        mv.weight,
+        Some(modelVersionToGrpcEntity(mv.item.modelVersion))
+      )
     }
 
     def toGStages(app: ReadyApp): NonEmptyList[GStage] = {

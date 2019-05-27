@@ -36,11 +36,11 @@ object Core extends Logging {
     timer: Timer[F],
     rng: RNG[F]
   ): F[(HttpApiServer[F], Server)] = {
-    val cloudDriver = CloudDriver.fromConfig[F](config.cloudDriver, config.dockerRepository)
+    val cloudDriver  = CloudDriver.fromConfig[F](config.cloudDriver, config.dockerRepository)
     val repositories = new Repositories[F](config)
     val discoveryHubIO = for {
       observed <- ApplicationDiscoveryHub.observed[F]
-      apps <- repositories.applicationRepository.all()
+      apps     <- repositories.applicationRepository.all()
       needToDiscover = apps.flatMap { app =>
         app.status match {
           case _: Application.Ready =>
@@ -54,15 +54,7 @@ object Core extends Logging {
     for {
       dh <- discoveryHubIO
     } yield {
-      val services = new Services[F](
-        dh,
-        repositories,
-        config,
-        dockerClient,
-        dockerConfig,
-        cloudDriver,
-        predictionCtor
-      )
+      val services = new Services[F](dh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
 
       val httpApi = new HttpApiServer(repositories, services, config)
       val grpcApi = GrpcApiServer(repositories, services, config, dh)

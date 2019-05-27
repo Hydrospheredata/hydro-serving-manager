@@ -33,7 +33,6 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def all(): IO[Seq[ModelVersion]] = ???
           override def listForModel(modelId: Long): IO[Seq[ModelVersion]] = ???
           override def lastModelVersionByModel(modelId: Long, max: Int): IO[Seq[ModelVersion]] = ???
-          override def modelVersionsByModelVersionIds(modelVersionIds: Set[Long]): IO[Seq[ModelVersion]] = ???
         }
 
         val modelVersionMetadata = ModelVersionMetadata(
@@ -60,12 +59,11 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           }
         }
         val versionService = new ModelVersionService[IO] {
-          override def getNextModelVersion(modelId: Long): IO[Long] = IO.pure(1)
-          override def get(name: String, version: Long): IO[Either[DomainError, ModelVersion]] = ???
-          override def deleteVersions(mvs: Seq[ModelVersion]): IO[Seq[ModelVersion]] = ???
-          override def list: IO[Seq[ModelVersionView]] = ???
-          override def modelVersionsByModelVersionIds(modelIds: Set[Long]): IO[Seq[ModelVersion]] = ???
-          override def delete(versionId: Long): IO[Option[ModelVersion]] = ???
+          override def getNextModelVersion(modelId: Long) = IO.pure(1)
+          override def get(name: String, version: Long) = ???
+          override def deleteVersions(mvs: Seq[ModelVersion]) = ???
+          override def list = ???
+          override def delete(versionId: Long) = ???
         }
 
         val mfs = ModelFileStructure(
@@ -97,8 +95,8 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         )
         for {
           stateful <- builder.build(model, modelVersionMetadata, mfs)
-          startedBuild = stateful.startedVersion
-          completedBuild <- stateful.completedVersion.get
+          startedBuild = stateful.started
+          completedBuild <- stateful.completed.get
         } yield {
           assert(startedBuild.model.name === "push-me")
           assert(startedBuild.modelVersion === 1)

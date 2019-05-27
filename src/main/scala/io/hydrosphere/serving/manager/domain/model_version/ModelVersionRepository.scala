@@ -18,6 +18,4 @@ trait ModelVersionRepository[F[_]] {
   def listForModel(modelId: Long): F[Seq[ModelVersion]]
 
   def lastModelVersionByModel(modelId: Long, max: Int): F[Seq[ModelVersion]]
-
-  def modelVersionsByModelVersionIds(modelVersionIds: Set[Long]): F[Seq[ModelVersion]]
 }

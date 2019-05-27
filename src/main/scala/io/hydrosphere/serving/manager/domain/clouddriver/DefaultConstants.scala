@@ -97,7 +97,6 @@ object DefaultConstants {
 
   def getModelLabels(service: GenericServable): Map[String, String] = {
     Map[String, String](
-//      LABEL_SERVICE_ID -> service.id.toString,
       LABEL_SERVICE_NAME -> service.nameSuffix,
       LABEL_HS_SERVICE_MARKER -> LABEL_HS_SERVICE_MARKER,
       DefaultConstants.LABEL_DEPLOYMENT_TYPE -> DefaultConstants.DEPLOYMENT_TYPE_MODEL
@@ -106,7 +105,6 @@ object DefaultConstants {
 
   def getRuntimeLabels(service: GenericServable): Map[String, String] =
     Map[String, String](
-//      LABEL_SERVICE_ID -> service.id.toString,
       LABEL_HS_SERVICE_MARKER -> LABEL_HS_SERVICE_MARKER,
       DefaultConstants.LABEL_DEPLOYMENT_TYPE -> DefaultConstants.DEPLOYMENT_TYPE_APP
     )

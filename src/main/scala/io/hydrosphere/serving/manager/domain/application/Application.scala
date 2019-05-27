@@ -28,9 +28,8 @@ object Application {
 
   case class Ready(stages: NonEmptyList[ExecutionNode]) extends Status
 
-
   type AssemblingApp = Application[Assembling]
-  type FailedApp = Application[Failed]
-  type ReadyApp = Application[Ready]
+  type FailedApp     = Application[Failed]
+  type ReadyApp      = Application[Ready]
 
 }

@@ -27,7 +27,6 @@ object ServableService extends Logging {
     servableRepository: ServableRepository[F],
     versionRepository: ModelVersionRepository[F],
     nameGenerator: NameGenerator[F],
-    clientCtor: PredictionClient.Factory[F],
     monitor: ServableMonitor[F]
   )(implicit F: Sync[F], timer: Timer[F]): ServableService[F] = new ServableService[F] {
 

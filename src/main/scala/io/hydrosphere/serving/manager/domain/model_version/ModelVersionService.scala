@@ -19,8 +19,6 @@ trait ModelVersionService[F[_]] {
 
   def list: F[Seq[ModelVersionView]]
 
-  def modelVersionsByModelVersionIds(modelIds: Set[Long]): F[Seq[ModelVersion]]
-
   def delete(versionId: Long): F[Option[ModelVersion]]
 }
 
@@ -51,10 +49,6 @@ object ModelVersionService {
           ModelVersionView.fromVersion(v, usageMap.getOrElse(v.id, Seq.empty))
         }
       }
-    }
-
-    def modelVersionsByModelVersionIds(modelIds: Set[Long]): F[Seq[ModelVersion]] = {
-      modelVersionRepository.modelVersionsByModelVersionIds(modelIds)
     }
 
     def delete(versionId: Long): F[Option[ModelVersion]] = {

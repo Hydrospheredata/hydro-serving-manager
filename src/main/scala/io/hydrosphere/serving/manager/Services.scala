@@ -35,18 +35,18 @@ class Services[F[_]: ConcurrentEffect](
   val cloudDriverService: CloudDriver[F],
   val predictionCtor: PredictionClient.Factory[F]
 )(
-  implicit val ex: ExecutionContext,
-  implicit val system: ActorSystem,
-  implicit val materializer: ActorMaterializer,
-  implicit val timeout: Timeout,
-  implicit val timer: Timer[F],
-  implicit val rng: RNG[F]
+  implicit ex: ExecutionContext,
+  system: ActorSystem,
+  materializer: ActorMaterializer,
+  timeout: Timeout,
+  timer: Timer[F],
+  rng: RNG[F]
 ) extends Logging {
 
   val progressHandler: ProgressHandler = InfoProgressHandler
 
   val nameGen: NameGenerator[F] = NameGenerator.haiku()
-  
+
   val storageOps: LocalStorageOps[F] = StorageOps.default
 
   val modelStorage: ModelUnpacker[F] = ModelUnpacker[F](storageOps)
@@ -60,13 +60,15 @@ class Services[F[_]: ConcurrentEffect](
     progressHandler = progressHandler
   )
 
-  val imageRepository: ImageRepository[F] = ImageRepository.fromConfig(dockerClient, progressHandler, managerConfiguration.dockerRepository)
+  val imageRepository: ImageRepository[F] =
+    ImageRepository.fromConfig(dockerClient, progressHandler, managerConfiguration.dockerRepository)
 
-  implicit val hostSelectorService: HostSelectorService[F] = HostSelectorService[F](managerRepositories.hostSelectorRepository)
+  implicit val hostSelectorService: HostSelectorService[F] =
+    HostSelectorService[F](managerRepositories.hostSelectorRepository)
 
   implicit val versionService: ModelVersionService[F] = ModelVersionService[F](
     modelVersionRepository = managerRepositories.modelVersionRepository,
-    applicationRepo = managerRepositories.applicationRepository,
+    applicationRepo = managerRepositories.applicationRepository
   )
 
   val versionBuilder = ModelVersionBuilder(
@@ -84,8 +86,8 @@ class Services[F[_]: ConcurrentEffect](
   implicit val servableService: ServableService[F] = ServableService[F](
     cloudDriverService,
     managerRepositories.servableRepository,
+    managerRepositories.modelVersionRepository,
     nameGen,
-    predictionCtor,
     servableMonitor
   )
 

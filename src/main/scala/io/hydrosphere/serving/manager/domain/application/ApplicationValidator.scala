@@ -8,6 +8,7 @@ import io.hydrosphere.serving.model.api.MergeError
 import io.hydrosphere.serving.model.api.ops.ModelSignatureOps
 
 object ApplicationValidator {
+
   /**
     * Check if name matches with  `[a-zA-Z\-_\d]+` regexp
     *
@@ -33,19 +34,22 @@ object ApplicationValidator {
     if (modelVariants.isEmpty) {
       Left(DomainError.invalidRequest("Invalid application: no stages in the graph."))
     } else {
-      val signatures = modelVariants.map(_.modelContract.predict.get)  // FIXME predict signature must be in the contract
+      val signatures    = modelVariants.map(_.modelContract.predict.get) // FIXME predict signature must be in the contract
       val signatureName = signatures.head.signatureName
-      val isSameName = signatures.forall(_.signatureName == signatureName)
+      val isSameName    = signatures.forall(_.signatureName == signatureName)
       if (isSameName) {
         val res = signatures.foldRight(Either.right[Seq[MergeError], ModelSignature](ModelSignature.defaultInstance)) {
           case (sig, Right(acc)) => ModelSignatureOps.merge(sig, acc)
-          case (_, x) => x
+          case (_, x)            => x
         }
-        res
-          .right.map(_.withSignatureName(signatureName))
-          .left.map(x => DomainError.invalidRequest(s"Errors while merging signatures: $x"))
+        res.right
+          .map(_.withSignatureName(signatureName))
+          .left
+          .map(x => DomainError.invalidRequest(s"Errors while merging signatures: $x"))
       } else {
-        Left(DomainError.invalidRequest(s"Model Versions ${modelVariants.map(_.fullName)} have different signature names"))
+        Left(
+          DomainError.invalidRequest(s"Model Versions ${modelVariants.map(_.fullName)} have different signature names")
+        )
       }
     }
   }

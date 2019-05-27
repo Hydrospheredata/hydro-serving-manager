@@ -26,9 +26,9 @@ class HttpApiServer[F[_]: Effect](
   managerServices: Services[F],
   managerConfiguration: ManagerConfiguration
 )(
-  implicit val system: ActorSystem,
-  implicit val materializer: ActorMaterializer,
-  implicit val ec: ExecutionContext
+  implicit system: ActorSystem,
+  materializer: ActorMaterializer,
+  ec: ExecutionContext
 ) extends AkkaHttpControllerDsl {
 
   import managerRepositories._
