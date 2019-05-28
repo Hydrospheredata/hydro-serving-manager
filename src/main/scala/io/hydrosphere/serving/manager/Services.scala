@@ -24,6 +24,7 @@ import io.hydrosphere.serving.manager.util.docker.InfoProgressHandler
 import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
 import org.apache.logging.log4j.scala.Logging
 
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 
 class Services[F[_]: ConcurrentEffect](
@@ -81,7 +82,7 @@ class Services[F[_]: ConcurrentEffect](
 
   logger.info(s"Using ${cloudDriverService.getClass} cloud driver")
 
-  val servableMonitor: ServableMonitor[F] = ServableMonitor.default[F](predictionCtor, cloudDriverService)
+  val servableMonitor: ServableMonitor[F] = ServableMonitor.default[F](predictionCtor, cloudDriverService, 2.seconds, 1.minute, 15.seconds)
 
   implicit val servableService: ServableService[F] = ServableService[F](
     cloudDriverService,

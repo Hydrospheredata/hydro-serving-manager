@@ -68,7 +68,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
 
   implicit val servingSF  = jsonFormat3(Servable.Serving)
   implicit val servingNSF = jsonFormat3(Servable.NotServing)
-  implicit val servingNAF = jsonFormat1(Servable.NotAvailable)
+  implicit val servingNAF = jsonFormat3(Servable.NotAvailable)
   implicit val servingUF  = jsonFormat3(Servable.Unknown)
 
   implicit val servableStatusFormat = new RootJsonFormat[Servable.Status] {

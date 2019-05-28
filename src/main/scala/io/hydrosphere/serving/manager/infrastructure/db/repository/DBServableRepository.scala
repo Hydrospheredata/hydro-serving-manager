@@ -31,7 +31,7 @@ class DBServableRepository[F[_]](
         case Servable.Serving(msg, h, p) => ("Serving", msg, h.some, p.some)
         case Servable.NotServing(msg, h, p) => ("NotServing", msg, h.some, p.some)
         case Servable.Unknown(msg, h, p) => ("Unknown", msg, h, p)
-        case Servable.NotAvailable(msg) => ("NotAvailable", msg, None, None)
+        case Servable.NotAvailable(msg, h, p) => ("NotAvailable", msg, h, p)
       }
 
       val row = Tables.ServableRow(
@@ -87,7 +87,7 @@ object DBServableRepository {
     (service.status, service.host, service.port) match {
       case ("Serving", Some(host), Some(port)) => Servable(mv, service.serviceName, Servable.Serving(service.statusText, host, port))
       case ("NotServing", Some(host), Some(port)) => Servable(mv, service.serviceName, Servable.NotServing(service.statusText, host, port))
-      case ("NotAvailable", None, None) => Servable(mv, service.serviceName, Servable.NotAvailable(service.statusText))
+      case ("NotAvailable", host, port) => Servable(mv, service.serviceName, Servable.NotAvailable(service.statusText, host, port))
       case (_, host, port) => Servable(mv, service.serviceName, Servable.Unknown(service.statusText, host, port))
     }
   }

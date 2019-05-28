@@ -9,12 +9,11 @@ case class Servable[+T <: Servable.Status](modelVersion: ModelVersion, nameSuffi
 
 object Servable {
 
-
   sealed trait Status
-  final case class Serving(msg: String, host: String, port: Int)                 extends Status
-  final case class NotServing(msg: String, host: String, port: Int)              extends Status
-  final case class NotAvailable(msg: String)                                     extends Status
-  final case class Unknown(msg: String, host: Option[String], port: Option[Int]) extends Status
+  final case class Serving(msg: String, host: String, port: Int)                      extends Status
+  final case class NotServing(msg: String, host: String, port: Int)                   extends Status
+  final case class NotAvailable(msg: String, host: Option[String], port: Option[Int]) extends Status
+  final case class Unknown(msg: String, host: Option[String], port: Option[Int])      extends Status
 
   def fullName(modelName: String, modelVersion: Long, suffix: String): String =
     s"$modelName-$modelVersion-$suffix".replace("_", "-")

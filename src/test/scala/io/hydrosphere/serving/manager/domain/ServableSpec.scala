@@ -19,6 +19,7 @@ import io.hydrosphere.serving.tensorflow.api.prediction_service.StatusResponse
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 class ServableSpec extends GenericUnitTest {
   implicit val rng = RNG.default[IO].unsafeRunSync()
@@ -87,9 +88,9 @@ class ServableSpec extends GenericUnitTest {
 
         override def remove(name: String): IO[Unit] = ???
       }
-      val monitor = ServableMonitor.default[IO](clientCtor, driver)
-      val result = monitor.monitor(mv, "test").unsafeRunSync()
-      assert(result.modelVersion === mv)
+      val monitor = ServableMonitor.default[IO](clientCtor, driver, 1.second, 10.seconds, 2.seconds)
+      val result = monitor.monitor("name-1-test").unsafeRunSync()
+      assert(result === Servable.Serving("I'm ready", "node.cluster.domain", 9090))
     }
 
     it("should fail on non-serving status") {
@@ -102,7 +103,7 @@ class ServableSpec extends GenericUnitTest {
                 println("Ping - NOT_SERVING")
                 StatusResponse(
                   status = StatusResponse.ServiceStatus.NOT_SERVING,
-                  message = "I'm ready"
+                  message = "WTF"
                 )
               } else {
                 println("Ping - UNKNOWN")
@@ -139,9 +140,9 @@ class ServableSpec extends GenericUnitTest {
 
         override def remove(name: String): IO[Unit] = ???
       }
-      val monitor = ServableMonitor.default[IO](clientCtor, driver)
-      val result = monitor.monitor(mv, "test").attempt.unsafeRunSync()
-      assert(result.isLeft, result)
+      val monitor = ServableMonitor.default[IO](clientCtor, driver, 1.second, 10.seconds, 2.seconds)
+      val result = monitor.monitor("name-1-test").unsafeRunSync()
+      assert(result === Servable.NotServing("WTF", "node.cluster.domain", 9090))
     }
 
     it("should propagate GRPC errors") {
@@ -175,9 +176,9 @@ class ServableSpec extends GenericUnitTest {
 
         override def remove(name: String): IO[Unit] = ???
       }
-      val monitor = ServableMonitor.default[IO](clientCtor, driver)
-      val result = monitor.monitor(mv, "test").attempt.unsafeRunSync()
-      assert(result.isLeft, result)
+      val monitor = ServableMonitor.default[IO](clientCtor, driver, 1.second, 10.seconds, 2.seconds)
+      val result = monitor.monitor("name-1-test").unsafeRunSync()
+      assert(result === Servable.NotAvailable("GRPC test error", "node.cluster.domain".some, 9090.some))
     }
   }
 
@@ -232,10 +233,10 @@ class ServableSpec extends GenericUnitTest {
 
         override def lastModelVersionByModel(modelId: Long, max: Int): IO[Seq[ModelVersion]] = ???
       }
-      val monitorState = ListBuffer.empty[OkServable]
+      val monitorState = ListBuffer.empty[Servable.Status]
       val monitor = new ServableMonitor[IO] {
-        override def monitor(modelVersion: ModelVersion, suffix: String): IO[OkServable] = {
-          val servable = Servable(modelVersion, suffix, Servable.Serving("Ok", "imaginary.host.some-cool-cluster", 6969))
+        override def monitor(name: String): IO[Servable.Status] = {
+          val servable = Servable.Serving("Ok", "imaginary.host.some-cool-cluster", 6969)
           monitorState += servable
           IO(servable)
         }
@@ -265,6 +266,12 @@ class ServableSpec extends GenericUnitTest {
         metadata = Map.empty
       )
 
+      val initServable = Servable(
+        modelVersion = mv,
+        nameSuffix = "delete-me",
+        Servable.Serving("Ok", "host", 9090)
+      )
+
       val driverState = ListBuffer.empty[String]
       val cloudDriver = new CloudDriver[IO] {
         override def instances: IO[List[CloudInstance]] = ???
@@ -279,6 +286,7 @@ class ServableSpec extends GenericUnitTest {
         }
       }
       val repoState = ListBuffer.empty[GenericServable]
+      repoState += initServable
       val servableRepo = new ServableRepository[IO] {
         override def all(): IO[List[GenericServable]] = IO(repoState.toList)
 
@@ -318,13 +326,13 @@ class ServableSpec extends GenericUnitTest {
         override def lastModelVersionByModel(modelId: Long, max: Int): IO[Seq[ModelVersion]] = ???
       }
       val monitor = new ServableMonitor[IO] {
-        override def monitor(modelVersion: ModelVersion, suffix: String) = ???
+        override def monitor(name: String) = ???
       }
       val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, nameGen, monitor)
-      val result = service.stop("test-model-1-good-vibes").unsafeRunSync()
+      val result = service.stop("test-model-1-delete-me").unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty
-      repoState should not be empty
+      repoState shouldBe empty
     }
   }
 }

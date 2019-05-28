@@ -7,7 +7,6 @@ import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
-import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.util.random.NameGenerator
 import org.apache.logging.log4j.scala.Logging
 
@@ -44,8 +43,12 @@ object ServableService extends Logging {
     def awaitServable(fullName: String, suffix: String, modelVersion: ModelVersion): F[OkServable] = {
       for {
         _ <- cloudDriver.run(fullName, modelVersion.id, modelVersion.image)
-        s <- monitor.monitor(modelVersion, suffix)
-        _ <- servableRepository.upsert(s.generic)
+        status <- monitor.monitor(fullName)
+        s <- status match {
+          case x: Servable.Serving => F.pure(Servable(modelVersion, suffix, x))
+          case x => F.raiseError[OkServable](DomainError.internalError(s"Servable $fullName is in invalid state: $x"))
+        }
+        _ <- servableRepository.upsert(s)
       } yield s
     }
 
