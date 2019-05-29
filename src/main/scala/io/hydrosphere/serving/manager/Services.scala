@@ -92,7 +92,7 @@ class Services[F[_]: ConcurrentEffect](
     servableMonitor
   )
 
-  val graphComposer = VersionGraphComposer.apply
+  val graphComposer = VersionGraphComposer.default
 
   implicit val appService: ApplicationService[F] = ApplicationService[F](
     applicationRepository = managerRepositories.applicationRepository,

@@ -24,7 +24,6 @@ import org.apache.logging.log4j.scala.Logging
 import spray.json.JsObject
 
 import scala.concurrent.ExecutionContext
-import cats.Monad
 
 trait ApplicationService[F[_]] {
   def generateInputs(name: String): F[JsObject]
@@ -117,15 +116,11 @@ object ApplicationService extends Logging {
         _ <- discoveryHub.added(translated)
       } yield finishedApp.asRight[FailedApp]
 
-      F.handleErrorWith(finished) { x =>
+      finished.handleErrorWith { x =>
         for {
           _ <- F.delay(logger.error(s"ModelVersion deployment exception", x))
         } yield
-          app
-            .copy(
-              status = Application
-                .Failed(app.status.versionGraph, Option(x.getMessage))
-            )
+          app.copy(status = Application.Failed(app.status.versionGraph, Option(x.getMessage)))
             .asLeft[ReadyApp]
       }
     }
@@ -142,6 +137,7 @@ object ApplicationService extends Logging {
             case Left(x)  => x.generic
           }
           _ <- applicationRepository.update(genericApp)
+          _ <- df.complete(genericApp)
         } yield ()).start
       } yield DeferredResult(app.generic, df)
     }

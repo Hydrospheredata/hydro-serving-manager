@@ -1,23 +1,19 @@
 package io.hydrosphere.serving.manager.it.service
 
-import cats.data.EitherT
+import cats.data.NonEmptyList
 import cats.effect.IO
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
-import io.hydrosphere.serving.manager.domain.DomainError
-import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.requests.{CreateApplicationRequest, ExecutionGraphRequest, ModelVariantRequest, PipelineStageRequest}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 import org.scalatest.BeforeAndAfterAll
 
-import scala.concurrent.Await
 import scala.collection.JavaConverters._
-import scala.concurrent.duration._
 
 class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
   private val uploadFile = packModel("/models/dummy_model")
@@ -57,9 +53,9 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
         val create = CreateApplicationRequest(
           "simple-app",
           None,
-          ExecutionGraphRequest(List(
+          ExecutionGraphRequest(NonEmptyList.of(
             PipelineStageRequest(
-              Seq(ModelVariantRequest(
+              NonEmptyList.of(ModelVariantRequest(
                 modelVersionId = mv1.id,
                 weight = 100
               ))
@@ -93,17 +89,16 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
     dockerClient.pull("hydrosphere/serving-runtime-dummy:latest")
 
     val f = for {
-      d1 <- EitherT(managerServices.modelService.uploadModel(uploadFile, upload1))
-      completed1 <- EitherT.liftF[IO, DomainError, ModelVersion](d1.completedVersion.get)
-      d2 <- EitherT(managerServices.modelService.uploadModel(uploadFile, upload2))
-      completed2 <- EitherT.liftF[IO, DomainError, ModelVersion](d2.completedVersion.get)
+      d1 <- managerServices.modelService.uploadModel(uploadFile, upload1)
+      completed1 <- d1.completed.get
+      d2 <- managerServices.modelService.uploadModel(uploadFile, upload2)
+      completed2 <- d2.completed.get
     } yield {
       println(s"UPLOADED: $completed1")
       println(s"UPLOADED: $completed2")
       mv1 = completed1
       mv2 = completed2
     }
-
-    Await.result(f.value.unsafeToFuture(), 30 seconds)
+    f.unsafeRunSync()
   }
 }

@@ -21,7 +21,7 @@ object VersionGraphComposer {
 
   case class VersionPipeline(stages: NonEmptyList[PipelineStage], pipelineSignature: ModelSignature)
 
-  def apply: VersionGraphComposer = {
+  def default: VersionGraphComposer = {
     new VersionGraphComposer {
       override def compose(
         nodes: NonEmptyList[Node[ModelVersion]]

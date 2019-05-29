@@ -2,15 +2,12 @@ package io.hydrosphere.serving.manager.it.service
 
 import java.nio.file.Path
 
-import cats.data.EitherT
-import cats.effect.IO
 import com.spotify.docker.client.DockerClient
 import com.spotify.docker.client.messages.ContainerConfig
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionStatus
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
-import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
@@ -28,11 +25,11 @@ class ModelBuildITSpec extends FullIntegrationSpec {
 
   describe("Model serivce") {
     it("should create an image with correct name and content") {
-      eitherTAssert {
+      ioAssert {
         for {
-          models <- EitherT.liftF(managerRepositories.modelVersionRepository.all())
-          mv <- EitherT(managerServices.modelService.uploadModel(uploadFile, uploadMetadata))
-          builtMv <- EitherT.liftF(mv.completedVersion.get)
+          models <- repositories.modelVersionRepository.all()
+          mv <- managerServices.modelService.uploadModel(uploadFile, uploadMetadata)
+          builtMv <- mv.completed.get
         } yield {
           println(models)
           println("BUILD_RESULT:")
