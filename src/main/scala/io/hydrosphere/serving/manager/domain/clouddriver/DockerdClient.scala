@@ -19,7 +19,8 @@ trait DockerdClient[F[_]]{
   def removeContainer(id: String): F[Unit] = removeContainer(id, Nil)
   
   def listContainers(params: List[ListContainersParam]): F[List[Container]]
-  def listContainers: F[List[Container]] = listContainers(Nil)
+  def listRunningContainers: F[List[Container]] = listContainers(Nil)
+  def listAllContainers: F[List[Container]] = listContainers(ListContainersParam.allContainers() :: Nil)
 }
 
 object DockerdClient {

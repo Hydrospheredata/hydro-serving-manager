@@ -1,11 +1,13 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import cats.effect.Async
+import cats.implicits._
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.db.Tables
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application._
-import io.hydrosphere.serving.manager.domain.application.graph.ExecutionGraphAdapter
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionGraphAdapter, ServableGraphAdapter, Variant, VersionGraphAdapter}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.infrastructure.db.DatabaseService
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
@@ -16,13 +18,14 @@ import spray.json._
 import scala.concurrent.ExecutionContext
 
 class DBApplicationRepository[F[_]: Async](
-  implicit val executionContext: ExecutionContext,
+  implicit executionContext: ExecutionContext,
   databaseService: DatabaseService
 ) extends ApplicationRepository[F] with Logging with CompleteJsonProtocol {
 
   import DBApplicationRepository._
   import databaseService._
   import databaseService.driver.api._
+
 
   override def create(entity: GenericApplication): F[GenericApplication] = AsyncUtil.futureAsync {
     val status = flatten(entity)
@@ -125,13 +128,14 @@ object DBApplicationRepository extends CompleteJsonProtocol {
     dbType.map(r => mapFromDb(r))
 
   def mapFromDb(dbType: Tables.Application#TableElementType): GenericApplication = {
+    val status = compose(dbType.status, dbType.statusMessage, dbType.executionGraph)
     Application(
       id = dbType.id,
       name = dbType.applicationName,
       signature = ModelSignature.fromAscii(dbType.applicationContract),
       kafkaStreaming = dbType.kafkaStreams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
       namespace = dbType.namespace,
-      status = dbType.executionGraph.parseJson.convertTo[Application.Status]
+      status = status
     )
   }
 
@@ -145,6 +149,40 @@ object DBApplicationRepository extends CompleteJsonProtocol {
         FlattenedStatus("Failed", reason, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
       case Application.Ready(servableGraph) =>
         FlattenedStatus("Ready", None, ExecutionGraphAdapter.fromServablePipeline(servableGraph))
+    }
+  }
+
+  def compose(status: String, message: Option[String], graph: String): Application.Status = {
+    status match {
+      case "Assembling" =>
+        val adapterGraph = graph.parseJson.convertTo[VersionGraphAdapter]
+        val mappedStages = adapterGraph.stages.map{stage =>
+          val signature = stage.signature
+          val variants = stage.modelVariants.map(m => Variant(m.modelVersion, m.weight))
+          PipelineStage(variants, signature)
+        }
+        Application.Assembling(mappedStages)
+      case "Failed" =>
+        val adapterGraph = graph.parseJson.convertTo[VersionGraphAdapter]
+        val mappedStages = adapterGraph.stages.map{stage =>
+          val signature = stage.signature
+          val variants = stage.modelVariants.map(m => Variant(m.modelVersion, m.weight))
+          PipelineStage(variants, signature)
+        }
+        Application.Failed(mappedStages, message)
+      case "Ready" =>
+        ???
+//        val adapterGraph = graph.parseJson.convertTo[ServableGraphAdapter]
+//        val mappedStages = adapterGraph.stages.traverse{ stage =>
+//          val variants = stage.modelVariants.traverse { s =>
+//            servables.get(s.item)
+//              .map(Variant(_, s.weight))
+//              .toRight(new Exception(s"Can't find servable with name ${s.item}"))
+//          }
+//          variants.map(ExecutionNode(_, stage.signature))
+//        }
+//        mappedStages.map(Application.Ready)
+      case x => ???
     }
   }
 }

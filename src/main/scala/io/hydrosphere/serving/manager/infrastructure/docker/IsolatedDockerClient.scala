@@ -23,20 +23,33 @@ class IsolatedDockerClient private(val builder: DefaultDockerClient.Builder) ext
   private val containerStorage = new ConcurrentSkipListSet[String]
 
   override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: DockerClient.BuildParam*): String = {
+    println(s"[ISODOCKER] build: $name dockerfile=$dockerfile")
     val image = super.build(directory, name, dockerfile, handler, params:_*)
     imageStorage.add(image)
     image
   }
 
   override def removeContainer(containerId: String, params: RemoveContainerParam*): Unit = {
+    println(s"[ISODOCKER] removeContainerContainer: $containerId")
     super.removeContainer(containerId, params: _*)
     containerStorage.remove(containerId)
   }
 
   override def createContainer(config: ContainerConfig, name: String): ContainerCreation = {
+    println(s"[ISODOCKER] createContainer: $name image=${config.image()}")
     val creation = super.createContainer(config, name)
     containerStorage.add(creation.id)
     creation
+  }
+
+  override def startContainer(containerId: String): Unit = {
+    println(s"[ISODOCKER] startContainer: $containerId")
+    super.startContainer(containerId)
+  }
+
+  override def stopContainer(containerId: String, secondsToWaitBeforeKilling: Int): Unit = {
+    println(s"[ISODOCKER] stopContainer: $containerId timeout=$secondsToWaitBeforeKilling")
+    super.stopContainer(containerId, secondsToWaitBeforeKilling)
   }
 
   def clear(): Unit = {

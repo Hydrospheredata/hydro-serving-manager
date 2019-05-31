@@ -118,7 +118,13 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       }
     }
 
-    override def write(obj: ExecutionGraphAdapter): JsValue = ???
+
+    override def write(obj: ExecutionGraphAdapter): JsValue = {
+      obj match {
+        case x: VersionGraphAdapter => x.toJson
+        case x: ServableGraphAdapter => x.toJson
+      }
+    }
   }
 
   implicit val applicationStageFormat          = jsonFormat2(PipelineStage.apply)
