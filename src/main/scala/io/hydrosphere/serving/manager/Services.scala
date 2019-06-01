@@ -4,6 +4,8 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import cats.effect.{ConcurrentEffect, Timer}
+import cats.implicits._
+import cats.effect.implicits._
 import com.spotify.docker.client._
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
@@ -15,7 +17,7 @@ import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model.ModelService
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionService
-import io.hydrosphere.serving.manager.domain.servable.{ServableMonitor, ServableService}
+import io.hydrosphere.serving.manager.domain.servable.{ServableMonitor, ServableProbe, ServableService}
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
@@ -43,6 +45,8 @@ class Services[F[_]: ConcurrentEffect](
   timer: Timer[F],
   rng: RNG[F]
 ) extends Logging {
+
+  import managerRepositories._
 
   val progressHandler: ProgressHandler = InfoProgressHandler
 
@@ -82,7 +86,11 @@ class Services[F[_]: ConcurrentEffect](
 
   logger.info(s"Using ${cloudDriverService.getClass} cloud driver")
 
-  val servableMonitor: ServableMonitor[F] = ServableMonitor.default[F](predictionCtor, cloudDriverService, 2.seconds, 1.minute, 15.seconds)
+  implicit val servableProbe = ServableProbe.default[F](predictionCtor, cloudDriverService)
+  implicit val servableMonitor = ServableMonitor.default[F](
+    2.seconds,
+    1.minute
+  ).toIO.unsafeRunSync()
 
   implicit val servableService: ServableService[F] = ServableService[F](
     cloudDriverService,

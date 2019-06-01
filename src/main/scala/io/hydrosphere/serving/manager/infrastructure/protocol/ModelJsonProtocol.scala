@@ -69,7 +69,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val servingSF  = jsonFormat3(Servable.Serving)
   implicit val servingNSF = jsonFormat3(Servable.NotServing)
   implicit val servingNAF = jsonFormat3(Servable.NotAvailable)
-  implicit val servingUF  = jsonFormat3(Servable.Unknown)
+  implicit val servingUF  = jsonFormat3(Servable.Starting)
 
   implicit val servableStatusFormat = new RootJsonFormat[Servable.Status] {
     override def write(obj: Servable.Status): JsValue = {
@@ -80,7 +80,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
           x.toJson.asJsObject.fields + "status" -> JsString("NotServing")
         case x: Servable.NotAvailable =>
           x.toJson.asJsObject.fields + "status" -> JsString("NotAvailable")
-        case x: Servable.Unknown =>
+        case x: Servable.Starting =>
           x.toJson.asJsObject.fields + "status" -> JsString("Unknown")
       }
       JsObject(fields)
@@ -93,7 +93,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
             case Some(JsString("Serving"))      => json.convertTo[Servable.Serving]
             case Some(JsString("NotServing"))   => json.convertTo[Servable.NotServing]
             case Some(JsString("NotAvailable")) => json.convertTo[Servable.NotAvailable]
-            case Some(JsString("Unknown"))      => json.convertTo[Servable.Unknown]
+            case Some(JsString("Unknown"))      => json.convertTo[Servable.Starting]
             case x                              => throw DeserializationException(s"Invalid Servable status type: $x")
           }
         case x => throw DeserializationException(s"Invalid Servable status JSON: $x")

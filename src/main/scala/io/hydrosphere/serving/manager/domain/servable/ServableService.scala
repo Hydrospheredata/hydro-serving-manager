@@ -32,21 +32,22 @@ object ServableService extends Logging {
     override def deploy(modelVersion: ModelVersion): F[OkServable] = {
       for {
         randomSuffix <- nameGenerator.getName()
-        fullName = Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, randomSuffix)
-        servable <- awaitServable(fullName, randomSuffix, modelVersion)
+        initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None))
+        servable <- awaitServable(initServable)
           .onError {
-            case NonFatal(ex) => cloudDriver.remove(fullName) >> F.delay(logger.error(ex))
+            case NonFatal(ex) => cloudDriver.remove(initServable.fullName) >> F.delay(logger.error(ex))
           }
       } yield servable
     }
 
-    def awaitServable(fullName: String, suffix: String, modelVersion: ModelVersion): F[OkServable] = {
+    def awaitServable(servable: GenericServable): F[OkServable] = {
       for {
-        _ <- cloudDriver.run(fullName, modelVersion.id, modelVersion.image)
-        status <- monitor.monitor(fullName)
-        s <- status match {
-          case x: Servable.Serving => F.pure(Servable(modelVersion, suffix, x))
-          case x => F.raiseError[OkServable](DomainError.internalError(s"Servable $fullName is in invalid state: $x"))
+        _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image)
+        servableDef <- monitor.monitor(servable)
+        servable <- servableDef.get
+        s <- servable.status match {
+          case x: Servable.Serving => F.pure(servable.copy(status = x))
+          case x => F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $x"))
         }
         _ <- servableRepository.upsert(s)
       } yield s

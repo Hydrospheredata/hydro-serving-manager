@@ -29,8 +29,8 @@ class DBServableRepository[F[_]](
     AsyncUtil.futureAsync {
       val (status, statusText, host, port) = entity.status match {
         case Servable.Serving(msg, h, p) => ("Serving", msg, h.some, p.some)
-        case Servable.NotServing(msg, h, p) => ("NotServing", msg, h.some, p.some)
-        case Servable.Unknown(msg, h, p) => ("Unknown", msg, h, p)
+        case Servable.NotServing(msg, h, p) => ("NotServing", msg, h, p)
+        case Servable.Starting(msg, h, p) => ("Unknown", msg, h, p)
         case Servable.NotAvailable(msg, h, p) => ("NotAvailable", msg, h, p)
       }
 
@@ -86,9 +86,9 @@ object DBServableRepository {
 
     (service.status, service.host, service.port) match {
       case ("Serving", Some(host), Some(port)) => Servable(mv, service.serviceName, Servable.Serving(service.statusText, host, port))
-      case ("NotServing", Some(host), Some(port)) => Servable(mv, service.serviceName, Servable.NotServing(service.statusText, host, port))
+      case ("NotServing", host, port) => Servable(mv, service.serviceName, Servable.NotServing(service.statusText, host, port))
       case ("NotAvailable", host, port) => Servable(mv, service.serviceName, Servable.NotAvailable(service.statusText, host, port))
-      case (_, host, port) => Servable(mv, service.serviceName, Servable.Unknown(service.statusText, host, port))
+      case (_, host, port) => Servable(mv, service.serviceName, Servable.Starting(service.statusText, host, port))
     }
   }
 }

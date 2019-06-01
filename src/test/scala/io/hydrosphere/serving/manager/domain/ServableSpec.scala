@@ -88,7 +88,7 @@ class ServableSpec extends GenericUnitTest {
 
         override def remove(name: String): IO[Unit] = ???
       }
-      val monitor = ServableMonitor.default[IO](clientCtor, driver, 1.second, 10.seconds, 2.seconds)
+      val monitor = ServableMonitor.default[IO](clientCtor, driver, 1.second, 10.seconds)
       val result = monitor.monitor("name-1-test").unsafeRunSync()
       assert(result === Servable.Serving("I'm ready", "node.cluster.domain", 9090))
     }
@@ -140,7 +140,7 @@ class ServableSpec extends GenericUnitTest {
 
         override def remove(name: String): IO[Unit] = ???
       }
-      val monitor = ServableMonitor.default[IO](clientCtor, driver, 1.second, 10.seconds, 2.seconds)
+      val monitor = ServableMonitor.default[IO](clientCtor, driver, 1.second, 10.seconds)
       val result = monitor.monitor("name-1-test").unsafeRunSync()
       assert(result === Servable.NotServing("WTF", "node.cluster.domain", 9090))
     }
@@ -176,9 +176,9 @@ class ServableSpec extends GenericUnitTest {
 
         override def remove(name: String): IO[Unit] = ???
       }
-      val monitor = ServableMonitor.default[IO](clientCtor, driver, 1.second, 10.seconds, 2.seconds)
+      val monitor = ServableMonitor.default[IO](clientCtor, driver, 1.second, 10.seconds)
       val result = monitor.monitor("name-1-test").unsafeRunSync()
-      assert(result === Servable.NotAvailable("GRPC test error", "node.cluster.domain".some, 9090.some))
+      assert(result === Servable.NotAvailable("Ping error: GRPC test error", "node.cluster.domain".some, 9090.some))
     }
   }
 
