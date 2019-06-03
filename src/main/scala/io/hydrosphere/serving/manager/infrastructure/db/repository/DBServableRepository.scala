@@ -76,6 +76,18 @@ class DBServableRepository[F[_]](
       }
     } yield res.map { case (servable, version) => mapFrom(servable, version) }
   }
+
+  override def get(names: Seq[String]): F[List[GenericServable]] = {
+    for {
+      res <- AsyncUtil.futureAsync {
+        db.run {
+          joineqQ.filter { case (s, _) => s.serviceName inSetBind names }
+            .result
+        }
+      }
+      servables = res.map { case (servable, version) => mapFrom(servable, version) }
+    } yield servables.toList
+  }
 }
 
 object DBServableRepository {

@@ -8,4 +8,6 @@ trait ServableRepository[F[_]] {
   def delete(name: String): F[Int]
 
   def get(name: String): F[Option[Servable.GenericServable]]
+
+  def get(names: Seq[String]): F[List[Servable.GenericServable]]
 }

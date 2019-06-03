@@ -154,6 +154,8 @@ class ServableSpec extends GenericUnitTest {
         }
         override def delete(name: String): IO[Int] = ???
         override def get(name: String): IO[Option[GenericServable]] = ???
+
+        override def get(names: Seq[String]): IO[List[GenericServable]] = ???
       }
       val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
       println("Created queue")
@@ -189,6 +191,8 @@ class ServableSpec extends GenericUnitTest {
         }
         override def delete(name: String): IO[Int] = ???
         override def get(name: String): IO[Option[GenericServable]] = ???
+
+        override def get(names: Seq[String]): IO[List[GenericServable]] = ???
       }
       val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
       println("Created queue")
@@ -220,6 +224,8 @@ class ServableSpec extends GenericUnitTest {
         }
         override def delete(name: String): IO[Int] = ???
         override def get(name: String): IO[Option[GenericServable]] = ???
+
+        override def get(names: Seq[String]): IO[List[GenericServable]] = ???
       }
       val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
       println("Created queue")
@@ -250,6 +256,8 @@ class ServableSpec extends GenericUnitTest {
         }
         override def delete(name: String): IO[Int] = ???
         override def get(name: String): IO[Option[GenericServable]] = ???
+
+        override def get(names: Seq[String]): IO[List[GenericServable]] = ???
       }
       val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
       println("Created queue")
@@ -299,6 +307,8 @@ class ServableSpec extends GenericUnitTest {
         override def get(name: String): IO[Option[GenericServable]] = {
           IO(repoState.find(_.fullName == name))
         }
+
+        override def get(names: Seq[String]): IO[List[GenericServable]] = ???
       }
       val versionRepo = new ModelVersionRepository[IO] {
         override def create(entity: ModelVersion): IO[ModelVersion] = ???
@@ -393,6 +403,8 @@ class ServableSpec extends GenericUnitTest {
         override def get(name: String): IO[Option[GenericServable]] = {
           IO(repoState.find(_.fullName == name))
         }
+
+        override def get(names: Seq[String]): IO[List[GenericServable]] = ???
       }
       val versionRepo = new ModelVersionRepository[IO] {
         override def create(entity: ModelVersion): IO[ModelVersion] = ???

@@ -15,11 +15,11 @@ class Repositories[F[_]: Async](config: ManagerConfiguration)(implicit execution
 
   implicit val modelVersionRepository = new DBModelVersionRepository[F]
 
-  implicit val applicationRepository = new DBApplicationRepository[F]
-
   implicit val hostSelectorRepository = new DBHostSelectorRepository[F]
 
   implicit val servableRepository = new DBServableRepository[F]
+
+  implicit val applicationRepository = new DBApplicationRepository[F]
 
   private def parseDatabase(hikariConfiguration: HikariConfiguration): HikariConfig = {
     val hikariConfig = new HikariConfig()

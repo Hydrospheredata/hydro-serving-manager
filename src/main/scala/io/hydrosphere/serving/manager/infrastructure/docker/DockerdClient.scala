@@ -1,11 +1,10 @@
-package io.hydrosphere.serving.manager.domain.clouddriver
+package io.hydrosphere.serving.manager.infrastructure.docker
 
-import cats.implicits._
 import cats.effect.Sync
-
-import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
+import cats.implicits._
 import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContainerParam}
 import com.spotify.docker.client.messages.{Container, ContainerConfig, ContainerCreation}
+import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 
 import scala.collection.JavaConverters._
 

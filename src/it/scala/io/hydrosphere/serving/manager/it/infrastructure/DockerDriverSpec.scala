@@ -3,7 +3,7 @@ package io.hydrosphere.serving.manager.it.infrastructure
 import cats.effect.IO
 import com.spotify.docker.client.messages.ContainerConfig
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
-import io.hydrosphere.serving.manager.domain.clouddriver.{CloudInstance, DockerDriver, DockerdClient}
+import io.hydrosphere.serving.manager.domain.clouddriver.{CloudInstance, DockerDriver}
 import io.hydrosphere.serving.manager.it.IsolatedDockerAccessIT
 
 import scala.collection.JavaConverters._

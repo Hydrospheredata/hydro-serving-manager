@@ -16,7 +16,7 @@ trait ApplicationRepository[F[_]] {
 
   def all(): F[List[GenericApplication]]
 
-  def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): F[Seq[GenericApplication]]
+  def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): F[List[GenericApplication]]
 
-  def findVersionsUsage(versionIdx: Long): F[Seq[GenericApplication]]
+  def findVersionsUsage(versionIdx: Long): F[List[GenericApplication]]
 }

@@ -12,7 +12,7 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 import org.scalatest.BeforeAndAfterAll
-
+import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 
 class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
@@ -36,13 +36,6 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
       predict = Some(signature)
     ))
   )
-  private val upload3 = ModelUploadMetadata(
-    name = "m3",
-    runtime = dummyImage,
-    contract = Some(ModelContract(
-      predict = Some(signature)
-    ))
-  )
 
   var mv1: ModelVersion = _
   var mv2: ModelVersion = _
@@ -61,14 +54,18 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
               ))
             ))
           ),
-          Option.empty
+          None
         )
         for {
           appResult <- managerServices.appService.create(create)
+          _ = println("Sent creation request")
           _ <- appResult.completed.get
+          _ = println("Creation completed")
           preCont <- IO(dockerClient.listContainers())
-          _ <- IO.pure(Thread.sleep(10000))
+          _ = println("sleep")
+          _ <- timer.sleep(5.seconds)
           _ <- managerServices.appService.delete(appResult.started.name)
+          _ = println("deleted app")
           cont <- IO(dockerClient.listContainers())
         } yield {
           println("App containers:")

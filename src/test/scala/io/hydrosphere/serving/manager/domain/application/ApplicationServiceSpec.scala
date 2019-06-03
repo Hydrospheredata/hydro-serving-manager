@@ -259,7 +259,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(appRepo.get(Matchers.anyLong())).thenReturn(IO(app))
         when(appRepo.get(Matchers.anyString())).thenReturn(IO(app))
         when(appRepo.create(Matchers.any())).thenReturn(IO(ogApp))
-        when(appRepo.applicationsWithCommonServices(Matchers.any(), Matchers.any())).thenReturn(IO(Seq.empty))
+        when(appRepo.applicationsWithCommonServices(Matchers.any(), Matchers.any())).thenReturn(IO(List.empty))
         when(appRepo.update(Matchers.any())).thenReturn(IO(1))
         when(appRepo.delete(Matchers.any())).thenReturn(IO{
           app = None

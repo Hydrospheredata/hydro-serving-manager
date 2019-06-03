@@ -128,7 +128,7 @@ object ApplicationService extends Logging {
     def create(req: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
       for {
         composedApp <- composeApp(req.name, req.namespace, req.executionGraph, req.kafkaStreaming)
-        appId       <- applicationRepository.create(composedApp.generic).map(_.id)
+        appId       <- applicationRepository.create(composedApp).map(_.id)
         app = composedApp.copy(id = appId)
         df <- Deferred[F, GenericApplication]
         _ <- (for {
@@ -138,7 +138,9 @@ object ApplicationService extends Logging {
           }
           _ <- applicationRepository.update(genericApp)
           _ <- df.complete(genericApp)
-        } yield ()).start
+        } yield ())
+          .handleError(x => logger.error("Error while buidling application", x))
+          .start
       } yield DeferredResult(app.generic, df)
     }
 

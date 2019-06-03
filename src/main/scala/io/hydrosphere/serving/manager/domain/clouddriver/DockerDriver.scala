@@ -7,6 +7,7 @@ import com.spotify.docker.client.messages._
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
 import io.hydrosphere.serving.manager.domain.clouddriver.DockerDriver.Internals.ContainerState
 import io.hydrosphere.serving.manager.domain.image.DockerImage
+import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 
 import scala.collection.JavaConverters._
 import scala.util.Try
