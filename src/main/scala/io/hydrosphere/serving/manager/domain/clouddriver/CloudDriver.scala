@@ -5,6 +5,7 @@ import akka.stream.Materializer
 import cats.effect._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
+import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 
 import scala.concurrent.ExecutionContext
 

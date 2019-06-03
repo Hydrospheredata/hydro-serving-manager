@@ -4,12 +4,13 @@ import cats.effect.IO
 import com.spotify.docker.client.messages.ContainerConfig
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudInstance, DockerDriver}
+import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.it.IsolatedDockerAccessIT
 
 import scala.collection.JavaConverters._
 
 class DockerDriverSpec extends IsolatedDockerAccessIT {
-  describe("DockerdClinet") {
+  describe("DockerdClient") {
     it("should correctly map starting containers to CloudInstances") {
       val client = DockerdClient.create[IO](dockerClient)
       val config = CloudDriverConfiguration.Docker("local", None)
