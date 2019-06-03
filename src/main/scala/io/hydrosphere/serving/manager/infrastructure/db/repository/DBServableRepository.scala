@@ -43,7 +43,10 @@ class DBServableRepository[F[_]](
         port = port,
         status = status
       )
-      db.run(Tables.Servable.insertOrUpdate(row))
+      val q = Tables.Servable.insertOrUpdate(row)
+      println("SERVABLE UPSERT SQL")
+      q.statements.map(println)
+      db.run(q)
     }.as(entity)
   }
 
