@@ -24,13 +24,14 @@ class DBServableRepository[F[_]](
 
   val joineqQ = Tables.Servable
     .join(modelVersionRepository.joinedQ)
+    .on { case (s, (m, _, _)) => s.modelVersionId === m.modelVersionId }
 
   override def upsert(entity: GenericServable): F[GenericServable] = {
     AsyncUtil.futureAsync {
       val (status, statusText, host, port) = entity.status match {
         case Servable.Serving(msg, h, p) => ("Serving", msg, h.some, p.some)
         case Servable.NotServing(msg, h, p) => ("NotServing", msg, h, p)
-        case Servable.Starting(msg, h, p) => ("Unknown", msg, h, p)
+        case Servable.Starting(msg, h, p) => ("Starting", msg, h, p)
         case Servable.NotAvailable(msg, h, p) => ("NotAvailable", msg, h, p)
       }
 
