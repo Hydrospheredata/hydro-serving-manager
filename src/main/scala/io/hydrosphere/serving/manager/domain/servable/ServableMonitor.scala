@@ -2,7 +2,7 @@ package io.hydrosphere.serving.manager.domain.servable
 
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
-import cats.effect.{Concurrent, Timer}
+import cats.effect.{Concurrent, Fiber, Timer}
 import cats.implicits._
 import fs2.concurrent.Queue
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
@@ -21,7 +21,35 @@ trait ServableMonitor[F[_]] {
 }
 
 object ServableMonitor extends Logging {
+  final case class CancellableMonitor[F[_]](mon: ServableMonitor[F], fiber: Fiber[F, Unit])
   type MonitoringEntry[F[_]] = (GenericServable, Deferred[F, GenericServable])
+
+  def withQueue[F[_]](
+    queue: Queue[F, MonitoringEntry[F]],
+    monitorSleep: FiniteDuration,
+    maxTimeout: FiniteDuration
+  )(
+    implicit F: Concurrent[F],
+    timer: Timer[F],
+    probe: ServableProbe[F],
+    servableRepository: ServableRepository[F]
+  ): F[CancellableMonitor[F]] = {
+    for {
+      deathNoteRef <- Ref.of(Map.empty[String, FiniteDuration])
+      fbr <- monitoringLoop(monitorSleep, maxTimeout, queue, deathNoteRef)
+        .handleError(x => logger.error(s"Error in monitoring loop", x))
+        .foreverM[Unit]
+        .start
+      mon = new ServableMonitor[F] {
+        override def monitor(servable: GenericServable): F[Deferred[F, GenericServable]] = {
+          for {
+            deferred <- Deferred[F, GenericServable]
+            _ <- queue.offer1(servable, deferred)
+          } yield deferred
+        }
+      }
+    } yield CancellableMonitor(mon, fbr)
+  }
 
   def default[F[_]](
     monitorSleep: FiniteDuration,
@@ -31,28 +59,21 @@ object ServableMonitor extends Logging {
     timer: Timer[F],
     probe: ServableProbe[F],
     servableRepository: ServableRepository[F],
-  ): F[ServableMonitor[F]] = {
+  ): F[CancellableMonitor[F]] = {
     for {
       queue <- Queue.unbounded[F, MonitoringEntry[F]]
-      deathNoteRef <- Ref.of(Map.empty[String, FiniteDuration])
-      _ <- monitoringLoop(monitorSleep, maxTimeout, queue, deathNoteRef).foreverM[Unit].start
-    } yield new ServableMonitor[F] {
-      override def monitor(servable: GenericServable): F[Deferred[F, GenericServable]] = {
-        for {
-          deferred <- Deferred[F, GenericServable]
-          _ <- queue.offer1(servable, deferred)
-        } yield deferred
-      }
-    }
+      res <- withQueue(queue, monitorSleep, maxTimeout)
+    } yield res
   }
 
-  private def monitoringLoop[F[_] : Concurrent](
+  private def monitoringLoop[F[_]](
     monitorSleep: FiniteDuration,
     maxTimeout: FiniteDuration,
     queue: Queue[F, MonitoringEntry[F]],
     deathNoteRef: Ref[F, Map[String, FiniteDuration]]
   )(
-    implicit timer: Timer[F],
+    implicit F: Concurrent[F],
+    timer: Timer[F],
     probe: ServableProbe[F],
     servableRepository: ServableRepository[F],
   ): F[Unit] = {
@@ -62,6 +83,10 @@ object ServableMonitor extends Logging {
       name = servable.fullName
       deathNote <- deathNoteRef.get
       status <- probe.probe(servable)
+        .handleError { x =>
+            logger.error("Servable probe failed", x)
+            Servable.NotAvailable(s"Probe failed. ${x.getMessage}", None, None)
+        }
       updatedServable = servable.copy(status = status)
       _ <- status match {
         case _: Servable.Serving =>
@@ -87,8 +112,8 @@ object ServableMonitor extends Logging {
                   .copy(status = Servable.NotServing(s"Ping timeout exceeded. Info: $msg", host, port))
 
                 deathNoteRef.set(deathNote - name) >>
-                  deferred.complete(invalidServable) >>
-                  servableRepository.upsert(invalidServable).void
+                  servableRepository.upsert(invalidServable) >>
+                  deferred.complete(invalidServable).void
               } else {
                 deathNoteRef.set(deathNote + (name -> (timeInTheList + monitorSleep))) >>
                   queue.offer1(updatedServable, deferred) >>

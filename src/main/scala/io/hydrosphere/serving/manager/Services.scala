@@ -86,11 +86,13 @@ class Services[F[_]: ConcurrentEffect](
 
   logger.info(s"Using ${cloudDriverService.getClass} cloud driver")
 
-  implicit val servableProbe = ServableProbe.default[F](predictionCtor, cloudDriverService)
+  implicit val c = predictionCtor
+  implicit val cc = cloudDriverService
+  implicit val servableProbe = ServableProbe.default[F]
   implicit val servableMonitor = ServableMonitor.default[F](
     2.seconds,
     1.minute
-  ).toIO.unsafeRunSync()
+  ).toIO.unsafeRunSync().mon
 
   implicit val servableService: ServableService[F] = ServableService[F](
     cloudDriverService,
