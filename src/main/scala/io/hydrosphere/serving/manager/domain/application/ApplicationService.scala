@@ -94,9 +94,9 @@ object ApplicationService extends Logging {
 
     def generateInputs(name: String): F[JsObject] = {
       for {
-        app        <- get(name)
+        app <- get(name)
         tensorData <- F.delay(TensorExampleGenerator(app.signature).inputs)
-        jsonData   <- F.delay(TensorJsonLens.mapToJson(tensorData))
+        jsonData <- F.delay(TensorJsonLens.mapToJson(tensorData))
       } yield jsonData
     }
 
@@ -112,7 +112,7 @@ object ApplicationService extends Logging {
           } yield ExecutionNode(variants, stage.signature)
         }
         finishedApp = app.copy(status = Application.Ready(deployedServables))
-        translated  = Internals.toServingApp(finishedApp)
+        translated = Internals.toServingApp(finishedApp)
         _ <- discoveryHub.added(translated)
       } yield finishedApp.asRight[FailedApp]
 
@@ -128,13 +128,13 @@ object ApplicationService extends Logging {
     def create(req: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
       for {
         composedApp <- composeApp(req.name, req.namespace, req.executionGraph, req.kafkaStreaming)
-        repoApp     <- applicationRepository.create(composedApp)
-        app         = composedApp.copy(id = repoApp.id)
-        df          <- Deferred[F, GenericApplication]
+        repoApp <- applicationRepository.create(composedApp)
+        app = composedApp.copy(id = repoApp.id)
+        df <- Deferred[F, GenericApplication]
         _ <- (for {
           genericApp <- startServices(app).map {
             case Right(x) => x.generic
-            case Left(x)  => x.generic
+            case Left(x) => x.generic
           }
           _ <- applicationRepository.update(genericApp)
           _ <- df.complete(genericApp)
@@ -152,8 +152,8 @@ object ApplicationService extends Logging {
     def delete(name: String): F[GenericApplication] = {
       for {
         app <- get(name)
-        _   <- discoveryHub.removed(app.id)
-        _   <- applicationRepository.delete(app.id)
+        _ <- discoveryHub.removed(app.id)
+        _ <- applicationRepository.delete(app.id)
         _ <- app.status match {
           case Application.Ready(graph) =>
             graph.traverse { s =>
@@ -170,12 +170,7 @@ object ApplicationService extends Logging {
     def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
       for {
         oldApplication <- OptionT(applicationRepository.get(appRequest.id))
-          .getOrElseF(
-            F.raiseError(
-              DomainError
-                .notFound(s"Can't find application id ${appRequest.id}")
-            )
-          )
+          .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find application id ${appRequest.id}")))
 
         _ <- delete(oldApplication.name)
 

@@ -20,8 +20,9 @@ import spray.json._
 
 import scala.concurrent.ExecutionContext
 
-class DBApplicationRepository[F[_]: Async](
-  implicit executionContext: ExecutionContext,
+class DBApplicationRepository[F[_]](
+  implicit F: Async[F],
+  executionContext: ExecutionContext,
   databaseService: DatabaseService,
   servableDb: DBServableRepository[F]
 ) extends ApplicationRepository[F] with Logging with CompleteJsonProtocol {
@@ -32,7 +33,7 @@ class DBApplicationRepository[F[_]: Async](
 
 
   override def create(entity: GenericApplication): F[GenericApplication] = AsyncUtil.futureAsync {
-    logger.debug(s"create ${entity}")
+    logger.debug(s"create $entity")
     val status = flatten(entity)
     val elem = Tables.ApplicationRow(
       id = entity.id,
@@ -52,7 +53,7 @@ class DBApplicationRepository[F[_]: Async](
   override def get(id: Long): F[Option[GenericApplication]] = {
     val f = for {
       appTable <- OptionT(AsyncUtil.futureAsync {
-        logger.debug(s"get ${id}")
+        logger.debug(s"get $id")
         db.run(
           Tables.Application
             .filter(_.id === id)
@@ -61,7 +62,12 @@ class DBApplicationRepository[F[_]: Async](
       })
       servables <- OptionT.liftF(servableDb.get(appTable.usedServables))
       sMap = servables.map(x => x.fullName -> x).toMap
-      app <- OptionT.fromOption[F](mapFromDb(appTable, sMap).toOption)
+      app <- OptionT(mapFromDb(appTable, sMap) match {
+        case Left(err) =>
+          F.delay(logger.warn(s"Tried to retrieve invalid app from db. ${err.getMessage}")) >>
+            F.pure(none[GenericApplication])
+        case Right(x) => F.pure(x.some)
+      })
     } yield app
     f.value
   }
@@ -161,7 +167,12 @@ class DBApplicationRepository[F[_]: Async](
       })
       servables <- OptionT.liftF(servableDb.get(appTable.usedServables))
       sMap = servables.map(x => x.fullName -> x).toMap
-      app <- OptionT.fromOption[F](mapFromDb(appTable, sMap).toOption)
+      app <- OptionT(mapFromDb(appTable, sMap) match {
+        case Left(err) =>
+          F.delay(logger.warn(s"Tried to retrieve invalid app from db. ${err.getMessage}")) >>
+            F.pure(none[GenericApplication])
+        case Right(x) => F.pure(x.some)
+      })
     } yield app
     f.value
   }
