@@ -44,8 +44,6 @@ class DBServableRepository[F[_]](
         status = status
       )
       val q = Tables.Servable.insertOrUpdate(row)
-      println("SERVABLE UPSERT SQL")
-      q.statements.map(println)
       db.run(q)
     }.as(entity)
   }
