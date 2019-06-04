@@ -77,7 +77,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           val models = status.stages.flatMap(_.variants)
           assert(models.head.weight === 100)
           assert(models.head.item.modelVersion.id === mv1.id)
-          println(s"Servables: $servables")
+          logger.debug(s"Servables: $servables")
           assert(servables.nonEmpty)
         }
       }

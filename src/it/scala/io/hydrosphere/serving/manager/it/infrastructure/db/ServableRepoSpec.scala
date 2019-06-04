@@ -38,6 +38,7 @@ class ServableRepoSpec extends FullIntegrationSpec {
       println(res)
       assert(res.isDefined, res)
       assert(res.get.modelVersion === mv1)
+      assert(res.get.nameSuffix === "test-servable")
     }
   }
 

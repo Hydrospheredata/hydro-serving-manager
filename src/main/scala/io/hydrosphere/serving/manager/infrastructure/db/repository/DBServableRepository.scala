@@ -100,12 +100,14 @@ object DBServableRepository {
   def mapFrom(service: Tables.ServableRow, version: (Tables.ModelVersionRow, Tables.ModelRow, Option[Tables.HostSelectorRow])): GenericServable = {
 
     val mv = DBModelVersionRepository.mapFromDb(version)
+    val suffix = service.serviceName.replaceFirst(s"${version._2.name}-${version._1.modelVersion}", "")
 
-    (service.status, service.host, service.port) match {
-      case ("Serving", Some(host), Some(port)) => Servable(mv, service.serviceName, Servable.Serving(service.statusText, host, port))
-      case ("NotServing", host, port) => Servable(mv, service.serviceName, Servable.NotServing(service.statusText, host, port))
-      case ("NotAvailable", host, port) => Servable(mv, service.serviceName, Servable.NotAvailable(service.statusText, host, port))
-      case (_, host, port) => Servable(mv, service.serviceName, Servable.Starting(service.statusText, host, port))
+    val status = (service.status, service.host, service.port) match {
+      case ("Serving", Some(host), Some(port)) => Servable.Serving(service.statusText, host, port)
+      case ("NotServing", host, port) => Servable.NotServing(service.statusText, host, port)
+      case ("NotAvailable", host, port) => Servable.NotAvailable(service.statusText, host, port)
+      case (_, host, port) => Servable.Starting(service.statusText, host, port)
     }
+    Servable(mv, suffix, status)
   }
 }
