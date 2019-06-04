@@ -28,6 +28,7 @@ class DBServableRepository[F[_]](
 
   override def upsert(entity: GenericServable): F[GenericServable] = {
     AsyncUtil.futureAsync {
+      logger.debug(s"upsert $entity")
       val (status, statusText, host, port) = entity.status match {
         case Servable.Serving(msg, h, p) => ("Serving", msg, h.some, p.some)
         case Servable.NotServing(msg, h, p) => ("NotServing", msg, h, p)
@@ -71,6 +72,7 @@ class DBServableRepository[F[_]](
   override def get(name: String): F[Option[GenericServable]] = {
     for {
       res <- AsyncUtil.futureAsync {
+        logger.debug(s"get $name")
         db.run {
           joineqQ.filter { case (s, _) => s.serviceName === name }
             .result.headOption
@@ -82,6 +84,7 @@ class DBServableRepository[F[_]](
   override def get(names: Seq[String]): F[List[GenericServable]] = {
     for {
       res <- AsyncUtil.futureAsync {
+        logger.debug(s"get $names")
         db.run {
           joineqQ.filter { case (s, _) => s.serviceName inSetBind names }
             .result
