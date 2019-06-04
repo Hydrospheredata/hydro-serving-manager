@@ -38,7 +38,7 @@ class DBServableRepository[F[_]](
       val row = Tables.ServableRow(
         serviceName = entity.fullName,
         modelVersionId = entity.modelVersion.id,
-        statusText = status,
+        statusText = statusText,
         host = host,
         port = port,
         status = status
