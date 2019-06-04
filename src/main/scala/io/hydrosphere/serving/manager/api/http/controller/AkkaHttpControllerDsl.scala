@@ -73,11 +73,11 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Logging {
     }
   }
 
-  final def completeF[F[_] : Effect, T: ToResponseMarshaller](res: F[T]): Route  = {
+  final def completeF[F[_] : Effect, T: ToResponseMarshaller](res: F[T]): Route = {
     withF(res)(complete(_))
   }
 
-  final def completeRes[T: ToResponseMarshaller](res: Either[DomainError, T]): Route  = {
+  final def completeRes[T: ToResponseMarshaller](res: Either[DomainError, T]): Route = {
     res match {
       case Left(a) =>
         a match {
@@ -108,13 +108,25 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Logging {
     }
   }
 
-  final def completeFRes[F[_] : Effect, T: ToResponseMarshaller](res: F[Either[DomainError, T]]): Route
-
-  = {
+  final def completeFRes[F[_] : Effect, T: ToResponseMarshaller](res: F[Either[DomainError, T]]): Route = {
     withF(res)(completeRes(_))
   }
 
   final def commonExceptionHandler = ExceptionHandler {
+    case x: DomainError.NotFound =>
+      complete(
+        HttpResponse(
+          status = StatusCodes.NotFound,
+          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].toJson.toString)
+        )
+      )
+    case x: DomainError.InvalidRequest =>
+      complete(
+        HttpResponse(
+          status = StatusCodes.BadRequest,
+          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].toJson.toString)
+        )
+      )
     case DeserializationException(msg, _, fields) =>
       logger.error(msg)
       complete(
