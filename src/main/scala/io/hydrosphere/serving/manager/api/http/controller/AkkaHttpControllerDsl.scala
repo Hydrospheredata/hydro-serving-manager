@@ -4,14 +4,12 @@ import java.nio.file.{Files, Path}
 
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.http.scaladsl.server.{Directives, ExceptionHandler, Route}
 import akka.stream.Materializer
 import akka.stream.scaladsl.FileIO
 import cats.effect.Effect
 import cats.syntax.flatMap._
 import io.hydrosphere.serving.manager.domain.DomainError
-import io.hydrosphere.serving.manager.domain.DomainError.{InternalError, InvalidRequest, NotFound}
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import org.apache.logging.log4j.scala.Logging
@@ -21,12 +19,12 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Logging {
+trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Logging {
 
   import AkkaHttpControllerDsl._
 
-  final def getFileWithMeta[F[_] : Effect, T: JsonReader, R: ToResponseMarshaller](callback: (Option[Path], Option[T]) => F[Either[DomainError, R]])
-    (implicit mat: Materializer, ec: ExecutionContext) = {
+  final def getFileWithMeta[F[_] : Effect, T: JsonReader, R: ToResponseMarshaller](callback: (Option[Path], Option[T]) => F[R])
+    (implicit mat: Materializer, ec: ExecutionContext): Route = {
     entity(as[Multipart.FormData]) { formdata =>
       val parts = formdata.parts.mapAsync(2) { part =>
         logger.debug(s"Got part ${part.name} filename=${part.filename}")
@@ -55,7 +53,7 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Logging {
         }
       }
 
-      completeFRes {
+      completeF {
         entitiesF.flatMap { entities =>
           val file = entities.find(_.isInstanceOf[UploadFile]).map(_.asInstanceOf[UploadFile].path)
           val metadata = entities.find(_.isInstanceOf[UploadMeta]).map(_.asInstanceOf[UploadMeta].meta.convertTo[T])
@@ -77,44 +75,21 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Logging {
     withF(res)(complete(_))
   }
 
-  final def completeRes[T: ToResponseMarshaller](res: Either[DomainError, T]): Route  = {
-    res match {
-      case Left(a) =>
-        a match {
-          case NotFound(_) =>
-            complete(
-              HttpResponse(
-                status = StatusCodes.NotFound,
-                entity = HttpEntity(ContentTypes.`application/json`, a.toJson.toString)
-              )
-            )
-          case InvalidRequest(_) =>
-            complete(
-              HttpResponse(
-                status = StatusCodes.BadRequest,
-                entity = HttpEntity(ContentTypes.`application/json`, a.toJson.toString)
-              )
-            )
-          case InternalError(err) =>
-            logger.error(err)
-            complete(
-              HttpResponse(
-                status = StatusCodes.InternalServerError,
-                entity = HttpEntity(ContentTypes.`application/json`, a.toJson.toString)
-              )
-            )
-        }
-      case Right(b) => complete(b)
-    }
-  }
-
-  final def completeFRes[F[_] : Effect, T: ToResponseMarshaller](res: F[Either[DomainError, T]]): Route
-
-  = {
-    withF(res)(completeRes(_))
-  }
-
   final def commonExceptionHandler = ExceptionHandler {
+    case x: DomainError.NotFound =>
+      complete(
+        HttpResponse(
+          StatusCodes.NotFound,
+          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].toJson.toString())
+        )
+      )
+    case x: DomainError.InvalidRequest =>
+      complete(
+        HttpResponse(
+          StatusCodes.BadRequest,
+          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].toJson.toString())
+        )
+      )
     case DeserializationException(msg, _, fields) =>
       logger.error(msg)
       complete(
