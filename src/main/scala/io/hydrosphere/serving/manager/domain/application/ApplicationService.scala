@@ -143,7 +143,7 @@ object ApplicationService extends Logging {
             val failedApp = app.copy(status = Application.Failed(composedApp.status.versionGraph, Some(x.getMessage)))
             F.delay(logger.error(s"Error while buidling application $failedApp", x)) >>
               applicationRepository.update(failedApp) >>
-              df.complete(failedApp).attempt
+              df.complete(failedApp).attempt.void
           }
           .start
       } yield DeferredResult(app.generic, df)
