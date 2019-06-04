@@ -96,17 +96,18 @@ class DBApplicationRepository[F[_]](
   }
 
   override def update(value: GenericApplication): F[Int] = AsyncUtil.futureAsync {
+    logger.debug(s"update $value")
     val query = for {
-      serv <- Tables.Application if serv.id === value.id
+      application <- Tables.Application if application.id === value.id
     } yield (
-      serv.applicationName,
-      serv.executionGraph,
-      serv.usedServables,
-      serv.kafkaStreams,
-      serv.namespace,
-      serv.applicationContract,
-      serv.status,
-      serv.statusMessage
+      application.applicationName,
+      application.executionGraph,
+      application.usedServables,
+      application.kafkaStreams,
+      application.namespace,
+      application.applicationContract,
+      application.status,
+      application.statusMessage
     )
     val status = flatten(value)
     db.run(query.update((
