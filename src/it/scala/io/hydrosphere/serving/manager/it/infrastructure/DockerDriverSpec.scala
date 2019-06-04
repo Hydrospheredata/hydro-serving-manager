@@ -11,19 +11,19 @@ import scala.collection.JavaConverters._
 
 class DockerDriverSpec extends IsolatedDockerAccessIT {
   describe("DockerdClient") {
+    val containerConfig = ContainerConfig.builder()
+      .image("hydrosphere/serving-runtime-dummy:latest")
+      .labels(Map(
+        "HS_INSTANCE_NAME" -> "test",
+        "HS_INSTANCE_MV_ID" -> "1"
+      ).asJava)
+      .attachStdout(true)
+      .attachStderr(true)
+      .build()
     it("should correctly map starting containers to CloudInstances") {
       val client = DockerdClient.create[IO](dockerClient)
       val config = CloudDriverConfiguration.Docker("local", None)
-      val c = ContainerConfig.builder()
-        .image("gan_model:1")
-        .labels(Map(
-          "HS_INSTANCE_NAME" -> "test",
-          "HS_INSTANCE_MV_ID" -> "1"
-        ).asJava)
-        .attachStdout(true)
-        .attachStderr(true)
-        .build()
-      val r = client.createContainer(c, None).unsafeRunSync()
+      val r = client.createContainer(containerConfig, None).unsafeRunSync()
       val driver = new DockerDriver[IO](client, config)
       val list = driver.instances.unsafeRunSync()
       println(list)
@@ -32,16 +32,7 @@ class DockerDriverSpec extends IsolatedDockerAccessIT {
     it("should correctly map running containers to CloudInstances") {
       val client = DockerdClient.create[IO](dockerClient)
       val config = CloudDriverConfiguration.Docker("local", None)
-      val c = ContainerConfig.builder()
-        .image("gan_model:1")
-        .labels(Map(
-          "HS_INSTANCE_NAME" -> "test",
-          "HS_INSTANCE_MV_ID" -> "1"
-        ).asJava)
-        .attachStdout(true)
-        .attachStderr(true)
-        .build()
-      val r = client.createContainer(c, None).unsafeRunSync()
+      val r = client.createContainer(containerConfig, None).unsafeRunSync()
       client.runContainer(r.id()).unsafeRunSync()
       Thread.sleep(5000)
       val driver = new DockerDriver[IO](client, config)
