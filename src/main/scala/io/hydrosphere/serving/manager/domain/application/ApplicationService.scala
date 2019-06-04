@@ -133,8 +133,8 @@ object ApplicationService extends Logging {
         df <- Deferred[F, GenericApplication]
         _ <- (for {
           genericApp <- startServices(app).map {
-            case Right(x) => x.generic
-            case Left(x) => x.generic
+            case Right(x) => x
+            case Left(x) => x
           }
           _ <- applicationRepository.update(genericApp)
           _ <- df.complete(genericApp)
