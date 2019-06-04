@@ -112,9 +112,9 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           val services = status.stages.flatMap(_.variants)
           val service1 = services.head
           val service2 = services.tail.head
-          assert(service1.weight === 50)
+          assert(service1.weight === 60)
           assert(service1.item.modelVersion.id === mv1.id)
-          assert(service2.weight === 50)
+          assert(service2.weight === 40)
           assert(service2.item.modelVersion.id === mv1.id)
         }
       }
