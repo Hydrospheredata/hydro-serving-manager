@@ -44,16 +44,7 @@ class DockerDriverSpec extends IsolatedDockerAccessIT {
     it("should correctly map stopped containers to CloudInstances") {
       val client = DockerdClient.create[IO](dockerClient)
       val config = CloudDriverConfiguration.Docker("local", None)
-      val c = ContainerConfig.builder()
-        .image("gan_model:1")
-        .labels(Map(
-          "HS_INSTANCE_NAME" -> "test",
-          "HS_INSTANCE_MV_ID" -> "1"
-        ).asJava)
-        .attachStdout(true)
-        .attachStderr(true)
-        .build()
-      val r = client.createContainer(c, None).unsafeRunSync()
+      val r = client.createContainer(containerConfig, None).unsafeRunSync()
       client.runContainer(r.id()).unsafeRunSync()
       dockerClient.pauseContainer(r.id())
       val driver = new DockerDriver[IO](client, config)
