@@ -12,9 +12,7 @@ case class Application[+T <: Application.Status](
   status: T,
   signature: ModelSignature,
   kafkaStreaming: List[ApplicationKafkaStream]
-) {
-  def generic: Application.GenericApplication = this
-}
+)
 
 object Application {
 

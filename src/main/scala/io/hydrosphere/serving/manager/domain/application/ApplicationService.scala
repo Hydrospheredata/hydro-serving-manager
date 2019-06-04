@@ -146,7 +146,7 @@ object ApplicationService extends Logging {
               df.complete(failedApp).attempt.void
           }
           .start
-      } yield DeferredResult(app.generic, df)
+      } yield DeferredResult(app, df)
     }
 
     def delete(name: String): F[GenericApplication] = {

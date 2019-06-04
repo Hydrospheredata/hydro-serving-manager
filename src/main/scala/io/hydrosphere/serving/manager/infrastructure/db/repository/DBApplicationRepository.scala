@@ -31,23 +31,26 @@ class DBApplicationRepository[F[_]](
   import databaseService._
   import databaseService.driver.api._
 
-
-  override def create(entity: GenericApplication): F[GenericApplication] = AsyncUtil.futureAsync {
-    logger.debug(s"create $entity")
-    val status = flatten(entity)
-    val elem = Tables.ApplicationRow(
-      id = entity.id,
-      applicationName = entity.name,
-      namespace = entity.namespace,
-      status = status.status,
-      applicationContract = entity.signature.toProtoString,
-      executionGraph = status.graph.toJson.compactPrint,
-      usedServables = status.usedServables,
-      kafkaStreams = entity.kafkaStreaming.map(p => p.toJson.toString()),
-      statusMessage = status.message
-    )
-    db.run(Tables.Application returning Tables.Application += elem)
-      .map(s => entity.copy(id = s.id))
+  override def create(entity: GenericApplication): F[GenericApplication] = {
+    for {
+      table <- AsyncUtil.futureAsync {
+        val status = flatten(entity)
+        val elem = Tables.ApplicationRow(
+          id = entity.id,
+          applicationName = entity.name,
+          namespace = entity.namespace,
+          status = status.status,
+          applicationContract = entity.signature.toProtoString,
+          executionGraph = status.graph.toJson.compactPrint,
+          usedServables = status.usedServables,
+          kafkaStreams = entity.kafkaStreaming.map(p => p.toJson.toString()),
+          statusMessage = status.message
+        )
+        db.run(Tables.Application returning Tables.Application += elem)
+      }
+      app = entity.copy(id = table.id)
+      _ = logger.debug(s"create $app")
+    } yield app
   }
 
   override def get(id: Long): F[Option[GenericApplication]] = {
