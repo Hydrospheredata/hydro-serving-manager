@@ -76,37 +76,6 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Lo
     withF(res)(complete(_))
   }
 
-  final def completeRes[T: ToResponseMarshaller](res: Either[DomainError, T]): Route  = {
-    res match {
-      case Left(a) =>
-        a match {
-          case NotFound(_) =>
-            complete(
-              HttpResponse(
-                status = StatusCodes.NotFound,
-                entity = HttpEntity(ContentTypes.`application/json`, a.toJson.toString)
-              )
-            )
-          case InvalidRequest(_) =>
-            complete(
-              HttpResponse(
-                status = StatusCodes.BadRequest,
-                entity = HttpEntity(ContentTypes.`application/json`, a.toJson.toString)
-              )
-            )
-          case InternalError(err) =>
-            logger.error(err)
-            complete(
-              HttpResponse(
-                status = StatusCodes.InternalServerError,
-                entity = HttpEntity(ContentTypes.`application/json`, a.toJson.toString)
-              )
-            )
-        }
-      case Right(b) => complete(b)
-    }
-  }
-
   final def commonExceptionHandler = ExceptionHandler {
     case DeserializationException(msg, _, fields) =>
       logger.error(msg)

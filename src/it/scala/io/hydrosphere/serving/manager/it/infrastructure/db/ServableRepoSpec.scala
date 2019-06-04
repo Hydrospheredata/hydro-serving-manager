@@ -30,7 +30,14 @@ class ServableRepoSpec extends FullIntegrationSpec {
     it("should upsert new Servable") {
       val servable = Servable(mv1, "test-servable", Servable.Serving("Ok", "localhost", 9090))
       val result = repositories.servableRepository.upsert(servable).unsafeRunSync()
+      println(result)
       assert(result.fullName === "m1-1-test-servable")
+    }
+    it("should get Servable by name") {
+      val res = repositories.servableRepository.get("m1-1-test-servable").unsafeRunSync()
+      println(res)
+      assert(res.isDefined, res)
+      assert(res.get.modelVersion === mv1)
     }
   }
 

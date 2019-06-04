@@ -67,6 +67,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           appResult <- managerServices.appService.create(create)
           started = appResult.started
           finished <- appResult.completed.get
+          servables <- repositories.servableRepository.all()
         } yield {
           assert(started.name === "simple-app")
           assert(finished.status.isInstanceOf[Application.Ready], finished.status)
@@ -76,6 +77,8 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           val models = status.stages.flatMap(_.variants)
           assert(models.head.weight === 100)
           assert(models.head.item.modelVersion.id === mv1.id)
+          println(s"Servables: $servables")
+          assert(servables.nonEmpty)
         }
       }
     }
