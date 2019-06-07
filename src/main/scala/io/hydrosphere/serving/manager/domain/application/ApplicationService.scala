@@ -14,7 +14,7 @@ import io.hydrosphere.serving.manager.domain.application.graph._
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
-import io.hydrosphere.serving.manager.domain.servable.ServableService
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.grpc.entities.ServingApp
 import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.manager.{domain, grpc}
@@ -52,7 +52,7 @@ object ApplicationService extends Logging {
       namespace: Option[String],
       executionGraph: ExecutionGraphRequest,
       kafkaStreaming: Option[List[ApplicationKafkaStream]]
-    ) = {
+    ): F[Application[Assembling]] = {
       for {
         _ <- checkApplicationName(name)
         versions <- executionGraph.stages.traverse { f =>
@@ -106,8 +106,19 @@ object ApplicationService extends Logging {
           for {
             variants <- stage.modelVariants.traverse { i =>
               for {
-                servable <- servableService.deploy(i.item)
-              } yield Variant(servable, i.weight)
+                result <- servableService.deploy(i.item)
+                servable <- result.completed.get
+                okServable <- servable.status match {
+                  case x: Servable.Serving =>
+                    servable.asInstanceOf[OkServable].pure[F]
+                  case Servable.NotServing(msg, _, _) =>
+                    F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
+                  case Servable.NotAvailable(msg, _, _) =>
+                    F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
+                  case Servable.Starting(msg, _, _) =>
+                    F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
+                }
+              } yield Variant(okServable, i.weight)
             }
           } yield ExecutionNode(variants, stage.signature)
         }

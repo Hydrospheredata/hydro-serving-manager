@@ -2,22 +2,25 @@ package io.hydrosphere.serving.manager.domain.servable
 
 import cats.data.OptionT
 import cats.effect._
+import cats.effect.concurrent.Deferred
 import cats.implicits._
+import cats.effect.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
+import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.manager.util.random.NameGenerator
 import org.apache.logging.log4j.scala.Logging
 
 import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
-  def findAndDeploy(name: String, version: Long): F[OkServable]
+  def findAndDeploy(name: String, version: Long): F[DeferredResult[F, GenericServable]]
 
   def stop(name: String): F[GenericServable]
 
-  def deploy(modelVersion: ModelVersion): F[OkServable]
+  def deploy(modelVersion: ModelVersion): F[DeferredResult[F, GenericServable]]
 }
 
 object ServableService extends Logging {
@@ -27,17 +30,23 @@ object ServableService extends Logging {
     versionRepository: ModelVersionRepository[F],
     nameGenerator: NameGenerator[F],
     monitor: ServableMonitor[F]
-  )(implicit F: Sync[F], timer: Timer[F]): ServableService[F] = new ServableService[F] {
+  )(implicit F: Concurrent[F], timer: Timer[F]): ServableService[F] = new ServableService[F] {
 
-    override def deploy(modelVersion: ModelVersion): F[OkServable] = {
+    override def deploy(modelVersion: ModelVersion): F[DeferredResult[F, GenericServable]] = {
       for {
         randomSuffix <- nameGenerator.getName()
+        d <- Deferred[F, GenericServable]
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None))
-        servable <- awaitServable(initServable)
+        _ <- awaitServable(initServable)
+          .map(d.complete)
           .onError {
-            case NonFatal(ex) => cloudDriver.remove(initServable.fullName) >> F.delay(logger.error(ex))
+            case NonFatal(ex) =>
+              cloudDriver.remove(initServable.fullName) >>
+                d.complete(initServable.copy(status = Servable.NotServing(ex.getMessage, None, None))).attempt >>
+                F.delay(logger.error(ex))
           }
-      } yield servable
+          .start
+      } yield DeferredResult(initServable, d)
     }
 
     def awaitServable(servable: GenericServable): F[OkServable] = {
@@ -62,7 +71,7 @@ object ServableService extends Logging {
       } yield servable
     }
 
-    override def findAndDeploy(name: String, version: Long): F[OkServable] = {
+    override def findAndDeploy(name: String, version: Long): F[DeferredResult[F, GenericServable]] = {
       for {
         version <- OptionT(versionRepository.get(name, version))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model $name:$version doesn't exist")))

@@ -57,7 +57,8 @@ class HttpApiServer[F[_]: Effect](
       swaggerController.routes ~
         modelController.routes ~
         applicationController.routes ~
-        environmentController.routes
+        environmentController.routes ~
+        servableController.routes
     }
   }
 

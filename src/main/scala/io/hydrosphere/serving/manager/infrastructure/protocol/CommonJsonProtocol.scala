@@ -6,6 +6,7 @@ import java.util.UUID
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.NonEmptyList
+import io.hydrosphere.serving.manager.util.DeferredResult
 import org.apache.logging.log4j.scala.Logging
 import scalapb._
 import spray.json._
@@ -104,6 +105,14 @@ trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with 
       case JsString(x) => LocalDateTime.parse(x, DateTimeFormatter.ISO_DATE_TIME)
       case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
     }
+  }
+
+  implicit def deferredResult[F[_], T: JsonFormat] = new RootJsonFormat[DeferredResult[F, T]] {
+    override def write(obj: DeferredResult[F, T]): JsValue = {
+      obj.started.toJson
+    }
+
+    override def read(json: JsValue): DeferredResult[F, T] = throw DeserializationException(s"Can't read Deferred from json: $json")
   }
 }
 

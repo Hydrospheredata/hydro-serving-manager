@@ -30,7 +30,7 @@ object DiscoveryGrpc {
         override def onNext(value: Empty): Unit = ()
         
         override def onError(t: Throwable): Unit = {
-          logger.error("Client stream failed", t)
+          logger.debug("Client stream failed", t)
           runSync(discoveryHub.unregister(id))
         }
         
