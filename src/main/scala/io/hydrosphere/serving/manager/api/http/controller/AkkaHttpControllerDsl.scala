@@ -77,6 +77,20 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Lo
   }
 
   final def commonExceptionHandler = ExceptionHandler {
+    case x: DomainError.NotFound =>
+      complete(
+        HttpResponse(
+          status = StatusCodes.NotFound,
+          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].toJson.toString)
+        )
+      )
+    case x: DomainError.InvalidRequest =>
+      complete(
+        HttpResponse(
+          status = StatusCodes.BadRequest,
+          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].toJson.toString)
+        )
+      )
     case DeserializationException(msg, _, fields) =>
       logger.error(msg)
       complete(
