@@ -32,15 +32,15 @@ class ServableController[F[_]]()(
   }
 
   @Path("/{name}")
-  @ApiOperation(value = "get servable", notes = "get servable", nickname = "get-servable", httpMethod = "DELETE")
+  @ApiOperation(value = "get servable", notes = "get servable", nickname = "get-servable", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "servable name", required = true, dataType = "string", paramType = "path", value = "name")
+    new ApiImplicitParam(name = "name", required = true, dataType = "string", paramType = "path", value = "name")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
-  def getServables = path("servable" / Segment) { name =>
+  def getServable = path("servable" / Segment) { name =>
     get {
       completeF {
         OptionT(servableRepository.get(name))
@@ -71,7 +71,7 @@ class ServableController[F[_]]()(
   @Path("/{name}")
   @ApiOperation(value = "stop servable", notes = "stop servable", nickname = "stop-servable", httpMethod = "DELETE")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "servable name", required = true, dataType = "string", paramType = "path", value = "name")
+    new ApiImplicitParam(name = "name", required = true, dataType = "string", paramType = "path", value = "name")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable]),
@@ -85,5 +85,5 @@ class ServableController[F[_]]()(
     }
   }
 
-  def routes = listServables ~ deployModel ~ stopServable
+  def routes = listServables ~ getServable ~ deployModel ~ stopServable
 }

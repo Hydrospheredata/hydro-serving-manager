@@ -37,6 +37,7 @@ object ServableService extends Logging {
         randomSuffix <- nameGenerator.getName()
         d <- Deferred[F, GenericServable]
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None))
+        _ <- servableRepository.upsert(initServable)
         _ <- awaitServable(initServable)
           .map(d.complete)
           .onError {
