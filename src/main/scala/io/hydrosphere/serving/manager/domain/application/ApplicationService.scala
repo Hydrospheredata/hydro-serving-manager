@@ -100,8 +100,8 @@ object ApplicationService extends Logging {
       } yield jsonData
     }
 
-    private def startServices(app: AssemblingApp): F[Either[FailedApp, ReadyApp]] = {
-      val finished = for {
+    private def startServices(app: AssemblingApp) = {
+      for {
         deployedServables <- app.status.versionGraph.traverse { stage =>
           for {
             variants <- stage.modelVariants.traverse { i =>
@@ -109,7 +109,7 @@ object ApplicationService extends Logging {
                 result <- servableService.deploy(i.item)
                 servable <- result.completed.get
                 okServable <- servable.status match {
-                  case x: Servable.Serving =>
+                  case _: Servable.Serving =>
                     servable.asInstanceOf[OkServable].pure[F]
                   case Servable.NotServing(msg, _, _) =>
                     F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
@@ -125,15 +125,7 @@ object ApplicationService extends Logging {
         finishedApp = app.copy(status = Application.Ready(deployedServables))
         translated = Internals.toServingApp(finishedApp)
         _ <- discoveryHub.added(translated)
-      } yield finishedApp.asRight[FailedApp]
-
-      finished.handleErrorWith { x =>
-        for {
-          _ <- F.delay(logger.error(s"ModelVersion deployment exception", x))
-        } yield
-          app.copy(status = Application.Failed(app.status.versionGraph, Option(x.getMessage)))
-            .asLeft[ReadyApp]
-      }
+      } yield finishedApp
     }
 
     def create(req: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
@@ -143,10 +135,7 @@ object ApplicationService extends Logging {
         app = composedApp.copy(id = repoApp.id)
         df <- Deferred[F, GenericApplication]
         _ <- (for {
-          genericApp <- startServices(app).map {
-            case Right(x) => x
-            case Left(x) => x
-          }
+          genericApp <- startServices(app)
           _ <- applicationRepository.update(genericApp)
           _ <- df.complete(genericApp)
         } yield ())

@@ -340,7 +340,7 @@ class ServableSpec extends GenericUnitTest {
         }
       }
       val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, nameGen, monitor)
-      val result = service.deploy(mv).unsafeRunSync()
+      val result = service.deploy(mv).unsafeRunSync().started
       assert(result.modelVersion === mv)
       driverState should not be empty
       monitorState should not be empty

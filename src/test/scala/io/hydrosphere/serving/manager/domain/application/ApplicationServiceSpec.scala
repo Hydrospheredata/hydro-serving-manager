@@ -4,6 +4,7 @@ import java.time.LocalDateTime
 
 import cats.data.NonEmptyList
 import cats.effect.IO
+import cats.effect.concurrent.Deferred
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
@@ -18,6 +19,7 @@ import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelV
 import io.hydrosphere.serving.manager.domain.servable.Servable._
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.grpc.entities.ServingApp
+import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.tensorflow.types.DataType
 import org.mockito.Matchers
 
@@ -72,15 +74,18 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         when(versionRepo.get(Seq(1L))).thenReturn(IO(Seq(modelVersion)))
         val servableService = new ServableService[IO] {
-          override def deploy(modelVersion: ModelVersion): IO[OkServable] = {
-            IO.pure(
-              Servable(modelVersion, "hi", Servable.Serving("Ok", "host", 9090))
-            )
+          override def deploy(modelVersion: ModelVersion): IO[DeferredResult[IO, GenericServable]] = {
+            IO.pure {
+              val s = Servable(modelVersion, "hi", Servable.Serving("Ok", "host", 9090))
+              val d = Deferred[IO, GenericServable].unsafeRunSync()
+              d.complete(s).unsafeRunSync()
+              DeferredResult(s, d)
+            }
           }
 
           override def stop(name: String): IO[GenericServable] = ???
 
-          override def findAndDeploy(name: String, version: Long): IO[OkServable] = ???
+          override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
         }
         val graphComposer = VersionGraphComposer.default
         val discoveryHub = mock[ApplicationDiscoveryHub[IO]]
@@ -131,10 +136,10 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         val servableService = new ServableService[IO] {
-          override def deploy(mv: ModelVersion): IO[OkServable] = {
+          override def deploy(mv: ModelVersion): IO[Nothing] = {
             IO.raiseError(new RuntimeException("Test error"))
           }
-          override def findAndDeploy(name: String, version: Long): IO[OkServable] = ???
+          override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
           override def stop(name: String): IO[GenericServable] = ???
         }
 
@@ -190,15 +195,18 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         when(versionRepo.get(Seq(1L))).thenReturn(IO(Seq(modelVersion)))
         val servableService = new ServableService[IO] {
-          override def deploy(mv: ModelVersion): IO[OkServable] = IO.pure {
-            Servable(
+          override def deploy(mv: ModelVersion) = IO.pure {
+            val s = Servable(
               modelVersion = mv,
               nameSuffix = "test",
               status = Servable.Serving("Ok", "host", 9090)
             )
+            val d = Deferred[IO, GenericServable].unsafeRunSync()
+            d.complete(s).unsafeRunSync()
+            DeferredResult(s, d)
           }
 
-          override def findAndDeploy(name: String, version: Long): IO[OkServable] = ???
+          override def findAndDeploy(name: String, version: Long) = ???
 
           override def stop(name: String): IO[GenericServable] = ???
         }
@@ -271,13 +279,16 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(versionRepo.get(Matchers.any[Seq[Long]]())).thenReturn(IO(Seq(modelVersion)))
 
         val servableService = new ServableService[IO] {
-          override def deploy(mv: ModelVersion): IO[OkServable] = {
-            IO.pure(
-              Servable(mv, "test", Servable.Serving("Ok", "host", 9090))
-            )
+          override def deploy(mv: ModelVersion) = {
+            IO.pure {
+              val s = Servable(mv, "test", Servable.Serving("Ok", "host", 9090))
+              val d = Deferred[IO, GenericServable].unsafeRunSync()
+              d.complete(s).unsafeRunSync()
+              DeferredResult(s, d)
+            }
           }
 
-          override def findAndDeploy(name: String, version: Long): IO[OkServable] = ???
+          override def findAndDeploy(name: String, version: Long) = ???
 
           override def stop(name: String): IO[GenericServable] = ???
         }
