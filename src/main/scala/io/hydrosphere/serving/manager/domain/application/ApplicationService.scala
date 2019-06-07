@@ -169,7 +169,7 @@ object ApplicationService extends Logging {
           case Application.Ready(graph) =>
             graph.traverse { s =>
               s.variants.traverse { ss =>
-                servableService.stop(ss.item.generic.fullName)
+                servableService.stop(ss.item.fullName)
               }.void
             }.void
           case _ =>

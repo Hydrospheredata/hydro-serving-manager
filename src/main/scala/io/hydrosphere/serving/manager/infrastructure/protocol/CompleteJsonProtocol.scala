@@ -1,20 +1,16 @@
 package io.hydrosphere.serving.manager.infrastructure.protocol
 
+import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
 import io.hydrosphere.serving.manager.api.http.controller.host_selector.CreateHostSelector
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.api.http.controller.servable.DeployModelRequest
 import io.hydrosphere.serving.manager.domain.DomainError
-//import io.hydrosphere.serving.manager.domain.clouddriver.{MetricServiceTargetLabels, MetricServiceTargets}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionView
 import spray.json._
 
 trait CompleteJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol with ModelJsonProtocol {
 
   implicit val createEnvironmentRequest = jsonFormat2(CreateHostSelector)
-
-//  implicit val metricServiceTargetLabelsFormat = jsonFormat11(MetricServiceTargetLabels)
-
-//  implicit val metricServiceTargetsFormat = jsonFormat2(MetricServiceTargets)
 
   implicit val errorFormat = new RootJsonFormat[DomainError] {
     override def write(obj: DomainError): JsValue = {
@@ -45,6 +41,8 @@ trait CompleteJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol 
 
   implicit val versionView = jsonFormat12(ModelVersionView.apply)
   implicit val deployModelFormat = jsonFormat2(DeployModelRequest.apply)
+
+  implicit val appView = jsonFormat7(ApplicationView.apply)
 }
 
 object CompleteJsonProtocol extends CompleteJsonProtocol

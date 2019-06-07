@@ -75,13 +75,13 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
     override def write(obj: Servable.Status): JsValue = {
       val fields = obj match {
         case x: Servable.Serving =>
-          x.toJson.asJsObject.fields + "status" -> JsString("Serving")
+          x.toJson.asJsObject.fields ++ Map("status" -> JsString("Serving"))
         case x: Servable.NotServing =>
-          x.toJson.asJsObject.fields + "status" -> JsString("NotServing")
+          x.toJson.asJsObject.fields ++ Map("status" -> JsString("NotServing"))
         case x: Servable.NotAvailable =>
-          x.toJson.asJsObject.fields + "status" -> JsString("NotAvailable")
+          x.toJson.asJsObject.fields ++ Map("status" -> JsString("NotAvailable"))
         case x: Servable.Starting =>
-          x.toJson.asJsObject.fields + "status" -> JsString("Unknown")
+          x.toJson.asJsObject.fields ++ Map("status" -> JsString("Unknown"))
       }
       JsObject(fields)
     }
@@ -129,10 +129,19 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
 
   implicit val applicationStageFormat          = jsonFormat2(PipelineStage.apply)
   implicit val applicationKafkaStreamingFormat = jsonFormat4(ApplicationKafkaStream)
-  implicit val appSFormat = new RootJsonFormat[Application.Status] {
-    override def read(json: JsValue): Application.Status = ???
+  implicit val execNode = jsonFormat2(ExecutionNode.apply)
+  implicit val appOk = jsonFormat1(Application.Ready)
+  implicit val appAssembling = jsonFormat1(Application.Assembling)
+  implicit val appFail = jsonFormat2(Application.Failed)
 
-    override def write(obj: Application.Status): JsValue = ???
+  implicit val appSFormat = new RootJsonFormat[Application.Status] {
+    override def read(json: JsValue): Application.Status = throw DeserializationException(s"Can't deserialize Application json: $json")
+
+    override def write(obj: Application.Status): JsValue = obj match {
+      case x: Application.Assembling => x.toJson
+      case x: Application.Failed => x.toJson
+      case x: Application.Ready => x.toJson
+    }
   }
 
   implicit def applicationFormat[T <: Application.Status](implicit jf: JsonFormat[T]) =

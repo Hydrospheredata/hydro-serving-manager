@@ -50,17 +50,13 @@ object ServableService extends Logging {
       } yield DeferredResult(initServable, d)
     }
 
-    def awaitServable(servable: GenericServable): F[OkServable] = {
+    def awaitServable(servable: GenericServable): F[GenericServable] = {
       for {
         _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image)
         servableDef <- monitor.monitor(servable)
         servable <- servableDef.get
-        s <- servable.status match {
-          case x: Servable.Serving => F.pure(servable.copy(status = x))
-          case x => F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $x"))
-        }
-        _ <- servableRepository.upsert(s)
-      } yield s
+        _ <- servableRepository.upsert(servable)
+      } yield servable
     }
 
     override def stop(name: String): F[Servable.GenericServable] = {

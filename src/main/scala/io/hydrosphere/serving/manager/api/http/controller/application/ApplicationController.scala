@@ -1,7 +1,8 @@
-package io.hydrosphere.serving.manager.api.http.controller
+package io.hydrosphere.serving.manager.api.http.controller.application
 
 import cats.effect.Effect
-import cats.syntax.functor._
+import cats.syntax.all._
+import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.requests.{CreateApplicationRequest, UpdateApplicationRequest}
@@ -23,7 +24,11 @@ class ApplicationController[F[_]: Effect]()(
   ))
   def listAll = path("application") {
     get {
-      completeF(appRepository.all())
+      completeF{
+        for {
+          apps <- appRepository.all()
+        } yield apps.map(ApplicationView.fromApplication)
+      }
     }
   }
 
@@ -39,7 +44,11 @@ class ApplicationController[F[_]: Effect]()(
   ))
   def getApp = path("application" / Segment) { appName =>
     get {
-      completeF(appService.get(appName))
+      completeF{
+        for {
+          app <- appService.get(appName)
+        } yield ApplicationView.fromApplication(app)
+      }
     }
   }
 
@@ -56,9 +65,11 @@ class ApplicationController[F[_]: Effect]()(
   def create = path("application") {
     post {
       entity(as[CreateApplicationRequest]) { r =>
-        completeF(
-          appService.create(r).map(_.started)
-        )
+        completeF{
+          for {
+            app <- appService.create(r)
+          } yield ApplicationView.fromApplication(app.started)
+        }
       }
     }
   }
@@ -76,9 +87,11 @@ class ApplicationController[F[_]: Effect]()(
   def update = pathPrefix("application") {
     put {
       entity(as[UpdateApplicationRequest]) { r =>
-        completeF(
-          appService.update(r).map(_.started)
-        )
+        completeF{
+          for {
+            app <- appService.update(r)
+          } yield ApplicationView.fromApplication(app.started)
+        }
       }
     }
   }
@@ -94,7 +107,11 @@ class ApplicationController[F[_]: Effect]()(
   ))
   def deleteApplicationByName = delete {
     path("application" / Segment) { appName =>
-      completeF(appService.delete(appName))
+      completeF{
+        for {
+          app <- appService.delete(appName)
+        } yield ApplicationView.fromApplication(app)
+      }
     }
   }
 

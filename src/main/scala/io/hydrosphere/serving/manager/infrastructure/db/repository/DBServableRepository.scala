@@ -23,7 +23,7 @@ class DBServableRepository[F[_]](
   import databaseService.driver.api._
 
   val joineqQ = Tables.Servable
-    .join(modelVersionRepository.joinedQ)
+    .joinLeft(modelVersionRepository.joinedQ)
     .on { case (s, (m, _, _)) => s.modelVersionId === m.modelVersionId }
 
   override def upsert(entity: GenericServable): F[GenericServable] = {
@@ -57,15 +57,13 @@ class DBServableRepository[F[_]](
   override def all(): F[List[GenericServable]] = {
     for {
       res <- AsyncUtil.futureAsync {
-        db.run {
-          Tables.Servable
-            .join(modelVersionRepository.joinedQ)
-            .result
-        }
+        db.run (joineqQ.result)
       }
     } yield {
-      res.map { case (servable, version) => mapFrom(servable, version) }
-        .toList
+      res.flatMap {
+        case (servable, Some(version)) => mapFrom(servable, version) :: Nil
+        case _ => Nil
+      }.toList
     }
   }
 
@@ -74,11 +72,13 @@ class DBServableRepository[F[_]](
       res <- AsyncUtil.futureAsync {
         logger.debug(s"get $name")
         db.run {
-          joineqQ.filter { case (s, _) => s.serviceName === name }
-            .result.headOption
+          joineqQ.filter { case (s, _) => s.serviceName === name }.result.headOption
         }
       }
-    } yield res.map { case (servable, version) => mapFrom(servable, version) }
+    } yield res.flatMap {
+      case (servable, Some(version)) => mapFrom(servable, version).some
+      case _ => None
+    }
   }
 
   override def get(names: Seq[String]): F[List[GenericServable]] = {
@@ -90,8 +90,11 @@ class DBServableRepository[F[_]](
             .result
         }
       }
-      servables = res.map { case (servable, version) => mapFrom(servable, version) }
-    } yield servables.toList
+      servables = res.toList.flatMap {
+        case (servable, Some(version)) => mapFrom(servable, version) :: Nil
+        case _ => Nil
+      }
+    } yield servables
   }
 }
 
