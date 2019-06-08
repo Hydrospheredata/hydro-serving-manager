@@ -39,10 +39,10 @@ object ServableService extends Logging {
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None))
         _ <- servableRepository.upsert(initServable)
         _ <- awaitServable(initServable)
-          .map(d.complete)
+          .flatMap(d.complete)
           .onError {
             case NonFatal(ex) =>
-              cloudDriver.remove(initServable.fullName) >>
+              cloudDriver.remove(initServable.fullName).attempt >>
                 d.complete(initServable.copy(status = Servable.NotServing(ex.getMessage, None, None))).attempt >>
                 F.delay(logger.error(ex))
           }
@@ -55,7 +55,6 @@ object ServableService extends Logging {
         _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image)
         servableDef <- monitor.monitor(servable)
         servable <- servableDef.get
-        _ <- servableRepository.upsert(servable)
       } yield servable
     }
 
