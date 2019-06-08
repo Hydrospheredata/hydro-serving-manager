@@ -1,10 +1,8 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
-import cats.data.{EitherT, OptionT}
-import cats.instances.list.catsStdInstancesForList
-import cats.syntax.flatMap._
-import cats.syntax.functor._
-import cats.{Monad, Traverse}
+import cats.data.OptionT
+import cats.implicits._
+import cats.{MonadError, Traverse}
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.model.ModelValidator
@@ -13,7 +11,7 @@ import org.apache.logging.log4j.scala.Logging
 import scala.concurrent.ExecutionContext
 
 trait ModelVersionService[F[_]] {
-  def get(name: String, version: Long): F[Either[DomainError, ModelVersion]]
+  def get(name: String, version: Long): F[ModelVersion]
 
   def deleteVersions(mvs: Seq[ModelVersion]): F[Seq[ModelVersion]]
 
@@ -21,16 +19,17 @@ trait ModelVersionService[F[_]] {
 
   def list: F[Seq[ModelVersionView]]
 
-  def modelVersionsByModelVersionIds(modelIds: Set[Long]): F[Seq[ModelVersion]]
-
   def delete(versionId: Long): F[Option[ModelVersion]]
 }
 
 object ModelVersionService {
-  def apply[F[_] : Monad](
+  def apply[F[_]](
     modelVersionRepository: ModelVersionRepository[F],
     applicationRepo: ApplicationRepository[F]
-  )(implicit executionContext: ExecutionContext): ModelVersionService[F] = new ModelVersionService[F] with Logging {
+  )(
+    implicit F: MonadError[F, Throwable],
+    executionContext: ExecutionContext
+  ): ModelVersionService[F] = new ModelVersionService[F] with Logging {
 
     def deleteVersions(mvs: Seq[ModelVersion]): F[Seq[ModelVersion]] = {
       Traverse[List].traverse(mvs.toList) { version =>
@@ -52,10 +51,6 @@ object ModelVersionService {
       }
     }
 
-    def modelVersionsByModelVersionIds(modelIds: Set[Long]): F[Seq[ModelVersion]] = {
-      modelVersionRepository.modelVersionsByModelVersionIds(modelIds)
-    }
-
     def delete(versionId: Long): F[Option[ModelVersion]] = {
       val f = for {
         version <- OptionT(modelVersionRepository.get(versionId))
@@ -70,18 +65,13 @@ object ModelVersionService {
       } yield versions.headOption.fold(1L)(_.modelVersion + 1)
     }
 
-    override def get(name: String, version: Long): F[Either[DomainError, ModelVersion]] = {
-      val f = for {
-        _ <- EitherT.fromOption[F].apply(
-          ModelValidator.name(name),
-          DomainError.invalidRequest("Name contains invalid characters.")
-        )
-        version <- EitherT.fromOptionF(
-          modelVersionRepository.get(name, version),
-          DomainError.notFound(s"Can't find a ModelVersion $name:$version")
-        )
-      } yield version
-      f.value
+    override def get(name: String, version: Long): F[ModelVersion] = {
+      for {
+        _ <- F.fromOption(ModelValidator.name(name), DomainError.invalidRequest("Name contains invalid characters."))
+
+        mv <- OptionT(modelVersionRepository.get(name, version))
+            .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $name:$version")))
+      } yield mv
     }
   }
 }

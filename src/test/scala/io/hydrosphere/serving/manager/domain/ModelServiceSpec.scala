@@ -3,7 +3,8 @@ package io.hydrosphere.serving.manager.domain
 import java.nio.file.{Path, Paths}
 import java.time.LocalDateTime
 
-import cats.Id
+import cats.syntax.option._
+import cats.effect.IO
 import cats.effect.concurrent.Deferred
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
@@ -14,10 +15,11 @@ import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, ModelService, ModelVersionMetadata}
-import io.hydrosphere.serving.manager.domain.model_build.{BuildResult, ModelVersionBuilder}
+import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{FetcherResult, ModelFetcher}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, ModelUnpacker}
+import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.tensorflow.TensorShape
 import io.hydrosphere.serving.tensorflow.types.DataType
 import org.mockito.Matchers
@@ -71,33 +73,33 @@ class ModelServiceSpec extends GenericUnitTest {
           installCommand = None
         )
 
-        val modelRepo = mock[ModelRepository[Id]]
-        when(modelRepo.get(Matchers.anyLong())).thenReturn(None)
+        val modelRepo = mock[ModelRepository[IO]]
+        when(modelRepo.get(Matchers.anyLong())).thenReturn(IO(None))
 
-        val storageMock = mock[ModelUnpacker[Id]]
-        when(storageMock.unpack(uploadFile)).thenReturn(ModelFileStructure.forRoot(uploadFile))
-        when(modelRepo.get(modelName)).thenReturn(None)
-        when(modelRepo.create(Model(0, modelName))).thenReturn(model)
+        val storageMock = mock[ModelUnpacker[IO]]
+        when(storageMock.unpack(uploadFile)).thenReturn(IO(ModelFileStructure.forRoot(uploadFile)))
+        when(modelRepo.get(modelName)).thenReturn(IO(None))
+        when(modelRepo.create(Model(0, modelName))).thenReturn(IO(model))
 
-        val versionBuilder = mock[ModelVersionBuilder[Id]]
-        when(versionBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
-          BuildResult(modelVersion, new Deferred[Id, ModelVersion] {
-            override def get: Id[ModelVersion] = modelVersion
+        val versionBuilder = mock[ModelVersionBuilder[IO]]
+        when(versionBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(IO(
+          DeferredResult(modelVersion, new Deferred[IO, ModelVersion] {
+            override def get = IO(modelVersion)
 
-            override def complete(a: ModelVersion): Id[Unit] = Unit
+            override def complete(a: ModelVersion) = IO.unit
           })
-        )
+        ))
 
-        val modelVersionService = mock[ModelVersionService[Id]]
-        when(modelVersionService.getNextModelVersion(1)).thenReturn(1L)
-        val modelVersionRepository = mock[ModelVersionRepository[Id]]
-        val selectorRepo = mock[HostSelectorRepository[Id]]
+        val modelVersionService = mock[ModelVersionService[IO]]
+        when(modelVersionService.getNextModelVersion(1)).thenReturn(IO(1L))
+        val modelVersionRepository = mock[ModelVersionRepository[IO]]
+        val selectorRepo = mock[HostSelectorRepository[IO]]
 
-        val fetcher = new ModelFetcher[Id] {
-          override def fetch(path: Path): Id[Option[FetcherResult]] = None
+        val fetcher = new ModelFetcher[IO] {
+          override def fetch(path: Path) = IO(None)
         }
 
-        val modelManagementService = ModelService[Id](
+        val modelManagementService = ModelService[IO](
           modelRepository = modelRepo,
           modelVersionService = modelVersionService,
           modelVersionRepository = modelVersionRepository,
@@ -108,9 +110,9 @@ class ModelServiceSpec extends GenericUnitTest {
           modelVersionBuilder = versionBuilder
         )
 
-        val maybeModel = modelManagementService.uploadModel(uploadFile, upload)
+        val maybeModel = modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
         assert(maybeModel.isRight, maybeModel)
-        val rModel = maybeModel.right.get.startedVersion
+        val rModel = maybeModel.right.get.started
         println(rModel)
         assert(rModel.model.name === "tf-model")
       }
@@ -169,27 +171,27 @@ class ModelServiceSpec extends GenericUnitTest {
         )
         println(upload)
 
-        val modelRepo = mock[ModelRepository[Id]]
-        when(modelRepo.update(Matchers.any(classOf[Model]))).thenReturn(1)
-        when(modelRepo.get(modelName)).thenReturn(Some(model))
-        when(modelRepo.get(1)).thenReturn(Some(model))
+        val modelRepo = mock[ModelRepository[IO]]
+        when(modelRepo.update(Matchers.any(classOf[Model]))).thenReturn(IO(1))
+        when(modelRepo.get(modelName)).thenReturn(IO(model.some))
+        when(modelRepo.get(1)).thenReturn(IO(model.some))
 
-        val storageMock = mock[ModelUnpacker[Id]]
-        when(storageMock.unpack(uploadFile)).thenReturn(ModelFileStructure.forRoot(Paths.get(".AAAAAAAAA")))
+        val storageMock = mock[ModelUnpacker[IO]]
+        when(storageMock.unpack(uploadFile)).thenReturn(IO(ModelFileStructure.forRoot(Paths.get(".AAAAAAAAA"))))
 
-        val versionService = mock[ModelVersionBuilder[Id]]
-        when(versionService.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
-          BuildResult(modelVersion, new Deferred[Id, ModelVersion] {
-            override def get: Id[ModelVersion] = modelVersion
+        val versionService = mock[ModelVersionBuilder[IO]]
+        when(versionService.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(IO(
+          DeferredResult(modelVersion, new Deferred[IO, ModelVersion] {
+            override def get = IO(modelVersion)
 
-            override def complete(a: ModelVersion): Id[Unit] = Unit
+            override def complete(a: ModelVersion) = IO.unit
           })
-        )
-        val fetcher = new ModelFetcher[Id] {
-          override def fetch(path: Path): Id[Option[FetcherResult]] = None
+        ))
+        val fetcher = new ModelFetcher[IO] {
+          override def fetch(path: Path) = IO(None)
         }
 
-        val modelManagementService = ModelService[Id](
+        val modelManagementService = ModelService[IO](
           modelRepository = modelRepo,
           modelVersionService = null,
           modelVersionRepository = null,
@@ -200,9 +202,9 @@ class ModelServiceSpec extends GenericUnitTest {
           modelVersionBuilder = versionService
         )
 
-        val maybeModel = modelManagementService.uploadModel(uploadFile, upload)
+        val maybeModel = modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
         assert(maybeModel.isRight, maybeModel)
-        val rModel = maybeModel.right.get.startedVersion
+        val rModel = maybeModel.right.get.started
         assert(rModel.model.name === "upload-model", rModel)
       }
     }

@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.it
 
-import io.hydrosphere.serving.manager.util.docker.IsolatedDockerClient
+import io.hydrosphere.serving.manager.infrastructure.docker.IsolatedDockerClient
 import org.apache.logging.log4j.scala.Logging
 import org.scalatest.{AsyncFunSpecLike, BeforeAndAfterAll}
 

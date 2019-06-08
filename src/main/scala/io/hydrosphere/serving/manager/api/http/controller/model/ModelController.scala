@@ -1,7 +1,6 @@
 package io.hydrosphere.serving.manager.api.http.controller.model
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import cats.effect.Effect
@@ -16,13 +15,12 @@ import javax.ws.rs.Path
 
 @Path("/api/v2/model")
 @Api(produces = "application/json", tags = Array("Model and Model Versions"))
-class ModelController[F[_]: Effect](
-  modelManagementService: ModelService[F],
+class ModelController[F[_]: Effect]()(
+  implicit modelManagementService: ModelService[F],
   modelRepo: ModelRepository[F],
-  modelVersionManagementService: ModelVersionService[F]
-)(
-  implicit val system: ActorSystem,
-  val materializer: ActorMaterializer,
+  modelVersionManagementService: ModelVersionService[F],
+  system: ActorSystem,
+  materializer: ActorMaterializer,
 ) extends AkkaHttpControllerDsl {
   implicit val ec = system.dispatcher
 
@@ -49,7 +47,7 @@ class ModelController[F[_]: Effect](
   ))
   def getModel = pathPrefix("model" / LongNumber) { id =>
     get {
-      completeFRes {
+      completeF {
         modelManagementService.get(id)
       }
     }
@@ -70,10 +68,9 @@ class ModelController[F[_]: Effect](
       getFileWithMeta[F, ModelUploadMetadata, ModelVersion] {
         case (Some(file), Some(meta)) =>
           logger.info(s"Upload request path=$file, metadata=$meta")
-          modelManagementService.uploadModel(file, meta)
-            .map(x => x.right.map(_.startedVersion))
-        case (None, _) => Effect[F].pure(Left(InvalidRequest("Couldn't find a payload in request")))
-        case (_, None) => Effect[F].pure(Left(InvalidRequest("Couldn't find a metadata in request")))
+          modelManagementService.uploadModel(file, meta).map(x => x.started)
+        case (None, _) => Effect[F].raiseError(InvalidRequest("Couldn't find a payload in request"))
+        case (_, None) => Effect[F].raiseError(InvalidRequest("Couldn't find a metadata in request"))
       }
     }
   }
@@ -105,7 +102,7 @@ class ModelController[F[_]: Effect](
   ))
   def getModelVersions = path("model" / "version" / Segment / LongNumber) { (name, version) =>
     get {
-      completeFRes(
+      completeF(
         modelVersionManagementService.get(name, version)
       )
     }
@@ -122,7 +119,7 @@ class ModelController[F[_]: Effect](
   ))
   def deleteModel = pathPrefix("model" / LongNumber) { modelId =>
     delete {
-      completeFRes {
+      completeF {
         modelManagementService.deleteModel(modelId)
       }
     }

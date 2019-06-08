@@ -2,6 +2,8 @@ package io.hydrosphere.serving.manager.config
 
 import java.nio.file.{Files, Path, Paths}
 
+import cats.effect.Sync
+
 import scala.util.Try
 
 case class DockerClientProxy(
@@ -26,11 +28,9 @@ object DockerClientConfig {
 
   final val defaultConfigPath = Paths.get(System.getProperty("user.home"), ".docker/config.json")
 
-  def load(path: Path): Try[DockerClientConfig] = {
-    Try {
-      val fileBytes = Files.readAllBytes(path)
-      val fileContent = new String(fileBytes)
-      fileContent.parseJson.convertTo[DockerClientConfig]
-    }
+  def load[F[_]](path: Path)(implicit F: Sync[F]): F[DockerClientConfig] = F.delay {
+    val fileBytes = Files.readAllBytes(path)
+    val fileContent = new String(fileBytes)
+    fileContent.parseJson.convertTo[DockerClientConfig]
   }
 }

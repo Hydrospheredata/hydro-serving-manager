@@ -7,21 +7,24 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import cats.data.EitherT
 import cats.effect.IO
-import cats.syntax.traverse._
 import cats.instances.list._
+import cats.syntax.traverse._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.grpc.Server
 import io.hydrosphere.serving.manager._
 import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
-import io.hydrosphere.serving.manager.discovery.{DiscoveryHub, ObservedDiscoveryHub}
+import io.hydrosphere.serving.manager.discovery.application.{ApplicationDiscoveryHub, ObservedApplicationDiscoveryHub}
 import io.hydrosphere.serving.manager.domain.DomainError
+import io.hydrosphere.serving.manager.domain.application.Application
+import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.grpc.entities.ServingApp
+import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.util.TarGzUtils
+import io.hydrosphere.serving.manager.util.random.RNG
 import org.scalatest._
 
 import scala.concurrent.duration._
@@ -36,6 +39,8 @@ trait FullIntegrationSpec extends DatabaseAccessIT
   implicit val ex = ExecutionContext.global
   implicit val contextShift = IO.contextShift(ex)
   implicit val timeout = Timeout(5.minute)
+  implicit val timer = IO.timer(ex)
+  implicit val rng = RNG.default[IO].unsafeRunSync()
 
   val dummyImage = DockerImage(
     name = "hydrosphere/serving-runtime-dummy",
@@ -51,50 +56,50 @@ trait FullIntegrationSpec extends DatabaseAccessIT
     ).root()
   )
 
-  private[this] val originalConfiguration = ManagerConfiguration.load
+  private[this] val originalConfiguration = ManagerConfiguration.load[IO]
 
-  def configuration = originalConfiguration.right.get
+  def configuration = originalConfiguration.unsafeRunSync()
 
-  var managerRepositories: ManagerRepositories[IO] = _
+  var repositories: Repositories[IO] = _
   var cloudDriver: CloudDriver[IO] = _
-  var managerServices: ManagerServices[IO] = _
-  var discoveryHub: ObservedDiscoveryHub[IO] = _
+  var managerServices: Services[IO] = _
+  var discoveryHub: ObservedApplicationDiscoveryHub[IO] = _
   var managerApi: HttpApiServer[IO] = _
   var managerGRPC: Server = _
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     cloudDriver = CloudDriver.fromConfig[IO](configuration.cloudDriver, configuration.dockerRepository)
-    managerRepositories = new ManagerRepositories[IO](configuration)
-    val discoveryHubIO = for {
-      observed <- DiscoveryHub.observed[IO]
-      instances <- cloudDriver.instances
-      apps <- managerRepositories.applicationRepository.all()
-      _ <- IO(logger.info(s"$instances"))
-      needToDeploy = for {
-        app <- apps
-      } yield {
-        val versions = app.executionGraph.stages.flatMap(_.modelVariants.map(_.modelVersion))
-        val deployed = instances.filter(inst => versions.map(_.id).contains(inst.modelVersionId))
-        IO.fromEither(Internals.toServingApp(app, deployed))
+    repositories = new Repositories[IO](configuration)
+      val discoveryHubIO = for {
+      observed <- ApplicationDiscoveryHub.observed[IO]
+      apps     <- repositories.applicationRepository.all()
+      needToDiscover = apps.flatMap { app =>
+        app.status match {
+          case _: Application.Ready =>
+            Internals.toServingApp(app.asInstanceOf[ReadyApp]) :: Nil
+          case _ => Nil
+        }
       }
-      servingApps <- needToDeploy.toList.sequence[IO, ServingApp]
-      _ <- servingApps.map(x => observed.added(x)).sequence
+      _ <- needToDiscover.traverse(observed.added)
     } yield observed
 
     discoveryHub = discoveryHubIO.unsafeRunSync()
+    val channelCtor = GrpcChannel.plaintextFactory[IO]
+    val predictionClient = PredictionClient.clientCtor[IO](channelCtor)
 
-    managerServices = new ManagerServices[IO](
+    managerServices = new Services[IO](
       discoveryHub,
-      managerRepositories,
+      repositories,
       configuration,
       dockerClient,
       DockerClientConfig(),
-      cloudDriver
+      cloudDriver,
+      predictionClient
     )
-    managerRepositories = new ManagerRepositories(configuration)
-    managerApi = new HttpApiServer(managerRepositories, managerServices, configuration)
-    managerGRPC = GrpcApiServer[IO](managerRepositories, managerServices, configuration, discoveryHub)
+    repositories = new Repositories(configuration)
+    managerApi = new HttpApiServer(repositories, managerServices, configuration)
+    managerGRPC = GrpcApiServer[IO](repositories, managerServices, configuration, discoveryHub)
     managerApi.start()
     managerGRPC.start()
   }

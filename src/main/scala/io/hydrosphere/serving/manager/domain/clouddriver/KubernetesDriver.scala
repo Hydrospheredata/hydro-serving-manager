@@ -1,36 +1,36 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
+
 import cats.effect.Async
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.domain.servable.Servable
 
 import scala.util.Try
 
 class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDriver[F] {
-  private def kubeSvc2Servable(svc: skuber.Service): Option[Servable] = for {
+  private def kubeSvc2Servable(svc: skuber.Service): Option[CloudInstance] = for {
     modelVersionId <- Try(svc.metadata.labels(CloudDriver.Labels.ModelVersionId).toLong).toOption
     serviceName <- Try(svc.metadata.labels(CloudDriver.Labels.ServiceName)).toOption
     host <- svc.spec.map(_.clusterIP)
     port <- svc.spec.flatMap(_.ports.find(_.name == "grpc")).map(_.port)
-  } yield Servable(
+  } yield CloudInstance(
     modelVersionId,
     serviceName,
-    Servable.Status.Running(host, port)
+    CloudInstance.Status.Running(host, port)
   )
   
-  override def instances: F[List[Servable]] = client.services.map(_.map(kubeSvc2Servable).collect {case Some(v) => v })
+  override def instances: F[List[CloudInstance]] = client.services.map(_.map(kubeSvc2Servable).collect {case Some(v) => v })
 
-  override def instance(name: String): F[Option[Servable]] = instances.map(_.find(_.serviceName == name))
+  override def instance(name: String): F[Option[CloudInstance]] = instances.map(_.find(_.name == name))
 
-  override def run(name: String, modelVersionId: Long, image: DockerImage): F[Servable] = {
-    val servable = Servable(modelVersionId, name, Servable.Status.Starting)
+  override def run(name: String, modelVersionId: Long, image: DockerImage): F[CloudInstance] = {
+    val servable = CloudInstance(modelVersionId, name, CloudInstance.Status.Starting)
     for {
       _ <- client.runDeployment(name, servable, image)
       service <- client.runService(name, servable)
       maybeServable = kubeSvc2Servable(service)
       newServable <- maybeServable match {
         case Some(value) => Async[F].pure(value)
-        case None => Async[F].raiseError(new RuntimeException(s"Cannot create Servable from kube Service $service"))
+        case None => Async[F].raiseError[CloudInstance](new RuntimeException(s"Cannot create Servable from kube Service $service"))
       }
     } yield newServable
   }

@@ -95,6 +95,8 @@ object Dependencies {
       "org.flywaydb" % "flyway-core" % "4.2.0",
       "com.spotify" % "docker-client" % "8.12.0" exclude("ch.qos.logback", "logback-classic"),
       "com.google.guava" % "guava" % "22.0",
-      "com.github.pureconfig" %% "pureconfig" % "0.9.1"
+      "com.github.pureconfig" %% "pureconfig" % "0.9.1",
+      "co.fs2" %% "fs2-core" % "1.0.4",
+      "co.fs2" %% "fs2-io" % "1.0.4"
     )
 }

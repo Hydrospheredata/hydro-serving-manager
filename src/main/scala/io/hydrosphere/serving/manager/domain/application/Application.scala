@@ -1,14 +1,33 @@
 package io.hydrosphere.serving.manager.domain.application
 
+import cats.data.NonEmptyList
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
-import io.hydrosphere.serving.manager.domain.application.ApplicationStatus.ApplicationStatus
+import io.hydrosphere.serving.manager.domain.application.graph.ExecutionNode
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 
-case class Application(
+case class Application[+T <: Application.Status](
   id: Long,
   name: String,
   namespace: Option[String],
-  status: ApplicationStatus,
+  status: T,
   signature: ModelSignature,
-  executionGraph: ApplicationExecutionGraph,
-  kafkaStreaming: Seq[ApplicationKafkaStream]
+  kafkaStreaming: List[ApplicationKafkaStream]
 )
+
+object Application {
+
+  type GenericApplication = Application[Status]
+
+  sealed trait Status
+
+  case class Assembling(versionGraph: NonEmptyList[PipelineStage]) extends Status
+
+  case class Failed(versionGraph: NonEmptyList[PipelineStage], reason: Option[String]) extends Status
+
+  case class Ready(stages: NonEmptyList[ExecutionNode]) extends Status
+
+  type AssemblingApp = Application[Assembling]
+  type FailedApp     = Application[Failed]
+  type ReadyApp      = Application[Ready]
+
+}

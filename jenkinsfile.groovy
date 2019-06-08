@@ -2,6 +2,7 @@ def repository = 'hydro-serving-manager'
 
 def buildFunction={
     sh "sbt test"
+    sh "sbt it:testOnly"
     sh "sbt docker"
 }
 

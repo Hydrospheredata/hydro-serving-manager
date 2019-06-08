@@ -7,7 +7,7 @@ object Common {
     scalaVersion := "2.12.8",
     publishArtifact := false,
     organization := "io.hydrosphere.serving",
-    homepage := Some(url("https://hydrosphere.io/serving-docs-new")),
+    homepage := Some(url("https://hydrosphere.io/serving-docs")),
     scalacOptions ++= Seq(
       "-unchecked",
       "-deprecation",

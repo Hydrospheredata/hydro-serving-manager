@@ -86,16 +86,6 @@ class DBModelVersionRepository[F[_]: Async](
     ).map(_.map(mapFromDb))
   }
 
-  override def modelVersionsByModelVersionIds(modelVersionIds: Set[Long]): F[Seq[ModelVersion]] = AsyncUtil.futureAsync {
-    val action = joinedQ
-      .filter {
-        _._1.modelVersionId inSetBind modelVersionIds
-      }
-      .result
-
-    db.run(action).map(_.map(mapFromDb))
-  }
-
   override def listForModel(modelId: Long): F[Seq[ModelVersion]] = AsyncUtil.futureAsync {
     db.run {
       joinedQ
