@@ -105,7 +105,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
-        appDeployer.deploy("test", graph, None).map { res =>
+        appDeployer.deploy("test", graph, List.empty).map { res =>
           assert(res.started.name === "test")
           assert(res.started.status.isInstanceOf[Application.Assembling])
           // build will fail nonetheless
@@ -160,7 +160,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
-        appDeployer.deploy("test", graph, None).flatMap { res =>
+        appDeployer.deploy("test", graph, List.empty).flatMap { res =>
           println("Waiting for build")
           res.completed.get.map { x =>
             val status = x.status.asInstanceOf[Application.Failed]
@@ -233,7 +233,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           discoveryHub = discoveryHub,
           graphComposer = graphComposer
         )
-        appDeployer.deploy("test", graph, None).flatMap { res =>
+        appDeployer.deploy("test", graph, List.empty).flatMap { res =>
           res.completed.get.map { finished =>
             assert(finished.name === "test")
             assert(finished.status.isInstanceOf[Application.Ready])
@@ -305,7 +305,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           ))
         ))
         val appDep = new ApplicationDeployer[IO] {
-          override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: Option[List[ApplicationKafkaStream]]): IO[DeferredResult[IO, GenericApplication]] = {
+          override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream]): IO[DeferredResult[IO, GenericApplication]] = {
             DeferredResult.completed[IO, GenericApplication](ogApp)
           }
         }

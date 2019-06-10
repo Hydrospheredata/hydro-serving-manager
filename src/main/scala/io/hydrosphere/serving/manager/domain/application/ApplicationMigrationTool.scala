@@ -28,14 +28,20 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
         apps <- maybeApps match {
           case Left(value) =>
             logger.warn("Encountered application db errors. Trying to recover.", value)
-            val appsToRestore = value.getSuppressed.toList.collect{
-              case IncompatibleExecutionGraphError(dbApp) => dbApp
+
+            val appsToRestore = value match {
+              case IncompatibleExecutionGraphError(dbApp) => List(dbApp)
+              case x => x.getSuppressed.toList.collect {
+                case IncompatibleExecutionGraphError(dbApp) => dbApp
+              }
             }
+            logger.info(appsToRestore)
             appsToRestore.traverse { rawApp =>
               val oldGraph = rawApp.executionGraph.parseJson.convertTo[VersionGraphAdapter]
               for {
                 _ <- oldGraph.stages.traverse { stage =>
                   stage.modelVariants.traverse { variant =>
+                    logger.info(s"Cleaning old ${variant}")
                     val x = for {
                       instance <- OptionT(cloudDriver.getByVersionId(variant.modelVersion.id))
                       _ <- OptionT.liftF(cloudDriver.remove(instance.name))
@@ -43,6 +49,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
                     x.value
                   }.void
                 }
+                _ = logger.info(s"Deletin app ${rawApp.id}")
                 _ <- appsRepo.delete(rawApp.id)
                 graph = ExecutionGraphRequest(
                   oldGraph.stages.map { stage =>
@@ -56,8 +63,9 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
                     )
                   }
                 )
+                streaming = rawApp.kafkaStreams.map(p => p.parseJson.convertTo[ApplicationKafkaStream])
                 _ = logger.info(s"Restoring ${rawApp.applicationName}")
-                newApp <- appDeployer.deploy(rawApp.applicationName, graph, ???)
+                newApp <- appDeployer.deploy(rawApp.applicationName, graph, streaming)
               } yield newApp.started
             }
           case Right(value) =>

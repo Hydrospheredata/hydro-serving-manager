@@ -55,7 +55,7 @@ object ApplicationService extends Logging {
 
 
     def create(req: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
-      applicationDeployer.deploy(req.name, req.executionGraph, req.kafkaStreaming)
+      applicationDeployer.deploy(req.name, req.executionGraph, req.kafkaStreaming.getOrElse(List.empty))
     }
 
     def delete(name: String): F[GenericApplication] = {
