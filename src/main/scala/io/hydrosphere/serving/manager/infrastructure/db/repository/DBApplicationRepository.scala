@@ -84,6 +84,7 @@ class DBApplicationRepository[F[_]](
       appTable <- AsyncUtil.futureAsync(db.run(Tables.Application.result))
       servables <- servableDb.all()
       sMap = servables.map(x => x.fullName -> x).toMap
+      _ = logger.info(s"SERVABLES: ${sMap}")
       apps = appTable.toList
         .traverse(appT => mapFromDb(appT, sMap).toValidatedNec)
         .leftMap { errors =>
