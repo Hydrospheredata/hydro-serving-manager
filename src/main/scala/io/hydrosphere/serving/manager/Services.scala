@@ -9,7 +9,7 @@ import cats.effect.implicits._
 import com.spotify.docker.client._
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
-import io.hydrosphere.serving.manager.domain.application.ApplicationService
+import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationService}
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorService
@@ -89,6 +89,7 @@ class Services[F[_]: ConcurrentEffect](
   implicit val c = predictionCtor
   implicit val cc = cloudDriverService
   implicit val servableProbe = ServableProbe.default[F]
+
   implicit val servableMonitor = ServableMonitor.default[F](
     2.seconds,
     1.minute
@@ -104,12 +105,20 @@ class Services[F[_]: ConcurrentEffect](
 
   val graphComposer = VersionGraphComposer.default
 
+  val appDeployer = ApplicationDeployer.default(
+    servableService,
+    managerRepositories.modelVersionRepository,
+    managerRepositories.applicationRepository,
+    graphComposer,
+    discoveryHub
+  )
+
   implicit val appService: ApplicationService[F] = ApplicationService[F](
     applicationRepository = managerRepositories.applicationRepository,
     versionRepository = managerRepositories.modelVersionRepository,
     servableService = servableService,
     discoveryHub = discoveryHub,
-    graphComposer
+    applicationDeployer = appDeployer
   )
 
   implicit val modelService: ModelService[F] = ModelService[F](

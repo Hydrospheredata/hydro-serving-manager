@@ -19,6 +19,7 @@ import org.apache.logging.log4j.scala.Logging
 import spray.json._
 
 import scala.concurrent.ExecutionContext
+import scala.util.{Failure, Success, Try}
 
 class DBApplicationRepository[F[_]](
   implicit F: Async[F],
@@ -65,12 +66,7 @@ class DBApplicationRepository[F[_]](
       })
       servables <- OptionT.liftF(servableDb.get(appTable.usedServables))
       sMap = servables.map(x => x.fullName -> x).toMap
-      app <- OptionT(mapFromDb(appTable, sMap) match {
-        case Left(err) =>
-          F.delay(logger.warn(s"Tried to retrieve invalid app from db. ${err.getMessage}")) >>
-            F.pure(none[GenericApplication])
-        case Right(x) => F.pure(x.some)
-      })
+      app <- OptionT.liftF(F.fromEither(mapFromDb(appTable, sMap)))
     } yield app
     f.value
   }
@@ -89,10 +85,15 @@ class DBApplicationRepository[F[_]](
       servableNames = appTable.flatMap(_.usedServables)
       servables <- servableDb.get(servableNames)
       sMap = servables.map(x => x.fullName -> x).toMap
-      apps = appTable
-        .map(appT => mapFromDb(appT, sMap))
-        .collect { case Right(v) => v }
-    } yield apps.toList
+      apps = appTable.toList
+        .traverse(appT => mapFromDb(appT, sMap).toValidatedNec)
+        .leftMap { errors =>
+          val err = new RuntimeException("Errors while getting applications from db")
+          errors.map(err.addSuppressed)
+          err
+        }
+      f <- F.fromValidated(apps)
+    } yield f
   }
 
   override def update(value: GenericApplication): F[Int] = AsyncUtil.futureAsync {
@@ -136,10 +137,9 @@ class DBApplicationRepository[F[_]](
       sNames = appTable.flatMap(_.usedServables)
       servables <- servableDb.get(sNames)
       sMap = servables.map(x => x.fullName -> x).toMap
-      apps = appTable
-        .map(appT => mapFromDb(appT, sMap))
-        .collect { case Right(v) => v }
-    } yield apps.toList
+      apps <- appTable.toList
+        .traverse(appT => F.fromEither(mapFromDb(appT, sMap)))
+    } yield apps
   }
 
   override def findVersionsUsage(versionIdx: Long): F[List[GenericApplication]] = {
@@ -154,10 +154,9 @@ class DBApplicationRepository[F[_]](
       sNames = appTable.flatMap(_.usedServables)
       servables <- servableDb.get(sNames)
       sMap = servables.map(x => x.fullName -> x).toMap
-      apps = appTable
-        .map(appT => mapFromDb(appT, sMap))
-        .collect { case Right(v) => v }
-    } yield apps.toList
+      apps <- appTable.toList
+        .traverse(appT => F.fromEither(mapFromDb(appT, sMap)))
+    } yield apps
   }
 
   override def get(name: String): F[Option[GenericApplication]] = {
@@ -171,12 +170,7 @@ class DBApplicationRepository[F[_]](
       })
       servables <- OptionT.liftF(servableDb.get(appTable.usedServables))
       sMap = servables.map(x => x.fullName -> x).toMap
-      app <- OptionT(mapFromDb(appTable, sMap) match {
-        case Left(err) =>
-          F.delay(logger.warn(s"Tried to retrieve invalid app from db. ${err.getMessage}")) >>
-            F.pure(none[GenericApplication])
-        case Right(x) => F.pure(x.some)
-      })
+      app <- OptionT.liftF(F.fromEither(mapFromDb(appTable, sMap)))
     } yield app
     f.value
   }
@@ -186,18 +180,7 @@ object DBApplicationRepository extends CompleteJsonProtocol {
 
   import spray.json._
 
-  def mapFromDb(dbType: Tables.Application#TableElementType, servables: Map[String, GenericServable]): Either[Throwable, Application[Application.Status]] = {
-    compose(dbType.status, dbType.statusMessage, dbType.executionGraph, servables).map { status =>
-      Application(
-        id = dbType.id,
-        name = dbType.applicationName,
-        signature = ModelSignature.fromAscii(dbType.applicationContract),
-        kafkaStreaming = dbType.kafkaStreams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
-        namespace = dbType.namespace,
-        status = status
-      )
-    }
-  }
+  case class IncompatibleExecutionGraphError(app: Tables.Application#TableElementType) extends Throwable
 
   case class FlattenedStatus(status: String, message: Option[String], usedServables: List[String], graph: ExecutionGraphAdapter)
 
@@ -214,10 +197,12 @@ object DBApplicationRepository extends CompleteJsonProtocol {
     }
   }
 
-  def compose(status: String, message: Option[String], graph: String, servables: Map[String, GenericServable]): Either[Throwable, Application.Status] = {
-    status match {
+  def mapFromDb(dbApp: Tables.Application#TableElementType, servables: Map[String, GenericServable]): Either[Throwable, GenericApplication] = {
+    val appName = dbApp.applicationName
+    val jsonGraph = dbApp.executionGraph.parseJson
+    val maybeStatus = dbApp.status match {
       case "Assembling" =>
-        val adapterGraph = graph.parseJson.convertTo[VersionGraphAdapter]
+        val adapterGraph = jsonGraph.convertTo[VersionGraphAdapter]
         val mappedStages = adapterGraph.stages.map { stage =>
           val signature = stage.signature
           val variants = stage.modelVariants.map(m => Variant(m.modelVersion, m.weight))
@@ -225,32 +210,47 @@ object DBApplicationRepository extends CompleteJsonProtocol {
         }
         Application.Assembling(mappedStages).asRight[Exception]
       case "Failed" =>
-        val adapterGraph = graph.parseJson.convertTo[VersionGraphAdapter]
+        val adapterGraph = jsonGraph.convertTo[VersionGraphAdapter]
         val mappedStages = adapterGraph.stages.map { stage =>
           val signature = stage.signature
           val variants = stage.modelVariants.map(m => Variant(m.modelVersion, m.weight))
           PipelineStage(variants, signature)
         }
-        Application.Failed(mappedStages, message).asRight[Exception]
+        Application.Failed(mappedStages, dbApp.statusMessage).asRight[Exception]
       case "Ready" =>
-        val adapterGraph = graph.parseJson.convertTo[ServableGraphAdapter]
-        val mappedStages = adapterGraph.stages.traverse { stage =>
-          val variants = stage.modelVariants.traverse { s =>
-            servables.get(s.item)
-              .toRight(new Exception(s"Can't find servable with name ${s.item}"))
-              .flatMap { servable =>
-                servable.status match {
-                  case _: Servable.Serving =>
-                    Variant(servable.asInstanceOf[OkServable], s.weight).asRight
-                  case x =>
-                    DomainError.internalError(s"Servable ${servable.fullName} has invalid status $x").asLeft
-                }
+        val mappedStages = Try(jsonGraph.convertTo[ServableGraphAdapter]) match {
+          case Failure(exception) => // old application recovery logic
+            logger.error(s"$appName execution graph read error: $exception")
+            IncompatibleExecutionGraphError(dbApp).asLeft
+          case Success(adapterGraph) =>
+            adapterGraph.stages.traverse { stage =>
+              val variants = stage.modelVariants.traverse { s =>
+                servables.get(s.item)
+                  .toRight(new Exception(s"Can't find servable with name ${s.item}"))
+                  .flatMap { servable =>
+                    servable.status match {
+                      case _: Servable.Serving =>
+                        Variant(servable.asInstanceOf[OkServable], s.weight).asRight
+                      case x =>
+                        DomainError.internalError(s"Servable ${servable.fullName} has invalid status $x").asLeft
+                    }
+                  }
               }
-          }
-          variants.map(ExecutionNode(_, stage.signature))
+              variants.map(ExecutionNode(_, stage.signature))
+            }
         }
         mappedStages.map(Application.Ready)
       case x => DomainError.internalError(s"Unknown application status: $x").asLeft
+    }
+    maybeStatus.map { s =>
+      Application(
+        id = dbApp.id,
+        name = dbApp.applicationName,
+        signature = ModelSignature.fromAscii(dbApp.applicationContract),
+        kafkaStreaming = dbApp.kafkaStreams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
+        namespace = dbApp.namespace,
+        status = s
+      )
     }
   }
 }

@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.model.api
+package io.hydrosphere.serving.manager.domain.tensor
 
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.model.api.json.TensorJsonLens

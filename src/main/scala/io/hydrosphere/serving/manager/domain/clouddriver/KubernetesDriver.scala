@@ -17,8 +17,8 @@ class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDr
     serviceName,
     CloudInstance.Status.Running(host, port)
   )
-  
-  override def instances: F[List[CloudInstance]] = client.services.map(_.map(kubeSvc2Servable).collect {case Some(v) => v })
+
+  override def instances: F[List[CloudInstance]] = client.services.map(_.map(kubeSvc2Servable).collect { case Some(v) => v })
 
   override def instance(name: String): F[Option[CloudInstance]] = instances.map(_.find(_.name == name))
 
@@ -36,4 +36,8 @@ class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDr
   }
 
   override def remove(name: String): F[Unit] = client.removeService(name) *> client.removeDeployment(name)
+
+  override def getByVersionId(modelVersionId: Long): F[Option[CloudInstance]] = {
+    instances.map(_.find(_.modelVersionId == modelVersionId))
+  }
 }

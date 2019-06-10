@@ -38,8 +38,10 @@ trait CloudDriver[F[_]] {
   def instance(name: String): F[Option[CloudInstance]]
 
   def run(name: String, modelVersionId: Long, image: DockerImage): F[CloudInstance]
-  
+
   def remove(name: String): F[Unit]
+
+  def getByVersionId(modelVersionId: Long): F[Option[CloudInstance]]
 }
 
 object CloudDriver {

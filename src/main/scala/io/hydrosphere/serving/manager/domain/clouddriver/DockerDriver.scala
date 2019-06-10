@@ -1,6 +1,7 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
 import cats._
+import cats.data.OptionT
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContainerParam}
 import com.spotify.docker.client.messages._
@@ -95,6 +96,18 @@ class DockerDriver[F[_]](
           CloudInstance(mvId, name, CloudInstance.Status.Stopped)
       }
     }
+  }
+
+  override def getByVersionId(modelVersionId: Long): F[Option[CloudInstance]] = {
+    val query = List(
+      ListContainersParam.allContainers(),
+      ListContainersParam.withLabel(CloudDriver.Labels.ModelVersionId, modelVersionId.toString)
+    )
+    val r = for {
+      cont <- OptionT(client.listContainers(query).map(_.headOption))
+      parsed <- OptionT.fromOption[F](containerToInstance(cont))
+    } yield parsed
+    r.value
   }
 }
 

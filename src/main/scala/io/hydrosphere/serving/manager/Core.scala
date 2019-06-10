@@ -10,9 +10,9 @@ import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
-import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
+import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationMigrationTool}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.util.random.RNG
@@ -36,11 +36,15 @@ object Core extends Logging {
     timer: Timer[F],
     rng: RNG[F]
   ): F[(HttpApiServer[F], Server)] = {
-    val cloudDriver  = CloudDriver.fromConfig[F](config.cloudDriver, config.dockerRepository)
+    val cloudDriver = CloudDriver.fromConfig[F](config.cloudDriver, config.dockerRepository)
     val repositories = new Repositories[F](config)
-    val discoveryHubIO = for {
-      observed <- ApplicationDiscoveryHub.observed[F]
-      apps     <- repositories.applicationRepository.all()
+
+    for {
+      dh <- ApplicationDiscoveryHub.observed[F]
+      services = new Services[F](dh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
+      n = ApplicationMigrationTool.default(repositories.applicationRepository, services.cloudDriverService, services.appDeployer)
+      _ <- n.getAndRevive()
+      apps <- repositories.applicationRepository.all()
       needToDiscover = apps.flatMap { app =>
         app.status match {
           case _: Application.Ready =>
@@ -48,17 +52,10 @@ object Core extends Logging {
           case _ => Nil
         }
       }
-      _ <- needToDiscover.traverse(observed.added)
-    } yield observed
-
-    for {
-      dh <- discoveryHubIO
+      _ <- needToDiscover.traverse(dh.added)
     } yield {
-      val services = new Services[F](dh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
-
       val httpApi = new HttpApiServer(repositories, services, config)
       val grpcApi = GrpcApiServer(repositories, services, config, dh)
-
       (httpApi, grpcApi)
     }
   }
