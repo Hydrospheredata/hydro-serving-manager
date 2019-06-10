@@ -102,10 +102,12 @@ class DBServableRepository[F[_]](
 
 object DBServableRepository {
 
+
+
   def mapFrom(service: Tables.ServableRow, version: (Tables.ModelVersionRow, Tables.ModelRow, Option[Tables.HostSelectorRow])): GenericServable = {
 
     val mv = DBModelVersionRepository.mapFromDb(version)
-    val suffix = service.serviceName.replaceFirst(s"${version._2.name}-${version._1.modelVersion}-", "")
+    val suffix = Servable.extractSuffix(version._2.name, version._1.modelVersion, service.serviceName)
 
     val status = (service.status, service.host, service.port) match {
       case ("Serving", Some(host), Some(port)) => Servable.Serving(service.statusText, host, port)

@@ -17,6 +17,10 @@ object Servable {
   def fullName(modelName: String, modelVersion: Long, suffix: String): String =
     s"$modelName-$modelVersion-$suffix".replace("_", "-")
 
+  def extractSuffix(modelName: String, modelVersion: Long, name: String): String = {
+    name.replaceFirst(s"${modelName.replace("_", "-")}-$modelVersion-", "")
+  }
+
   type GenericServable = Servable[Status]
   type OkServable      = Servable[Serving]
   type NotOkServable   = Servable[NotServing]
