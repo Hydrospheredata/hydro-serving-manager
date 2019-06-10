@@ -88,6 +88,7 @@ class DBApplicationRepository[F[_]](
       apps = appTable.toList
         .traverse(appT => mapFromDb(appT, sMap).toValidatedNec)
         .leftMap { errors =>
+          errors.map(logger.error)
           val err = new RuntimeException("Errors while getting applications from db")
           errors.map(err.addSuppressed)
           err
