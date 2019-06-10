@@ -10,6 +10,7 @@ import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.application.{ApplicationDiscoveryHub, ApplicationEvent}
+import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.graph.{Variant, VersionGraphComposer}
 import io.hydrosphere.serving.manager.domain.application.requests._
@@ -27,6 +28,7 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 
 class ApplicationServiceSpec extends GenericUnitTest {
+  implicit val cs = IO.contextShift(ExecutionContext.global)
   val signature = ModelSignature(
     "claim",
     Seq(ModelField("in", None, typeOrSubfields = ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE))),
@@ -48,9 +50,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
     installCommand = None,
     metadata = Map.empty
   )
+  describe("Application Deployer") {
 
-  describe("Application management service") {
-    implicit val cs = IO.contextShift(ExecutionContext.global)
     it("should start application build") {
       ioAssert {
         val appRepo = mock[ApplicationRepository[IO]]
@@ -89,12 +90,12 @@ class ApplicationServiceSpec extends GenericUnitTest {
         }
         val graphComposer = VersionGraphComposer.default
         val discoveryHub = mock[ApplicationDiscoveryHub[IO]]
-        val applicationService = ApplicationService[IO](
-          appRepo,
-          versionRepo,
-          servableService,
-          discoveryHub,
-          graphComposer
+        val appDeployer = ApplicationDeployer.default[IO](
+          applicationRepository = appRepo,
+          versionRepository = versionRepo,
+          servableService= servableService,
+          discoveryHub = discoveryHub,
+          graphComposer = graphComposer
         )
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -104,8 +105,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
-        val createReq = CreateApplicationRequest("test", None, graph, Option.empty)
-        applicationService.create(createReq).map { res =>
+        appDeployer.deploy("test", graph, None).map { res =>
           assert(res.started.name === "test")
           assert(res.started.status.isInstanceOf[Application.Assembling])
           // build will fail nonetheless
@@ -124,10 +124,10 @@ class ApplicationServiceSpec extends GenericUnitTest {
             name = "test",
             namespace = None,
             status = Application.Assembling(NonEmptyList.of(
-               PipelineStage(NonEmptyList.of(
-                 Variant(modelVersion, 100)),
-                 signature
-               )
+              PipelineStage(NonEmptyList.of(
+                Variant(modelVersion, 100)),
+                signature
+              )
             )),
             signature = signature.copy(signatureName = "test"),
             kafkaStreaming = List.empty
@@ -145,12 +145,12 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
         val graphComposer = VersionGraphComposer.default
         val discoveryHub = mock[ApplicationDiscoveryHub[IO]]
-        val applicationService = ApplicationService[IO](
-          appRepo,
-          versionRepo,
-          servableService,
-          discoveryHub,
-          graphComposer
+        val appDeployer = ApplicationDeployer.default[IO](
+          applicationRepository = appRepo,
+          versionRepository = versionRepo,
+          servableService= servableService,
+          discoveryHub = discoveryHub,
+          graphComposer = graphComposer
         )
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -160,8 +160,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
-        val createReq = CreateApplicationRequest("test", None, graph, Option.empty)
-        applicationService.create(createReq).flatMap { res =>
+        appDeployer.deploy("test", graph, None).flatMap { res =>
           println("Waiting for build")
           res.completed.get.map { x =>
             val status = x.status.asInstanceOf[Application.Failed]
@@ -195,15 +194,13 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         when(versionRepo.get(Seq(1L))).thenReturn(IO(Seq(modelVersion)))
         val servableService = new ServableService[IO] {
-          override def deploy(mv: ModelVersion) = IO.pure {
+          override def deploy(mv: ModelVersion) = {
             val s = Servable(
               modelVersion = mv,
               nameSuffix = "test",
               status = Servable.Serving("Ok", "host", 9090)
             )
-            val d = Deferred[IO, GenericServable].unsafeRunSync()
-            d.complete(s).unsafeRunSync()
-            DeferredResult(s, d)
+            DeferredResult.completed(s)
           }
 
           override def findAndDeploy(name: String, version: Long) = ???
@@ -229,23 +226,25 @@ class ApplicationServiceSpec extends GenericUnitTest {
           ))
         ))
         val graphComposer = VersionGraphComposer.default
-        val applicationService = ApplicationService[IO](
-          appRepo,
-          versionRepo,
-          servableService,
-          discoveryHub,
-          graphComposer
+        val appDeployer = ApplicationDeployer.default[IO](
+          applicationRepository = appRepo,
+          versionRepository = versionRepo,
+          servableService= servableService,
+          discoveryHub = discoveryHub,
+          graphComposer = graphComposer
         )
-        val createReq = CreateApplicationRequest("test", None, graph, Option.empty)
-        applicationService.create(createReq).flatMap { res =>
+        appDeployer.deploy("test", graph, None).flatMap { res =>
           res.completed.get.map { finished =>
             assert(finished.name === "test")
             assert(finished.status.isInstanceOf[Application.Ready])
-            assert(appChanged.nonEmpty)
+            assert(appChanged.toList.nonEmpty)
           }
         }
       }
     }
+  }
+
+  describe("Application management service") {
 
     it("should rebuild on update") {
       ioAssert {
@@ -280,12 +279,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
         val servableService = new ServableService[IO] {
           override def deploy(mv: ModelVersion) = {
-            IO.pure {
-              val s = Servable(mv, "test", Servable.Serving("Ok", "host", 9090))
-              val d = Deferred[IO, GenericServable].unsafeRunSync()
-              d.complete(s).unsafeRunSync()
-              DeferredResult(s, d)
-            }
+            DeferredResult.completed(Servable(mv, "test", Servable.Serving("Ok", "host", 9090)))
           }
 
           override def findAndDeploy(name: String, version: Long) = ???
@@ -310,13 +304,17 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
-        val graphComposer = VersionGraphComposer.default
+        val appDep = new ApplicationDeployer[IO] {
+          override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: Option[List[ApplicationKafkaStream]]): IO[DeferredResult[IO, GenericApplication]] = {
+            DeferredResult.completed[IO, GenericApplication](ogApp)
+          }
+        }
         val applicationService = ApplicationService[IO](
           appRepo,
           versionRepo,
           servableService,
           eventPublisher,
-          graphComposer
+          appDep
         )
         val updateReq = UpdateApplicationRequest(1, "test", None, graph, Option.empty)
         applicationService.update(updateReq).map { res =>

@@ -105,7 +105,7 @@ class DockerDriver[F[_]](
     )
     val r = for {
       cont <- OptionT(client.listContainers(query).map(_.headOption))
-      parsed <- OptionT.fromOption(containerToInstance(cont))
+      parsed <- OptionT.fromOption[F](containerToInstance(cont))
     } yield parsed
     r.value
   }

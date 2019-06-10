@@ -48,9 +48,9 @@ object ApplicationDeployer extends Logging {
           _ <- (for {
             genericApp <- startServices(app)
             _ <- applicationRepository.update(genericApp)
-            _ <- df.complete(genericApp)
             translated = Internals.toServingApp(genericApp)
             _ <- discoveryHub.added(translated)
+            _ <- df.complete(genericApp)
           } yield ())
             .handleErrorWith { x =>
               val failedApp = app.copy(status = Application.Failed(composedApp.status.versionGraph, Some(x.getMessage)))

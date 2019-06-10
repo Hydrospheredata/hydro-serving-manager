@@ -60,6 +60,8 @@ class ServableSpec extends GenericUnitTest {
         }
         override def run(name: String, modelVersionId: Long, image: DockerImage): IO[CloudInstance] = ???
         override def remove(name: String): IO[Unit] = ???
+
+        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
       }
       implicit val clientCtor = new PredictionClient.Factory[IO] {
         override def make(host: String, port: Int): Resource[IO, PredictionClient[IO]] = {
@@ -106,6 +108,8 @@ class ServableSpec extends GenericUnitTest {
         }
         override def run(name: String, modelVersionId: Long, image: DockerImage): IO[CloudInstance] = ???
         override def remove(name: String): IO[Unit] = ???
+
+        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
       }
       val probe = ServableProbe.default[IO]()
       val result = probe.probe(servable).unsafeRunSync()
@@ -132,6 +136,8 @@ class ServableSpec extends GenericUnitTest {
         }
         override def run(name: String, modelVersionId: Long, image: DockerImage): IO[CloudInstance] = ???
         override def remove(name: String): IO[Unit] = ???
+
+        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
       }
       val probe = ServableProbe.default[IO]()
       val result = probe.probe(servable).unsafeRunSync()
@@ -292,6 +298,8 @@ class ServableSpec extends GenericUnitTest {
         }
 
         override def remove(name: String): IO[Unit] = ???
+
+        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
       }
       val repoState = ListBuffer.empty[GenericServable]
       val servableRepo = new ServableRepository[IO] {
@@ -382,6 +390,8 @@ class ServableSpec extends GenericUnitTest {
           driverState += name
           IO.unit
         }
+
+        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
       }
       val repoState = ListBuffer.empty[GenericServable]
       repoState += initServable
