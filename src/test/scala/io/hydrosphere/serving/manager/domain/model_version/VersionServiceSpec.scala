@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.domain
+package io.hydrosphere.serving.manager.domain.model_version
 
 import java.time.LocalDateTime
 
@@ -7,7 +7,6 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version._
 
 class VersionServiceSpec extends GenericUnitTest {
   describe("ModelVersion service") {

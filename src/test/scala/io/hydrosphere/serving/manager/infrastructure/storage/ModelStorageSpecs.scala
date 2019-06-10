@@ -1,4 +1,4 @@
-//package io.hydrosphere.serving.manager.storage
+//package io.hydrosphere.serving.manager.infrastructure.storage
 //
 //import java.io.PrintWriter
 //import java.nio.file._

@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.storage
+package io.hydrosphere.serving.manager.infrastructure.storage
 
 
 import cats.effect.IO

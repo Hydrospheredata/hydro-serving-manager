@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.domain
+package io.hydrosphere.serving.manager.domain.model_version
 
 import java.io.File
 import java.nio.file.{Path, Paths}
@@ -9,7 +9,6 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService, ModelVersionView}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import org.mockito.Matchers
 

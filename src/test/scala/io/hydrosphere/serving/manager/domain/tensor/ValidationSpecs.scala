@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.model.api
+package io.hydrosphere.serving.manager.domain.tensor
 
 import com.google.protobuf.ByteString
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
