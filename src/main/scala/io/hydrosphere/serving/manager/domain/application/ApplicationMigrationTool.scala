@@ -35,13 +35,13 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
                 case IncompatibleExecutionGraphError(dbApp) => dbApp
               }
             }
-            logger.info(appsToRestore)
+            logger.debug(appsToRestore)
             appsToRestore.traverse { rawApp =>
               val oldGraph = rawApp.executionGraph.parseJson.convertTo[VersionGraphAdapter]
               for {
                 _ <- oldGraph.stages.traverse { stage =>
                   stage.modelVariants.traverse { variant =>
-                    logger.info(s"Cleaning old ${variant}")
+                    logger.debug(s"Cleaning old ${variant}")
                     val x = for {
                       instance <- OptionT(cloudDriver.getByVersionId(variant.modelVersion.id))
                       _ <- OptionT.liftF(cloudDriver.remove(instance.name))
@@ -49,7 +49,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
                     x.value
                   }.void
                 }
-                _ = logger.info(s"Deletin app ${rawApp.id}")
+                _ = logger.debug(s"Deleting app ${rawApp.id}")
                 _ <- appsRepo.delete(rawApp.id)
                 graph = ExecutionGraphRequest(
                   oldGraph.stages.map { stage =>
@@ -64,7 +64,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
                   }
                 )
                 streaming = rawApp.kafkaStreams.map(p => p.parseJson.convertTo[ApplicationKafkaStream])
-                _ = logger.info(s"Restoring ${rawApp.applicationName}")
+                _ = logger.debug(s"Restoring ${rawApp.applicationName}")
                 newApp <- appDeployer.deploy(rawApp.applicationName, graph, streaming)
               } yield newApp.started
             }
