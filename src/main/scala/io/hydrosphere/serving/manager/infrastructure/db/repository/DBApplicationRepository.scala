@@ -82,8 +82,7 @@ class DBApplicationRepository[F[_]](
   override def all(): F[List[GenericApplication]] = {
     for {
       appTable <- AsyncUtil.futureAsync(db.run(Tables.Application.result))
-      servableNames = appTable.flatMap(_.usedServables)
-      servables <- servableDb.get(servableNames)
+      servables <- servableDb.all()
       sMap = servables.map(x => x.fullName -> x).toMap
       apps = appTable.toList
         .traverse(appT => mapFromDb(appT, sMap).toValidatedNec)

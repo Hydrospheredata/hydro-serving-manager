@@ -62,7 +62,9 @@ class DBServableRepository[F[_]](
     } yield {
       res.flatMap {
         case (servable, Some(version)) => mapFrom(servable, version) :: Nil
-        case _ => Nil
+        case (x, _) =>
+          logger.error(s"Trying to get servable ${x.serviceName} but it doesn't have ModelVersion")
+          Nil
       }.toList
     }
   }
