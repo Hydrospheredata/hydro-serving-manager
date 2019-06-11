@@ -9,6 +9,7 @@ import cats.effect.implicits._
 import com.spotify.docker.client._
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
 import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationService}
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
@@ -31,6 +32,7 @@ import scala.concurrent.ExecutionContext
 
 class Services[F[_]: ConcurrentEffect](
   val discoveryHub: ApplicationDiscoveryHub[F],
+  val servableHub: ServableDiscoveryHub[F],
   val managerRepositories: Repositories[F],
   val managerConfiguration: ManagerConfiguration,
   val dockerClient: DockerClient,
@@ -100,7 +102,8 @@ class Services[F[_]: ConcurrentEffect](
     managerRepositories.servableRepository,
     managerRepositories.modelVersionRepository,
     nameGen,
-    servableMonitor
+    servableMonitor,
+    servableHub
   )
 
   val graphComposer = VersionGraphComposer.default

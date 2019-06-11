@@ -10,6 +10,7 @@ import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationMigrationTool}
@@ -41,7 +42,8 @@ object Core extends Logging {
 
     for {
       dh <- ApplicationDiscoveryHub.observed[F]
-      services = new Services[F](dh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
+      sdh <- ServableDiscoveryHub.observed[F]
+      services = new Services[F](dh, sdh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
       n = ApplicationMigrationTool.default(repositories.applicationRepository, services.cloudDriverService, services.appDeployer)
       _ <- n.getAndRevive()
       apps <- repositories.applicationRepository.all()
@@ -55,7 +57,7 @@ object Core extends Logging {
       _ <- needToDiscover.traverse(dh.added)
     } yield {
       val httpApi = new HttpApiServer(repositories, services, config)
-      val grpcApi = GrpcApiServer(repositories, services, config, dh)
+      val grpcApi = GrpcApiServer(repositories, services, config, dh, sdh)
       (httpApi, grpcApi)
     }
   }
