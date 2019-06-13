@@ -25,7 +25,7 @@ object DiscoveryGrpc {
 
     override def watchApplications(observer: StreamObserver[ApplicationDiscoveryEvent]): StreamObserver[Empty] = {
       val id = UUID.randomUUID().toString
-
+      logger.debug(s"Application watcher  ${id} registered")
       val obs = AppsObserver.grpc[F](observer)
       runSync(appDiscoverer.register(id, obs))
 
@@ -34,7 +34,7 @@ object DiscoveryGrpc {
         override def onNext(value: Empty): Unit = ()
 
         override def onError(t: Throwable): Unit = {
-          logger.debug("Client stream failed", t)
+          logger.debug("Application stream failed", t)
           runSync(appDiscoverer.unregister(id))
         }
 
@@ -45,6 +45,7 @@ object DiscoveryGrpc {
 
     override def watchServables(responseObserver: StreamObserver[ServableDiscoveryEvent]): StreamObserver[Empty] = {
       val id = UUID.randomUUID().toString
+      logger.debug(s"Servable subscriber ${id} registered")
       val obs = ServableObserver.grpc[F](responseObserver)
       runSync(servableDiscoverer.register(id, obs))
 
@@ -52,7 +53,7 @@ object DiscoveryGrpc {
         override def onNext(value: Empty): Unit = ()
 
         override def onError(t: Throwable): Unit = {
-          logger.debug("Client stream failed", t)
+          logger.debug("Servable stream failed", t)
           runSync(servableDiscoverer.unregister(id))
         }
 

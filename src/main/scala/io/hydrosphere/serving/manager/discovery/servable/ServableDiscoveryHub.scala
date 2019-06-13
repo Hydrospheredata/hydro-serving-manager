@@ -6,6 +6,7 @@ import cats.effect.concurrent.{Ref, Semaphore}
 import io.hydrosphere.serving.discovery.serving.ServableDiscoveryEvent
 import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub.{ServableAdded, ServableEvent, ServableRemoved}
 import io.hydrosphere.serving.manager.grpc.entities.Servable
+import org.apache.logging.log4j.scala.Logging
 
 trait ServableDiscoveryHub[F[_]] {
   def update(ev: ServableEvent): F[Unit]
@@ -21,7 +22,7 @@ trait ObservedServableDiscoveryHub[F[_]] extends ServableDiscoveryHub[F] {
   def unregister(id: String): F[Unit]
 }
 
-object ServableDiscoveryHub {
+object ServableDiscoveryHub extends Logging {
 
   sealed trait ServableEvent
   final case class ServableAdded(s: List[Servable]) extends ServableEvent
@@ -54,7 +55,7 @@ object ServableDiscoveryHub {
         val op = for {
           st <- ref.get
           _  <- ref.update(st => st.copy(observers = st.observers + (id -> obs)))
-          _  <- added(st.servables.values.toList)
+          _  <- obs.init(st.servables.values.toList)
         } yield ()
         useLock(op)
       }
@@ -64,6 +65,7 @@ object ServableDiscoveryHub {
       }
 
       override def update(e: ServableEvent): F[Unit] = {
+        logger.debug(s"State update: $e")
         val notify = e match {
           case ServableRemoved(id) => (o: ServableObserver[F]) =>
             o.notify(ServableDiscoveryEvent(removedIdx = id))
@@ -77,9 +79,9 @@ object ServableDiscoveryHub {
               val filtered = st.servables.filterNot(kv => id.contains(kv._1))
               st.copy(servables = filtered)
             }
-          case ServableAdded(app) =>
+          case ServableAdded(newServables) =>
             (st: State[F]) => {
-              val added = st.servables ++ app.map(x => x.name -> x).toMap
+              val added = st.servables ++ newServables.map(x => x.name -> x).toMap
               st.copy(servables = added)
             }
         }

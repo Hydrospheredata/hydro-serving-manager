@@ -8,7 +8,6 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.contract.utils.ContractBuilders
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
-import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers._
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.keras.KerasFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.SparkModelFetcher

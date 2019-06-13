@@ -11,7 +11,10 @@ import io.hydrosphere.serving.manager.api.grpc.ManagerGrpcService
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionStatus, ModelVersion => DMV}
+import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
+import io.hydrosphere.serving.manager.domain.servable.ServableService
 import io.hydrosphere.serving.manager.grpc.entities.ModelVersion
+import io.hydrosphere.serving.manager.util.DeferredResult
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
@@ -39,7 +42,16 @@ class GrpcSpec extends GenericUnitTest {
         )
       )))
       when(versionRepo.get(1000)).thenReturn(IO(None))
-      val grpcApi = new ManagerGrpcService(versionRepo)
+      val s = new ServableService[IO] {
+        override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
+
+        override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
+
+        override def stop(name: String): IO[GenericServable] = ???
+
+        override def deploy(modelVersion: DMV): IO[DeferredResult[IO, GenericServable]] = ???
+      }
+      val grpcApi = new ManagerGrpcService(versionRepo, s)
 
       grpcApi.getVersion(GetVersionRequest(1000)).onComplete {
         case Success(_) => fail("Value instead of exception")
@@ -95,7 +107,16 @@ class GrpcSpec extends GenericUnitTest {
         override def onCompleted(): Unit = completionFlag = true
       }
 
-      val grpcApi = new ManagerGrpcService(versionRepo)
+      val s = new ServableService[IO] {
+        override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
+
+        override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
+
+        override def stop(name: String): IO[GenericServable] = ???
+
+        override def deploy(modelVersion: DMV): IO[DeferredResult[IO, GenericServable]] = ???
+      }
+      val grpcApi = new ManagerGrpcService(versionRepo, s)
       grpcApi.getAllVersions(Empty(), observer)
 
       Future {
@@ -115,8 +136,16 @@ class GrpcSpec extends GenericUnitTest {
 
         override def onCompleted(): Unit = ???
       }
+      val s = new ServableService[IO] {
+        override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
 
-      val grpcApi = new ManagerGrpcService(versionRepo)
+        override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
+
+        override def stop(name: String): IO[GenericServable] = ???
+
+        override def deploy(modelVersion: DMV): IO[DeferredResult[IO, GenericServable]] = ???
+      }
+      val grpcApi = new ManagerGrpcService(versionRepo, s)
       grpcApi.getAllVersions(Empty(), observer)
       Future {
         assert(errors.nonEmpty)

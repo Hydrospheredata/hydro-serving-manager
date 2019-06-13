@@ -15,7 +15,9 @@ import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationMigrationTool}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
+import io.hydrosphere.serving.manager.util.grpc.Converters
 import io.hydrosphere.serving.manager.util.random.RNG
 import org.apache.logging.log4j.scala.Logging
 
@@ -46,15 +48,24 @@ object Core extends Logging {
       services = new Services[F](dh, sdh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
       n = ApplicationMigrationTool.default(repositories.applicationRepository, services.cloudDriverService, services.appDeployer)
       _ <- n.getAndRevive()
+            servables <- repositories.servableRepository.all()
+      servablesToDiscover = servables.flatMap { s =>
+        s.status match {
+          case Servable.Serving(_, _, _) =>
+            Converters.fromServable(s) :: Nil
+          case _ => Nil
+        }
+      }
+      _ <- sdh.added(servablesToDiscover)
       apps <- repositories.applicationRepository.all()
-      needToDiscover = apps.flatMap { app =>
+      appsToDiscover = apps.flatMap { app =>
         app.status match {
           case _: Application.Ready =>
             Internals.toServingApp(app.asInstanceOf[ReadyApp]) :: Nil
           case _ => Nil
         }
       }
-      _ <- needToDiscover.traverse(dh.added)
+      _ <- appsToDiscover.traverse(dh.added)
     } yield {
       val httpApi = new HttpApiServer(repositories, services, config)
       val grpcApi = GrpcApiServer(repositories, services, config, dh, sdh)

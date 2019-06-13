@@ -44,7 +44,6 @@ object ServableService extends Logging {
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None))
         _ <- servableRepository.upsert(initServable)
         _ <- awaitServable(initServable)
-          .flatMap(x => servableDH.addedSingle(Converters.fromServable(x)).as(x))
           .flatMap(d.complete)
           .onError {
             case NonFatal(ex) =>
@@ -60,8 +59,12 @@ object ServableService extends Logging {
       for {
         _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image)
         servableDef <- monitor.monitor(servable)
-        servable <- servableDef.get
-      } yield servable
+        resultServable <- servableDef.get
+        _ <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))
+        ds = Converters.fromServable(resultServable)
+        _ <- servableDH.addedSingle(ds)
+        _ <- F.delay(s"Sent to discovery stream: $ds")
+      } yield resultServable
     }
 
     override def stop(name: String): F[Servable.GenericServable] = {

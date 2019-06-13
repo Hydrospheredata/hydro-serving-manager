@@ -87,6 +87,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
           override def stop(name: String): IO[GenericServable] = ???
 
           override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
+
+          override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
         }
         val graphComposer = VersionGraphComposer.default
         val discoveryHub = mock[ApplicationDiscoveryHub[IO]]
@@ -141,6 +143,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
           }
           override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
           override def stop(name: String): IO[GenericServable] = ???
+
+          override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
         }
 
         val graphComposer = VersionGraphComposer.default
@@ -206,6 +210,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
           override def findAndDeploy(name: String, version: Long) = ???
 
           override def stop(name: String): IO[GenericServable] = ???
+
+          override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
         }
 
         val appChanged = ListBuffer.empty[ServingApp]
@@ -285,6 +291,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
           override def findAndDeploy(name: String, version: Long) = ???
 
           override def stop(name: String): IO[GenericServable] = ???
+
+          override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
         }
 
         val apps = ListBuffer.empty[ServingApp]

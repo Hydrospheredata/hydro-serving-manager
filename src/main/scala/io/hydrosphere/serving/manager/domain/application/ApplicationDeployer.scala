@@ -47,8 +47,10 @@ object ApplicationDeployer extends Logging {
           df <- Deferred[F, GenericApplication]
           _ <- (for {
             genericApp <- startServices(app)
+            _ <- F.delay(logger.debug("App services started. All ok."))
             _ <- applicationRepository.update(genericApp)
             translated = Internals.toServingApp(genericApp)
+            _ <- F.delay(logger.debug(s"Sending to discovery stream $translated"))
             _ <- discoveryHub.added(translated)
             _ <- df.complete(genericApp)
           } yield ())
@@ -125,6 +127,7 @@ object ApplicationDeployer extends Logging {
             for {
               variants <- stage.modelVariants.traverse { i =>
                 for {
+                  _ <- F.delay(logger.debug(s"Deploying ${i.item.fullName}"))
                   result <- servableService.deploy(i.item)
                   servable <- result.completed.get
                   okServable <- servable.status match {
