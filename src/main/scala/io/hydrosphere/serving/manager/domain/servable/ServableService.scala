@@ -10,7 +10,7 @@ import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import io.hydrosphere.serving.manager.util.DeferredResult
+import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator}
 import io.hydrosphere.serving.manager.util.grpc.Converters
 import io.hydrosphere.serving.manager.util.random.NameGenerator
 import org.apache.logging.log4j.scala.Logging
@@ -32,14 +32,18 @@ object ServableService extends Logging {
     cloudDriver: CloudDriver[F],
     servableRepository: ServableRepository[F],
     versionRepository: ModelVersionRepository[F],
-    nameGenerator: NameGenerator[F],
     monitor: ServableMonitor[F],
     servableDH: ServableDiscoveryHub[F]
-  )(implicit F: Concurrent[F], timer: Timer[F]): ServableService[F] = new ServableService[F] {
+  )(
+    implicit F: Concurrent[F],
+    timer: Timer[F],
+    nameGenerator: NameGenerator[F],
+    idGenerator: UUIDGenerator[F]
+  ): ServableService[F] = new ServableService[F] {
 
     override def deploy(modelVersion: ModelVersion): F[DeferredResult[F, GenericServable]] = {
       for {
-        randomSuffix <- nameGenerator.getName()
+        randomSuffix <- generateUniqueSuffix(modelVersion)
         d <- Deferred[F, GenericServable]
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None))
         _ <- servableRepository.upsert(initServable)
@@ -91,6 +95,22 @@ object ServableService extends Logging {
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model id=$modelId doesn't exist")))
         servable <- deploy(version)
       } yield servable
+    }
+
+    def generateUniqueSuffix(mv: ModelVersion): F[String] = {
+      def _gen(tries: Long): F[String] = {
+        for {
+          randomSuffix <- nameGenerator.getName()
+          fullName = Servable.fullName(mv.model.name, mv.modelVersion, randomSuffix)
+          maybeServable <- servableRepository.get(fullName)
+          res <- maybeServable match {
+            case Some(_) if tries > 3 => idGenerator.generate().map(_.toString)
+            case Some(_) => _gen(tries + 1) // name exists. try again
+            case None => randomSuffix.pure[F]
+          }
+        } yield res
+      }
+      _gen(0)
     }
   }
 }

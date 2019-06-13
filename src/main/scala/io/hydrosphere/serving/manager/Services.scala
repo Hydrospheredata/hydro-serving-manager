@@ -23,6 +23,7 @@ import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.{LocalStorageOps, ModelUnpacker, StorageOps}
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.docker.InfoProgressHandler
 import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
 import org.apache.logging.log4j.scala.Logging
@@ -52,9 +53,11 @@ class Services[F[_]: ConcurrentEffect](
 
   val progressHandler: ProgressHandler = InfoProgressHandler
 
-  val nameGen: NameGenerator[F] = NameGenerator.haiku()
+  implicit val nameGen: NameGenerator[F] = NameGenerator.haiku()
 
-  val storageOps: LocalStorageOps[F] = StorageOps.default
+  implicit val uuidGen = UUIDGenerator.default[F]()
+
+  val storageOps: LocalStorageOps[F] = StorageOps.default[F]
 
   val modelStorage: ModelUnpacker[F] = ModelUnpacker[F](storageOps)
 
@@ -101,7 +104,6 @@ class Services[F[_]: ConcurrentEffect](
     cloudDriverService,
     managerRepositories.servableRepository,
     managerRepositories.modelVersionRepository,
-    nameGen,
     servableMonitor,
     servableHub
   )
