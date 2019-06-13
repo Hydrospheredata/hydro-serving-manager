@@ -15,11 +15,11 @@ import org.apache.logging.log4j.scala.Logging
 object DiscoveryGrpc {
 
   class GrpcServingDiscovery[F[_]](
-                                    appDiscoverer: ObservedApplicationDiscoveryHub[F],
-                                    servableDiscoverer: ObservedServableDiscoveryHub[F]
-                                  )(
-                                    implicit F: Effect[F]
-                                  ) extends ServingDiscovery with Logging {
+    appDiscoverer: ObservedApplicationDiscoveryHub[F],
+    servableDiscoverer: ObservedServableDiscoveryHub[F]
+  )(
+    implicit F: Effect[F]
+  ) extends ServingDiscovery with Logging {
 
     private def runSync[A](f: => F[A]): A = F.toIO(f).unsafeRunSync()
 
