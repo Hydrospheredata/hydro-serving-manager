@@ -6,12 +6,16 @@ import cats.effect.implicits._
 import cats.implicits._
 import com.google.protobuf.empty.Empty
 import io.grpc.stub.StreamObserver
+import io.hydrosphere.serving.manager.api.DeployServableRequest.ModelVersion
 import io.hydrosphere.serving.manager.api.ManagerServiceGrpc.ManagerService
 import io.hydrosphere.serving.manager.api.{DeployServableRequest, GetVersionRequest, RemoveServableRequest}
+import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersion => DMV}
+import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableService
 import io.hydrosphere.serving.manager.grpc
 import io.hydrosphere.serving.manager.grpc.entities.Servable
+import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.manager.util.grpc.Converters
 
 import scala.concurrent.Future
@@ -46,7 +50,11 @@ class ManagerGrpcService[F[_]](
 
   override def deployServable(request: DeployServableRequest, responseObserver: StreamObserver[Servable]): Unit = {
     val flow = for {
-      res <- servableService.findAndDeploy(request.modelVersionId)
+      res <- request.modelVersion match {
+        case ModelVersion.Empty =>  F.raiseError[DeferredResult[F, GenericServable]](DomainError.invalidRequest("model version is not specified"))
+        case ModelVersion.VersionId(value) => servableService.findAndDeploy(value)
+        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version)
+      }
       _ <- F.delay(responseObserver.onNext(Converters.fromServable(res.started)))
       completed <- res.completed.get
       _ <- F.delay(responseObserver.onNext(Converters.fromServable(completed)))
