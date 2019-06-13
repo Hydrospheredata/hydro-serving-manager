@@ -8,18 +8,18 @@ import io.grpc.stub.StreamObserver
 import io.hydrosphere.serving.discovery.serving.{ApplicationDiscoveryEvent, ServableDiscoveryEvent}
 import io.hydrosphere.serving.discovery.serving.ServingDiscoveryGrpc.ServingDiscovery
 import io.hydrosphere.serving.manager.discovery.application.{AppsObserver, ObservedApplicationDiscoveryHub}
-import io.hydrosphere.serving.manager.discovery.servable.ObservedServableDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.servable.{ObservedServableDiscoveryHub, ServableObserver}
 import org.apache.logging.log4j.scala.Logging
 
 
 object DiscoveryGrpc {
-  
+
   class GrpcServingDiscovery[F[_]](
-    appDiscoverer: ObservedApplicationDiscoveryHub[F],
-    servableDiscoverer: ObservedServableDiscoveryHub[F]
-  )(
-    implicit F: Effect[F]
-  ) extends ServingDiscovery with Logging {
+                                    appDiscoverer: ObservedApplicationDiscoveryHub[F],
+                                    servableDiscoverer: ObservedServableDiscoveryHub[F]
+                                  )(
+                                    implicit F: Effect[F]
+                                  ) extends ServingDiscovery with Logging {
 
     private def runSync[A](f: => F[A]): A = F.toIO(f).unsafeRunSync()
 
@@ -43,7 +43,24 @@ object DiscoveryGrpc {
       }
     }
 
-    override def watchServables(responseObserver: StreamObserver[ServableDiscoveryEvent]): StreamObserver[Empty] = ???
+    override def watchServables(responseObserver: StreamObserver[ServableDiscoveryEvent]): StreamObserver[Empty] = {
+      val id = UUID.randomUUID().toString
+      val obs = ServableObserver.grpc[F](responseObserver)
+      runSync(servableDiscoverer.register(id, obs))
+
+      new StreamObserver[Empty] {
+        override def onNext(value: Empty): Unit = ()
+
+        override def onError(t: Throwable): Unit = {
+          logger.debug("Client stream failed", t)
+          runSync(servableDiscoverer.unregister(id))
+        }
+
+        override def onCompleted(): Unit = {
+          runSync(servableDiscoverer.unregister(id))
+        }
+      }
+    }
   }
-  
+
 }
