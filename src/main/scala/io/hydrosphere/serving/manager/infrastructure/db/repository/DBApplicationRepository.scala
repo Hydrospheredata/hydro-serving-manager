@@ -5,11 +5,12 @@ import cats.effect.Async
 import cats.implicits._
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.db.Tables
-import io.hydrosphere.serving.manager.domain.DomainError
+import io.hydrosphere.serving.manager.db.Tables.ApplicationRow
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
-import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionGraphAdapter, ExecutionNode, ServableGraphAdapter, Variant, VersionGraphAdapter}
+import io.hydrosphere.serving.manager.domain.application.graph._
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
 import io.hydrosphere.serving.manager.infrastructure.db.DatabaseService
@@ -25,7 +26,8 @@ class DBApplicationRepository[F[_]](
   implicit F: Async[F],
   executionContext: ExecutionContext,
   databaseService: DatabaseService,
-  servableDb: DBServableRepository[F]
+  servableDb: DBServableRepository[F],
+  versionDb: DBModelVersionRepository[F]
 ) extends ApplicationRepository[F] with Logging with CompleteJsonProtocol {
 
   import DBApplicationRepository._
@@ -67,7 +69,9 @@ class DBApplicationRepository[F[_]](
       })
       servables <- OptionT.liftF(servableDb.get(appTable.usedServables))
       sMap = servables.map(x => x.fullName -> x).toMap
-      app <- OptionT.liftF(F.fromEither(mapFromDb(appTable, sMap)))
+      versions <-OptionT.liftF(versionDb.get(appTable.usedModelVersions))
+      vMap = versions.map(x => x.id -> x).toMap
+      app <- OptionT.liftF(F.fromEither(mapFromDb(appTable, vMap, sMap)))
     } yield app
     f.value
   }
@@ -85,13 +89,13 @@ class DBApplicationRepository[F[_]](
       appTable <- AsyncUtil.futureAsync(db.run(Tables.Application.result))
       servables <- servableDb.all()
       sMap = servables.map(x => x.fullName -> x).toMap
-      _ = logger.info(s"SERVABLES: $sMap")
+      versions <- versionDb.get(appTable.flatMap(_.usedModelVersions))
+      vMap = versions.map(x => x.id -> x).toMap
       apps = appTable.toList
-        .traverse(appT => mapFromDb(appT, sMap).toValidatedNec)
+        .traverse(appT => mapFromDb(appT, vMap, sMap).toValidatedNec)
         .leftMap { errors =>
           errors.map(x => logger.error("db retrieval error", x))
-          val err = new RuntimeException("Errors while getting applications from db")
-          errors.map(err.addSuppressed)
+          val err = AppDBSchemaErrors(errors.toList)
           err
         }
       f <- F.fromValidated(apps)
@@ -127,6 +131,10 @@ class DBApplicationRepository[F[_]](
     )))
   }
 
+  def updateRow(app: ApplicationRow): F[Int] = AsyncUtil.futureAsync {
+    db.run(Tables.Application.insertOrUpdate(app))
+  }
+
   override def applicationsWithCommonServices(servables: Set[GenericServable], appId: Long): F[List[GenericApplication]] = {
     for {
       appTable <- AsyncUtil.futureAsync {
@@ -141,8 +149,10 @@ class DBApplicationRepository[F[_]](
       sNames = appTable.flatMap(_.usedServables)
       servables <- servableDb.get(sNames)
       sMap = servables.map(x => x.fullName -> x).toMap
+      versions <- versionDb.get(appTable.flatMap(_.usedModelVersions))
+      vMap = versions.map(x => x.id -> x).toMap
       apps <- appTable.toList
-        .traverse(appT => F.fromEither(mapFromDb(appT, sMap)))
+        .traverse(appT => F.fromEither(mapFromDb(appT, vMap, sMap)))
     } yield apps
   }
 
@@ -158,8 +168,10 @@ class DBApplicationRepository[F[_]](
       sNames = appTable.flatMap(_.usedServables)
       servables <- servableDb.get(sNames)
       sMap = servables.map(x => x.fullName -> x).toMap
+      versions <- versionDb.get(appTable.flatMap(_.usedModelVersions))
+      vMap = versions.map(x => x.id -> x).toMap
       apps <- appTable.toList
-        .traverse(appT => F.fromEither(mapFromDb(appT, sMap)))
+        .traverse(appT => F.fromEither(mapFromDb(appT, vMap, sMap)))
     } yield apps
   }
 
@@ -174,7 +186,9 @@ class DBApplicationRepository[F[_]](
       })
       servables <- OptionT.liftF(servableDb.get(appTable.usedServables))
       sMap = servables.map(x => x.fullName -> x).toMap
-      app <- OptionT.liftF(F.fromEither(mapFromDb(appTable, sMap)))
+      versions <- OptionT.liftF(versionDb.get(appTable.usedModelVersions))
+      vMap = versions.map(x => x.id -> x).toMap
+      app <- OptionT.liftF(F.fromEither(mapFromDb(appTable,vMap, sMap)))
     } yield app
     f.value
   }
@@ -184,7 +198,17 @@ object DBApplicationRepository extends CompleteJsonProtocol {
 
   import spray.json._
 
-  case class IncompatibleExecutionGraphError(app: Tables.Application#TableElementType) extends Throwable
+  case class AppDBSchemaErrors(errs: List[AppDBSchemaError]) extends Throwable
+
+  sealed trait AppDBSchemaError extends Throwable
+
+  case class IncompatibleExecutionGraphError(app: Tables.Application#TableElementType) extends AppDBSchemaError
+
+  case class UsingModelVersionIsMissing(app: Tables.Application#TableElementType, graph: Either[VersionGraphAdapter, ServableGraphAdapter]) extends AppDBSchemaError
+
+  case class UsingServableIsMissing(app: Tables.ApplicationRow, servableName: String) extends AppDBSchemaError
+
+  case class InvalidAppStatus(app: Tables.ApplicationRow) extends AppDBSchemaError
 
   case class FlattenedStatus(
     status: String,
@@ -210,26 +234,38 @@ object DBApplicationRepository extends CompleteJsonProtocol {
     }
   }
 
-  def mapFromDb(dbApp: Tables.Application#TableElementType, servables: Map[String, GenericServable]): Either[Throwable, GenericApplication] = {
+  def mapFromDb(
+    dbApp: Tables.Application#TableElementType,
+    versions: Map[Long, ModelVersion],
+    servables: Map[String, GenericServable]
+  ): Either[AppDBSchemaError, GenericApplication] = {
     val appName = dbApp.applicationName
     val jsonGraph = dbApp.executionGraph.parseJson
-    val maybeStatus = dbApp.status match {
+    val maybeStatus: Either[AppDBSchemaError, Application.Status] = dbApp.status match {
       case "Assembling" =>
         val adapterGraph = jsonGraph.convertTo[VersionGraphAdapter]
-        val mappedStages = adapterGraph.stages.map { stage =>
+        val mappedStages = adapterGraph.stages.traverse { stage =>
           val signature = stage.signature
-          val variants = stage.modelVariants.map(m => Variant(m.modelVersion, m.weight))
-          PipelineStage(variants, signature)
+          val variants = stage.modelVariants.traverse { m =>
+            versions.get(m.modelVersion.id)
+              .toRight(UsingModelVersionIsMissing(dbApp, adapterGraph.asLeft))
+              .map(Variant(_, m.weight))
+          }
+          variants.map(PipelineStage(_, signature))
         }
-        Application.Assembling(mappedStages).asRight[Exception]
+        mappedStages.map(Application.Assembling.apply)
       case "Failed" =>
         val adapterGraph = jsonGraph.convertTo[VersionGraphAdapter]
-        val mappedStages = adapterGraph.stages.map { stage =>
+        val mappedStages = adapterGraph.stages.traverse { stage =>
           val signature = stage.signature
-          val variants = stage.modelVariants.map(m => Variant(m.modelVersion, m.weight))
-          PipelineStage(variants, signature)
+          val variants = stage.modelVariants.traverse { m =>
+            versions.get(m.modelVersion.id)
+              .toRight(UsingModelVersionIsMissing(dbApp, adapterGraph.asLeft))
+              .map(Variant(_, m.weight))
+          }
+          variants.map(PipelineStage(_, signature))
         }
-        Application.Failed(mappedStages, dbApp.statusMessage).asRight[Exception]
+        mappedStages.map(Application.Failed(_, dbApp.statusMessage))
       case "Ready" =>
         val mappedStages = Try(jsonGraph.convertTo[ServableGraphAdapter]) match {
           case Failure(exception) => // old application recovery logic
@@ -239,21 +275,26 @@ object DBApplicationRepository extends CompleteJsonProtocol {
             adapterGraph.stages.traverse { stage =>
               val variants = stage.modelVariants.traverse { s =>
                 servables.get(s.item)
-                  .toRight(new Exception(s"Can't find servable with name ${s.item}"))
+                  .toRight(UsingServableIsMissing(dbApp, s.item))
                   .flatMap { servable =>
                     servable.status match {
                       case _: Servable.Serving =>
                         Variant(servable.asInstanceOf[OkServable], s.weight).asRight
-                      case x =>
-                        DomainError.internalError(s"Servable ${servable.fullName} has invalid status $x").asLeft
+                      case _ =>
+                        IncompatibleExecutionGraphError(dbApp).asLeft
                     }
+                  }
+                  .flatMap{ s =>
+                    versions.get(s.item.modelVersion.id)
+                      .map(_ => s)
+                      .toRight(UsingModelVersionIsMissing(dbApp, adapterGraph.asRight))
                   }
               }
               variants.map(ExecutionNode(_, stage.signature))
             }
         }
         mappedStages.map(Application.Ready)
-      case x => DomainError.internalError(s"Unknown application status: $x").asLeft
+      case _ => InvalidAppStatus(dbApp).asLeft
     }
     maybeStatus.map { s =>
       Application(

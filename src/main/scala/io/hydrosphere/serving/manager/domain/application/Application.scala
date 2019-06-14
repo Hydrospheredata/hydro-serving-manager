@@ -11,7 +11,7 @@ case class Application[+T <: Application.Status](
   namespace: Option[String],
   status: T,
   signature: ModelSignature,
-  kafkaStreaming: List[ApplicationKafkaStream]
+  kafkaStreaming: List[ApplicationKafkaStream],
 )
 
 object Application {
@@ -27,7 +27,7 @@ object Application {
   case class Ready(stages: NonEmptyList[ExecutionNode]) extends Status
 
   type AssemblingApp = Application[Assembling]
-  type FailedApp     = Application[Failed]
-  type ReadyApp      = Application[Ready]
+  type FailedApp = Application[Failed]
+  type ReadyApp = Application[Ready]
 
 }
