@@ -6,8 +6,9 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.db.Tables.ApplicationRow
 import io.hydrosphere.serving.manager.domain.application.graph.{ServableGraphAdapter, VersionGraphAdapter}
 import io.hydrosphere.serving.manager.domain.application.requests.{ExecutionGraphRequest, ModelVariantRequest, PipelineStageRequest}
-import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationKafkaStream}
+import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationKafkaStream, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.{AppDBSchemaErrors, IncompatibleExecutionGraphError, UsingModelVersionIsMissing}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
@@ -20,10 +21,10 @@ trait ApplicationMigrationTool[F[_]] {
 
 object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
   def default[F[_]](
-    appsRepo: DBApplicationRepository[F],
+    appsRepo: ApplicationRepository[F],
     cloudDriver: CloudDriver[F],
     appDeployer: ApplicationDeployer[F],
-    servableRepository: DBServableRepository[F]
+    servableRepository: ServableRepository[F]
   )(implicit F: MonadError[F, Throwable]): ApplicationMigrationTool[F] = new ApplicationMigrationTool[F] {
     override def getAndRevive() = {
       for {
