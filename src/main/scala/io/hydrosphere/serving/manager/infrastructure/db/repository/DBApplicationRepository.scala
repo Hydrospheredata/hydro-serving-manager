@@ -45,7 +45,8 @@ class DBApplicationRepository[F[_]](
           executionGraph = status.graph.toJson.compactPrint,
           usedServables = status.usedServables,
           kafkaStreams = entity.kafkaStreaming.map(p => p.toJson.toString()),
-          statusMessage = status.message
+          statusMessage = status.message,
+          usedModelVersions = status.usedVersions
         )
         db.run(Tables.Application returning Tables.Application += elem)
       }
@@ -105,6 +106,7 @@ class DBApplicationRepository[F[_]](
       application.applicationName,
       application.executionGraph,
       application.usedServables,
+      application.usedModelVersions,
       application.kafkaStreams,
       application.namespace,
       application.applicationContract,
@@ -116,6 +118,7 @@ class DBApplicationRepository[F[_]](
       value.name,
       status.graph.toJson.compactPrint,
       status.usedServables,
+      status.usedVersions,
       value.kafkaStreaming.map(_.toJson.toString),
       value.namespace,
       value.signature.toProtoString,
@@ -148,7 +151,7 @@ class DBApplicationRepository[F[_]](
       appTable <- AsyncUtil.futureAsync {
         db.run {
           Tables.Application
-            .filter(a => a.usedServables @> List(versionIdx.toString))
+            .filter(a => a.usedModelVersions @> List(versionIdx))
             .result
         }
       }
@@ -183,18 +186,27 @@ object DBApplicationRepository extends CompleteJsonProtocol {
 
   case class IncompatibleExecutionGraphError(app: Tables.Application#TableElementType) extends Throwable
 
-  case class FlattenedStatus(status: String, message: Option[String], usedServables: List[String], graph: ExecutionGraphAdapter)
+  case class FlattenedStatus(
+    status: String,
+    message: Option[String],
+    usedServables: List[String],
+    usedVersions: List[Long],
+    graph: ExecutionGraphAdapter
+  )
 
   def flatten(app: GenericApplication): FlattenedStatus = {
     app.status match {
       case Application.Assembling(versionGraph) =>
-        FlattenedStatus("Assembling", None, List.empty, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
+        val versionsIdx = versionGraph.flatMap(_.modelVariants.map(_.item.id)).toList
+        FlattenedStatus("Assembling", None, List.empty, versionsIdx, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
       case Application.Failed(versionGraph, reason) =>
-        FlattenedStatus("Failed", reason, List.empty, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
+        val versionsIdx = versionGraph.flatMap(_.modelVariants.map(_.item.id)).toList
+        FlattenedStatus("Failed", reason, List.empty, versionsIdx, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
       case Application.Ready(servableGraph) =>
         val adapter = ExecutionGraphAdapter.fromServablePipeline(servableGraph)
+        val versionsIdx = servableGraph.flatMap(_.variants.map(_.item.modelVersion.id)).toList
         val servables = adapter.stages.flatMap(_.modelVariants.map(_.item))
-        FlattenedStatus("Ready", None, servables.toList, adapter)
+        FlattenedStatus("Ready", None, servables.toList, versionsIdx, adapter)
     }
   }
 
