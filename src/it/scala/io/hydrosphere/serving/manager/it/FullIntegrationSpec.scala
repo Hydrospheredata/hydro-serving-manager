@@ -16,14 +16,17 @@ import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.{ApplicationDiscoveryHub, ObservedApplicationDiscoveryHub}
+import io.hydrosphere.serving.manager.discovery.servable.{ObservedServableDiscoveryHub, ServableDiscoveryHub}
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.image.DockerImage
+import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.util.TarGzUtils
+import io.hydrosphere.serving.manager.util.grpc.Converters
 import io.hydrosphere.serving.manager.util.random.RNG
 import org.scalatest._
 
@@ -63,7 +66,8 @@ trait FullIntegrationSpec extends DatabaseAccessIT
   var repositories: Repositories[IO] = _
   var cloudDriver: CloudDriver[IO] = _
   var managerServices: Services[IO] = _
-  var discoveryHub: ObservedApplicationDiscoveryHub[IO] = _
+  var appHub: ObservedApplicationDiscoveryHub[IO] = _
+  var sHub: ObservedServableDiscoveryHub[IO] = _
   var managerApi: HttpApiServer[IO] = _
   var managerGRPC: Server = _
 
@@ -71,7 +75,7 @@ trait FullIntegrationSpec extends DatabaseAccessIT
     super.beforeAll()
     cloudDriver = CloudDriver.fromConfig[IO](configuration.cloudDriver, configuration.dockerRepository)
     repositories = new Repositories[IO](configuration)
-      val discoveryHubIO = for {
+      val appHubIO = for {
       observed <- ApplicationDiscoveryHub.observed[IO]
       apps     <- repositories.applicationRepository.all()
       needToDiscover = apps.flatMap { app =>
@@ -84,12 +88,28 @@ trait FullIntegrationSpec extends DatabaseAccessIT
       _ <- needToDiscover.traverse(observed.added)
     } yield observed
 
-    discoveryHub = discoveryHubIO.unsafeRunSync()
+    val servableHubIO = for {
+
+      sdh <- ServableDiscoveryHub.observed[IO]
+            servables <- repositories.servableRepository.all()
+      servablesToDiscover = servables.flatMap { s =>
+        s.status match {
+          case Servable.Serving(_, _, _) =>
+            Converters.fromServable(s) :: Nil
+          case _ => Nil
+        }
+      }
+      _ <- sdh.added(servablesToDiscover)
+    } yield sdh
+
+    appHub = appHubIO.unsafeRunSync()
+    sHub = servableHubIO.unsafeRunSync()
     val channelCtor = GrpcChannel.plaintextFactory[IO]
     val predictionClient = PredictionClient.clientCtor[IO](channelCtor)
 
     managerServices = new Services[IO](
-      discoveryHub,
+      appHub,
+      sHub,
       repositories,
       configuration,
       dockerClient,
@@ -99,7 +119,7 @@ trait FullIntegrationSpec extends DatabaseAccessIT
     )
     repositories = new Repositories(configuration)
     managerApi = new HttpApiServer(repositories, managerServices, configuration)
-    managerGRPC = GrpcApiServer[IO](repositories, managerServices, configuration, discoveryHub)
+    managerGRPC = GrpcApiServer[IO](repositories, managerServices, configuration, appHub, sHub)
     managerApi.start()
     managerGRPC.start()
   }
