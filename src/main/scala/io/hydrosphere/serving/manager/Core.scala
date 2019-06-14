@@ -12,8 +12,9 @@ import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfigu
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationMigrationTool}
+import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.infrastructure.db.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.util.random.RNG
 import org.apache.logging.log4j.scala.Logging
@@ -42,7 +43,12 @@ object Core extends Logging {
     for {
       dh <- ApplicationDiscoveryHub.observed[F]
       services = new Services[F](dh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
-      n = ApplicationMigrationTool.default(repositories.applicationRepository, services.cloudDriverService, services.appDeployer)
+      n = ApplicationMigrationTool.default(
+        repositories.applicationRepository,
+        services.cloudDriverService,
+        services.appDeployer,
+        repositories.servableRepository
+      )
       _ <- n.getAndRevive()
       apps <- repositories.applicationRepository.all()
       needToDiscover = apps.flatMap { app =>

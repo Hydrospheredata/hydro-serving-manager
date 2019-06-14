@@ -1,0 +1,1 @@
+ALTER TABLE hydro_serving.application ADD COLUMN used_model_versions BIGINT[] NOT NULL;
