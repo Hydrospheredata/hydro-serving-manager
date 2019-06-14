@@ -40,7 +40,7 @@ object ModelVersionService {
     def list: F[Seq[ModelVersionView]] = {
       for {
         allVersions <- modelVersionRepository.all()
-        f <- Traverse[List].traverse(allVersions.map(_.id).toList) { x =>
+        f <- allVersions.map(_.id).toList.traverse { x =>
           applicationRepo.findVersionsUsage(x).map(x -> _)
         }
         usageMap = f.toMap

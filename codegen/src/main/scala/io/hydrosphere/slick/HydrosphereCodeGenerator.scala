@@ -51,6 +51,7 @@ trait $container${parentType.map(t => s" extends $t").getOrElse("")} {
           case "java.sql.Timestamp" => "java.time.LocalDateTime"
           case "scala.collection.Seq" => model.options.find(_.isInstanceOf[ColumnOption.SqlType]).map(_.asInstanceOf[ColumnOption.SqlType].typeName).map({
             case "_text" => "List[String]"
+            case "_int8" => "List[Long]"
             case _ => "List[String]"
           }).getOrElse("String")
           case _ => super.rawType
