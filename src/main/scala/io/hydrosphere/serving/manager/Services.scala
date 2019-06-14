@@ -9,6 +9,7 @@ import cats.effect.implicits._
 import com.spotify.docker.client._
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
 import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationService}
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
@@ -22,6 +23,7 @@ import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.{LocalStorageOps, ModelUnpacker, StorageOps}
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.docker.InfoProgressHandler
 import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
 import org.apache.logging.log4j.scala.Logging
@@ -31,6 +33,7 @@ import scala.concurrent.ExecutionContext
 
 class Services[F[_]: ConcurrentEffect](
   val discoveryHub: ApplicationDiscoveryHub[F],
+  val servableHub: ServableDiscoveryHub[F],
   val managerRepositories: Repositories[F],
   val managerConfiguration: ManagerConfiguration,
   val dockerClient: DockerClient,
@@ -50,9 +53,11 @@ class Services[F[_]: ConcurrentEffect](
 
   val progressHandler: ProgressHandler = InfoProgressHandler
 
-  val nameGen: NameGenerator[F] = NameGenerator.haiku()
+  implicit val nameGen: NameGenerator[F] = NameGenerator.haiku()
 
-  val storageOps: LocalStorageOps[F] = StorageOps.default
+  implicit val uuidGen = UUIDGenerator.default[F]()
+
+  val storageOps: LocalStorageOps[F] = StorageOps.default[F]
 
   val modelStorage: ModelUnpacker[F] = ModelUnpacker[F](storageOps)
 
@@ -99,8 +104,8 @@ class Services[F[_]: ConcurrentEffect](
     cloudDriverService,
     managerRepositories.servableRepository,
     managerRepositories.modelVersionRepository,
-    nameGen,
-    servableMonitor
+    servableMonitor,
+    servableHub
   )
 
   val graphComposer = VersionGraphComposer.default

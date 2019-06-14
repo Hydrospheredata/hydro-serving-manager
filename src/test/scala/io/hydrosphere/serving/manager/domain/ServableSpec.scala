@@ -10,6 +10,7 @@ import cats.implicits._
 import fs2.concurrent.Queue
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
+import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
@@ -17,7 +18,9 @@ import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelV
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableMonitor.MonitoringEntry
 import io.hydrosphere.serving.manager.domain.servable._
+import io.hydrosphere.serving.manager.grpc.entities
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
 import io.hydrosphere.serving.tensorflow.api.prediction_service.StatusResponse
 
@@ -28,6 +31,7 @@ import scala.concurrent.duration._
 class ServableSpec extends GenericUnitTest {
   implicit val rng: RNG[IO] = RNG.default[IO].unsafeRunSync()
   implicit val nameGen: NameGenerator[IO] = NameGenerator.haiku[IO]()
+  implicit val uuidGen = UUIDGenerator.default[IO]()
   implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   val mv = ModelVersion(
@@ -347,12 +351,20 @@ class ServableSpec extends GenericUnitTest {
           IO(d)
         }
       }
-      val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, nameGen, monitor)
+      val events = ListBuffer.empty[ServableDiscoveryHub.ServableEvent]
+      val dh = new ServableDiscoveryHub[IO] {
+        override def update(ev: ServableDiscoveryHub.ServableEvent): IO[Unit] = IO(events += ev).void
+
+        override def current: IO[List[entities.Servable]] = IO.raiseError(???)
+      }
+      val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, monitor, dh)
       val result = service.deploy(mv).unsafeRunSync().completed.get.unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty
       monitorState should not be empty
       repoState should not be empty
+      println(events)
+      events should not be empty
     }
 
     it("should be able to delete Servable") {
@@ -438,7 +450,14 @@ class ServableSpec extends GenericUnitTest {
       val monitor = new ServableMonitor[IO] {
         override def monitor(name: GenericServable) = ???
       }
-      val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, nameGen, monitor)
+
+      val events = ListBuffer.empty[ServableDiscoveryHub.ServableEvent]
+      val dh = new ServableDiscoveryHub[IO] {
+        override def update(ev: ServableDiscoveryHub.ServableEvent): IO[Unit] = IO(events += ev).void
+
+        override def current: IO[List[entities.Servable]] = IO.raiseError(???)
+      }
+      val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, monitor, dh)
       val result = service.stop("test-model-1-delete-me").unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty

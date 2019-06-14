@@ -2,38 +2,33 @@ package io.hydrosphere.serving.manager.api.grpc
 
 import cats.data.EitherT
 import cats.effect.Effect
-import cats.syntax.applicativeError._
-import cats.syntax.functor._
+import cats.effect.implicits._
+import cats.implicits._
 import com.google.protobuf.empty.Empty
 import io.grpc.stub.StreamObserver
-import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain
-import io.hydrosphere.serving.manager.api.GetVersionRequest
+import io.hydrosphere.serving.manager.api.DeployServableRequest.ModelVersion
 import io.hydrosphere.serving.manager.api.ManagerServiceGrpc.ManagerService
+import io.hydrosphere.serving.manager.api.{DeployServableRequest, GetVersionRequest, RemoveServableRequest}
+import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersion => DMV}
+import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
+import io.hydrosphere.serving.manager.domain.servable.ServableService
 import io.hydrosphere.serving.manager.grpc
+import io.hydrosphere.serving.manager.grpc.entities.Servable
+import io.hydrosphere.serving.manager.util.DeferredResult
+import io.hydrosphere.serving.manager.util.grpc.Converters
 
 import scala.concurrent.Future
 
-class ManagerGrpcService[F[_]: Effect](versionRepositoryAlgebra: ModelVersionRepository[F]) extends ManagerService {
-  
-  private def modelVersionToGrpcEntity(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion = grpc.entities.ModelVersion(
-    id = mv.id,
-    version = mv.modelVersion,
-    modelType = "",
-    status = mv.status.toString,
-    selector = mv.hostSelector.map(s => grpc.entities.HostSelector(s.id, s.name)),
-    model = Some(grpc.entities.Model(mv.model.id, mv.model.name)),
-    contract = Some(ModelContract(mv.modelContract.modelName, mv.modelContract.predict)),
-    image = Some(grpc.entities.DockerImage(mv.image.name, mv.image.tag)),
-    imageSha = mv.image.sha256.getOrElse(""),
-    runtime = Some(grpc.entities.DockerImage(mv.runtime.name, mv.runtime.tag))
-  )
-  
+class ManagerGrpcService[F[_]](
+  versionRepo: ModelVersionRepository[F],
+  servableService: ServableService[F]
+)(implicit F: Effect[F]) extends ManagerService {
+
   override def getAllVersions(request: Empty, responseObserver: StreamObserver[grpc.entities.ModelVersion]): Unit = {
-    val fAction = versionRepositoryAlgebra.all().map { versions =>
+    val fAction = versionRepo.all().map { versions =>
       versions.foreach { v =>
-        responseObserver.onNext(modelVersionToGrpcEntity(v))
+        responseObserver.onNext(Converters.fromModelVersion(v))
       }
       responseObserver.onCompleted()
     }.onError {
@@ -43,16 +38,38 @@ class ManagerGrpcService[F[_]: Effect](versionRepositoryAlgebra: ModelVersionRep
         }
     }
 
-    Effect[F].toIO(fAction).unsafeRunAsyncAndForget()
+    fAction.toIO.unsafeRunAsyncAndForget()
   }
 
   override def getVersion(request: GetVersionRequest): Future[grpc.entities.ModelVersion] = {
     val f = for {
-      version <- EitherT.fromOptionF[F, Throwable, DMV](versionRepositoryAlgebra.get(request.id), new IllegalArgumentException(s"ModelVersion with id ${request.id} is not found"))
-    } yield modelVersionToGrpcEntity(version)
+      version <- EitherT.fromOptionF[F, Throwable, DMV](versionRepo.get(request.id), new IllegalArgumentException(s"ModelVersion with id ${request.id} is not found"))
+    } yield Converters.fromModelVersion(version)
+    f.value.rethrow.toIO.unsafeToFuture()
+  }
 
-    Effect[F].toIO(
-      Effect[F].rethrow(f.value)
-    ).unsafeToFuture()
+  override def deployServable(request: DeployServableRequest, responseObserver: StreamObserver[Servable]): Unit = {
+    val flow = for {
+      res <- request.modelVersion match {
+        case ModelVersion.Empty =>  F.raiseError[DeferredResult[F, GenericServable]](DomainError.invalidRequest("model version is not specified"))
+        case ModelVersion.VersionId(value) => servableService.findAndDeploy(value)
+        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version)
+      }
+      _ <- F.delay(responseObserver.onNext(Converters.fromServable(res.started)))
+      completed <- res.completed.get
+      _ <- F.delay(responseObserver.onNext(Converters.fromServable(completed)))
+      _ <- F.delay(responseObserver.onCompleted())
+    } yield ()
+
+    flow
+      .onError { case x => F.delay(responseObserver.onError(x)) }
+      .toIO.unsafeRunAsyncAndForget()
+  }
+
+  override def removeServable(request: RemoveServableRequest): Future[Servable] = {
+    val flow = for {
+      res <- servableService.stop(request.servableName)
+    } yield Converters.fromServable(res)
+    flow.toIO.unsafeToFuture()
   }
 }

@@ -107,7 +107,7 @@ object ApplicationService extends Logging {
     def toServingApp(app: ReadyApp): ServingApp = {
       val stages = toGStages(app)
 
-      val contract = ModelContract(modelName = app.name, predict = Some(app.signature))
+      val contract = ModelContract(modelName = app.name, predict = app.signature.some)
 
       ServingApp(app.id.toString, app.name, contract.some, stages.toList)
     }
@@ -119,19 +119,20 @@ object ApplicationService extends Logging {
         modelType = "",
         status = mv.status.toString,
         selector = mv.hostSelector.map(s => grpc.entities.HostSelector(s.id, s.name)),
-        model = Some(grpc.entities.Model(mv.model.id, mv.model.name)),
-        contract = Some(ModelContract(mv.modelContract.modelName, mv.modelContract.predict)),
-        image = Some(grpc.entities.DockerImage(mv.image.name, mv.image.tag)),
+        model = grpc.entities.Model(mv.model.id, mv.model.name).some,
+        contract = ModelContract(mv.modelContract.modelName, mv.modelContract.predict).some,
+        image = grpc.entities.DockerImage(mv.image.name, mv.image.tag).some,
         imageSha = mv.image.sha256.getOrElse(""),
-        runtime = Some(grpc.entities.DockerImage(mv.runtime.name, mv.runtime.tag))
+        runtime = grpc.entities.DockerImage(mv.runtime.name, mv.runtime.tag).some
       )
 
     def toGServable(mv: Variant[OkServable]): GServable = {
       GServable(
-        mv.item.status.host,
-        mv.item.status.port,
-        mv.weight,
-        Some(modelVersionToGrpcEntity(mv.item.modelVersion))
+        host = mv.item.status.host,
+        port = mv.item.status.port,
+        weight = mv.weight,
+        modelVersion = modelVersionToGrpcEntity(mv.item.modelVersion).some,
+        name = mv.item.fullName
       )
     }
 
