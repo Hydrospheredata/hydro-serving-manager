@@ -13,9 +13,10 @@ import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscovery
 import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationMigrationTool}
+import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.servable.Servable
+import io.hydrosphere.serving.manager.infrastructure.db.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.util.grpc.Converters
 import io.hydrosphere.serving.manager.util.random.RNG
@@ -46,9 +47,14 @@ object Core extends Logging {
       dh <- ApplicationDiscoveryHub.observed[F]
       sdh <- ServableDiscoveryHub.observed[F]
       services = new Services[F](dh, sdh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
-      n = ApplicationMigrationTool.default(repositories.applicationRepository, services.cloudDriverService, services.appDeployer)
+      n = ApplicationMigrationTool.default(
+        repositories.applicationRepository,
+        services.cloudDriverService,
+        services.appDeployer,
+        repositories.servableRepository
+      )
       _ <- n.getAndRevive()
-            servables <- repositories.servableRepository.all()
+      servables <- repositories.servableRepository.all()
       servablesToDiscover = servables.flatMap { s =>
         s.status match {
           case Servable.Serving(_, _, _) =>

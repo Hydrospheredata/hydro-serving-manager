@@ -20,6 +20,7 @@ import io.hydrosphere.serving.manager.domain.servable.ServableMonitor.Monitoring
 import io.hydrosphere.serving.manager.domain.servable._
 import io.hydrosphere.serving.manager.grpc.entities
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
 import io.hydrosphere.serving.tensorflow.api.prediction_service.StatusResponse
 
@@ -30,6 +31,7 @@ import scala.concurrent.duration._
 class ServableSpec extends GenericUnitTest {
   implicit val rng: RNG[IO] = RNG.default[IO].unsafeRunSync()
   implicit val nameGen: NameGenerator[IO] = NameGenerator.haiku[IO]()
+  implicit val uuidGen = UUIDGenerator.default[IO]()
   implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   val mv = ModelVersion(
@@ -355,7 +357,7 @@ class ServableSpec extends GenericUnitTest {
 
         override def current: IO[List[entities.Servable]] = IO.raiseError(???)
       }
-      val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, nameGen, monitor, dh)
+      val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, monitor, dh)
       val result = service.deploy(mv).unsafeRunSync().completed.get.unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty
@@ -455,7 +457,7 @@ class ServableSpec extends GenericUnitTest {
 
         override def current: IO[List[entities.Servable]] = IO.raiseError(???)
       }
-      val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, nameGen, monitor, dh)
+      val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, monitor, dh)
       val result = service.stop("test-model-1-delete-me").unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty
