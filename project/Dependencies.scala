@@ -96,7 +96,8 @@ object Dependencies {
       "com.spotify" % "docker-client" % "8.12.0" exclude("ch.qos.logback", "logback-classic"),
       "com.google.guava" % "guava" % "22.0",
       "com.github.pureconfig" %% "pureconfig" % "0.9.1",
-      "co.fs2" %% "fs2-core" % "1.0.4",
-      "co.fs2" %% "fs2-io" % "1.0.4"
+      "co.fs2" %% "fs2-core" % "1.0.5",
+      "co.fs2" %% "fs2-io" % "1.0.5",
+      "com.github.krasserm" %% "streamz-converter" % "0.10-M2" // uses FS2 1.0.0
     )
 }

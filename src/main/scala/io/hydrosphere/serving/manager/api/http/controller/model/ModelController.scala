@@ -1,16 +1,27 @@
 package io.hydrosphere.serving.manager.api.http.controller.model
 
-import akka.actor.ActorSystem
+import java.util.UUID
+
+import akka.NotUsed
+import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import cats.effect.Effect
+import cats.effect.{ConcurrentEffect, ContextShift, Effect}
 import cats.syntax.functor._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, ModelService}
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionService, ModelVersionView}
 import io.swagger.annotations._
+import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
+import akka.http.scaladsl.model.sse.ServerSentEvent
+import akka.stream.scaladsl.Source
+import io.hydrosphere.serving.manager.discovery.model.ModelDiscoverySubscriber
 import javax.ws.rs.Path
+import streamz.converter._
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 
 @Path("/api/v2/model")
@@ -125,6 +136,17 @@ class ModelController[F[_]: Effect]()(
     }
   }
 
+  def modelEvents = pathPrefix("model" / "events") {
+    get {
+      val subId = UUID.randomUUID().toString
+      complete {
+        Source.tick(2.seconds, 2.seconds, NotUsed)
+          .map(_ => ServerSentEvent(data = "hi", `type`="model-test", id = subId))
+          .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
+      }
+    }
+  }
 
-  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions
+
+  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions ~ modelEvents
 }

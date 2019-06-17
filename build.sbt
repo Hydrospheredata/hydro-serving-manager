@@ -42,6 +42,7 @@ lazy val codegen = project.in(file("codegen"))
     libraryDependencies ++= Dependencies.codegenDependencies
   )
 
+resolvers += "krasserm at bintray" at "http://dl.bintray.com/krasserm/maven"
 
 lazy val manager = project.in(file("."))
   .dependsOn(codegen)

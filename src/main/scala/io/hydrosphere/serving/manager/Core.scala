@@ -10,12 +10,13 @@ import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
-import io.hydrosphere.serving.manager.discovery.model.ModelDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.model.ModelDiscoveryPublisher
 import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
 import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.domain.model_version
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.grpc.entities.ModelVersion
 import io.hydrosphere.serving.manager.infrastructure.db.ApplicationMigrationTool
@@ -48,8 +49,8 @@ object Core extends Logging {
     for {
       dh <- ApplicationDiscoveryHub.observed[F]
       sdh <- ServableDiscoveryHub.observed[F]
-      mdh = new ModelDiscoveryHub[F] {
-        override def update(modelVersion: ModelVersion): F[Unit] = F.unit
+      mdh = new ModelDiscoveryPublisher[F] {
+        override def update(modelVersion: model_version.ModelVersion): F[Unit] = F.unit
 
         override def deleted(modelId: Long): F[Unit] = F.unit
       }

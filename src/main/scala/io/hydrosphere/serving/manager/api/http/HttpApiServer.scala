@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import cats.effect.Effect
+import cats.effect.{ConcurrentEffect, ContextShift, Effect}
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import io.hydrosphere.serving.BuildInfo
