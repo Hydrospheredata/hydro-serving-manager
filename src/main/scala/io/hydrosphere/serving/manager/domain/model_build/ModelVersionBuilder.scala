@@ -5,13 +5,14 @@ import java.time.LocalDateTime
 import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
-import cats.syntax.flatMap._
-import cats.syntax.functor._
+import cats.implicits._
+import io.hydrosphere.serving.manager.discovery.model.ModelDiscoveryHub
 import io.hydrosphere.serving.manager.domain.image.{ImageBuilder, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DeferredResult
+import io.hydrosphere.serving.manager.util.grpc.Converters
 import org.apache.logging.log4j.scala.Logging
 
 trait ModelVersionBuilder[F[_]]{
@@ -24,11 +25,13 @@ object ModelVersionBuilder {
     modelVersionRepository: ModelVersionRepository[F],
     imageRepository: ImageRepository[F],
     modelVersionService: ModelVersionService[F],
-    storageOps: StorageOps[F]
+    storageOps: StorageOps[F],
+    modelDiscoveryHub: ModelDiscoveryHub[F]
   ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] with Logging {
     override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion]] = {
       for {
         init <- initialVersion(model, metadata)
+        _ <- modelDiscoveryHub.update(Converters.fromModelVersion(init))
         deferred <- Deferred[F, ModelVersion]
         fbr <- handleBuild(init, modelFileStructure).flatMap(deferred.complete).start
       } yield DeferredResult(init, deferred)
@@ -64,13 +67,15 @@ object ModelVersionBuilder {
         newDockerImage = mv.image.copy(sha256 = Some(imageSha))
         finishedVersion = mv.copy(image = newDockerImage, finished = Some(LocalDateTime.now()), status = ModelVersionStatus.Released)
         _ <- modelVersionRepository.update(finishedVersion.id, finishedVersion)
+        _ <- modelDiscoveryHub.update(Converters.fromModelVersion(finishedVersion))
         _ <- imageRepository.push(finishedVersion.image)
       } yield finishedVersion
 
-      Concurrent[F].handleErrorWith(innerCompleted) { err =>
+      innerCompleted.handleErrorWith { err =>
         for {
           _ <- Concurrent[F].delay(logger.error(err, err))
           failed = mv.copy(status = ModelVersionStatus.Failed)
+          _ <- modelDiscoveryHub.update(Converters.fromModelVersion(failed))
           _ <- modelVersionRepository.update(failed.id, failed)
         } yield failed
       }

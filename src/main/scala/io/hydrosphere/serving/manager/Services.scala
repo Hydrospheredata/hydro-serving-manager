@@ -9,6 +9,7 @@ import cats.effect.implicits._
 import com.spotify.docker.client._
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.model.ModelDiscoveryHub
 import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
 import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationService}
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
@@ -34,6 +35,7 @@ import scala.concurrent.ExecutionContext
 class Services[F[_]: ConcurrentEffect](
   val discoveryHub: ApplicationDiscoveryHub[F],
   val servableHub: ServableDiscoveryHub[F],
+  val modelHub: ModelDiscoveryHub[F],
   val managerRepositories: Repositories[F],
   val managerConfiguration: ManagerConfiguration,
   val dockerClient: DockerClient,
@@ -86,7 +88,8 @@ class Services[F[_]: ConcurrentEffect](
     modelVersionRepository = managerRepositories.modelVersionRepository,
     imageRepository = imageRepository,
     modelVersionService = versionService,
-    storageOps = storageOps
+    storageOps = storageOps,
+    modelDiscoveryHub = modelHub
   )
 
   logger.info(s"Using ${cloudDriverService.getClass} cloud driver")

@@ -10,12 +10,14 @@ import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.model.ModelDiscoveryHub
 import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
 import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.servable.Servable
+import io.hydrosphere.serving.manager.grpc.entities.ModelVersion
 import io.hydrosphere.serving.manager.infrastructure.db.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.util.grpc.Converters
@@ -46,7 +48,12 @@ object Core extends Logging {
     for {
       dh <- ApplicationDiscoveryHub.observed[F]
       sdh <- ServableDiscoveryHub.observed[F]
-      services = new Services[F](dh, sdh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
+      mdh = new ModelDiscoveryHub[F] {
+        override def update(modelVersion: ModelVersion): F[Unit] = F.unit
+
+        override def deleted(modelId: Long): F[Unit] = F.unit
+      }
+      services = new Services[F](dh, sdh, mdh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
       n = ApplicationMigrationTool.default(
         repositories.applicationRepository,
         services.cloudDriverService,
