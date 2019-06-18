@@ -30,6 +30,7 @@ object Core extends Logging {
     predictionCtor: PredictionClient.Factory[F]
   )(
     implicit F: ConcurrentEffect[F],
+    cs: ContextShift[F],
     ec: ExecutionContext,
     as: ActorSystem,
     mat: ActorMaterializer,
@@ -67,7 +68,7 @@ object Core extends Logging {
       )
       _ <- n.getAndRevive()
     } yield {
-      val httpApi = new HttpApiServer(repositories, services, config)
+      val httpApi = new HttpApiServer(repositories, services, config, appSub, modelSub)
       val grpcApi = GrpcApiServer(repositories, services, config, appSub, servSub)
       (httpApi, grpcApi)
     }

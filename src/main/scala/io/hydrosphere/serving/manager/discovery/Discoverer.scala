@@ -13,11 +13,15 @@ case class DiscoverItemUpdate[T, K](items: List[T]) extends DiscoveryEvent[T, K]
 case class DiscoverItemRemove[T, K](items: List[K]) extends DiscoveryEvent[T, K]
 
 trait DiscoveryPublisher[F[_], T, K] {
+  type Event = DiscoveryEvent[T, K]
+
   def update(item: T): F[Unit]
   def remove(itemId: K): F[Unit]
 }
 
 trait DiscoverySubscriber[F[_], T, K] {
+  type Event = DiscoveryEvent[T, K]
+
   def sub(id: String): F[fs2.Stream[F, DiscoveryEvent[T, K]]]
   def unsub(id: String): F[Unit]
 }
