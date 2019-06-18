@@ -24,7 +24,6 @@ import scala.concurrent.ExecutionContext
 object Core extends Logging {
   def app[F[_]](
     config: ManagerConfiguration,
-    repos: Repositories[F],
     dockerClient: DefaultDockerClient,
     dockerConfig: DockerClientConfig,
     predictionCtor: PredictionClient.Factory[F]
@@ -37,7 +36,7 @@ object Core extends Logging {
     timeout: Timeout,
     timer: Timer[F],
     rng: RNG[F]
-  ): F[(HttpApiServer[F], Server)] = {
+  ) = {
     val cloudDriver = CloudDriver.fromConfig[F](config.cloudDriver, config.dockerRepository)
     val repositories = new Repositories[F](config)
 
@@ -48,6 +47,7 @@ object Core extends Logging {
       (servPub, servSub) = servDH
       mdh <- DiscoveryCtor.topicBased[F, ModelVersion, Long]()
       (modelPub, modelSub) = mdh
+      repos = new Repositories[IO](config)
       services = new Services[F] (
         appPub,
         servPub,
@@ -70,7 +70,7 @@ object Core extends Logging {
     } yield {
       val httpApi = new HttpApiServer(repositories, services, config, appSub, modelSub)
       val grpcApi = GrpcApiServer(repositories, services, config, appSub, servSub)
-      (httpApi, grpcApi)
+      (httpApi, grpcApi, services, repos)
     }
   }
 }

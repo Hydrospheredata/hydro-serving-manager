@@ -57,14 +57,14 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
           None
         )
         for {
-          appResult <- managerServices.appService.create(create)
+          appResult <- services.appService.create(create)
           _ = println("Sent creation request")
           _ <- appResult.completed.get
           _ = println("Creation completed")
           preCont <- IO(dockerClient.listContainers())
           _ = println("sleep")
           _ <- timer.sleep(5.seconds)
-          _ <- managerServices.appService.delete(appResult.started.name)
+          _ <- services.appService.delete(appResult.started.name)
           _ = println("deleted app")
           cont <- IO(dockerClient.listContainers())
         } yield {
@@ -86,9 +86,9 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
     dockerClient.pull("hydrosphere/serving-runtime-dummy:latest")
 
     val f = for {
-      d1 <- managerServices.modelService.uploadModel(uploadFile, upload1)
+      d1 <- services.modelService.uploadModel(uploadFile, upload1)
       completed1 <- d1.completed.get
-      d2 <- managerServices.modelService.uploadModel(uploadFile, upload2)
+      d2 <- services.modelService.uploadModel(uploadFile, upload2)
       completed2 <- d2.completed.get
     } yield {
       println(s"UPLOADED: $completed1")

@@ -46,7 +46,7 @@ class ServableRepoSpec extends FullIntegrationSpec {
     super.beforeAll()
 
     val f = for {
-      d1 <- managerServices.modelService.uploadModel(uploadFile, upload1)
+      d1 <- services.modelService.uploadModel(uploadFile, upload1)
       completed1 <- d1.completed.get
     } yield {
       println(s"UPLOADED: $completed1")

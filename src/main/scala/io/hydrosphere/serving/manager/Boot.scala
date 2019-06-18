@@ -34,13 +34,12 @@ object Boot extends IOApp with Logging {
         logger
           .info(s"Using docker client config: ${ReflectionUtils.prettyPrint(dockerClientConfig)}")
       )
-      repos <- IO(new Repositories[IO](configuration))
       grpcCtor       = GrpcChannel.plaintextFactory[IO]
       predictionCtor = PredictionClient.clientCtor[IO](grpcCtor)
       apis <- {
-        Core.app[IO](configuration, repos, dockerClient, dockerClientConfig, predictionCtor)
+        Core.app[IO](configuration, dockerClient, dockerClientConfig, predictionCtor)
       }
-      (httpApi, grpcApi) = apis
+      (httpApi, grpcApi, _, _) = apis
       _ <- httpApi.start()
       _ <- IO(grpcApi.start())
       _ <- IO(
