@@ -10,7 +10,7 @@ import cats.implicits._
 import fs2.concurrent.Queue
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.ServablePublisher
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
@@ -351,11 +351,11 @@ class ServableSpec extends GenericUnitTest {
           IO(d)
         }
       }
-      val events = ListBuffer.empty[ServableDiscoveryHub.ServableEvent]
-      val dh = new ServableDiscoveryHub[IO] {
-        override def update(ev: ServableDiscoveryHub.ServableEvent): IO[Unit] = IO(events += ev).void
+      val events = ListBuffer.empty[GenericServable]
+      val dh = new ServablePublisher[IO] {
+        override def update(item: GenericServable): IO[Unit] = IO(events += item)
 
-        override def current: IO[List[entities.Servable]] = IO.raiseError(???)
+        override def remove(itemId: String): IO[Unit] = IO.unit
       }
       val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, monitor, dh)
       val result = service.deploy(mv).unsafeRunSync().completed.get.unsafeRunSync()
@@ -451,11 +451,11 @@ class ServableSpec extends GenericUnitTest {
         override def monitor(name: GenericServable) = ???
       }
 
-      val events = ListBuffer.empty[ServableDiscoveryHub.ServableEvent]
-      val dh = new ServableDiscoveryHub[IO] {
-        override def update(ev: ServableDiscoveryHub.ServableEvent): IO[Unit] = IO(events += ev).void
+      val events = ListBuffer.empty[GenericServable]
+      val dh = new ServablePublisher[IO] {
+        override def update(item: GenericServable): IO[Unit] = IO(events += item)
 
-        override def current: IO[List[entities.Servable]] = IO.raiseError(???)
+        override def remove(itemId: String): IO[Unit] = IO.unit
       }
       val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, monitor, dh)
       val result = service.stop("test-model-1-delete-me").unsafeRunSync()
