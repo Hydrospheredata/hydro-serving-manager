@@ -6,6 +6,7 @@ import java.nio.file.{Path, Paths}
 import cats.effect.IO
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
+import io.hydrosphere.serving.manager.discovery.ModelPublisher
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
@@ -85,12 +86,18 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def readBytes(path: Path): IO[Option[Array[Byte]]] = ???
           override def writeBytes(path: Path, bytes: Array[Byte]): IO[Path] = IO.pure(path)
         }
+        val mh = new ModelPublisher[IO] {
+          override def update(modelVersion: ModelVersion): IO[Unit] = IO.unit
+
+          override def remove(itemId: Long): IO[Unit] = ???
+        }
         val builder = ModelVersionBuilder[IO](
           imageBuilder = imageBuilder,
           modelVersionRepository = versionRepo,
           imageRepository = imageRepo,
           modelVersionService = versionService,
-          storageOps = ops
+          storageOps = ops,
+          modelDiscoveryHub = mh
         )
         for {
           stateful <- builder.build(model, modelVersionMetadata, mfs)

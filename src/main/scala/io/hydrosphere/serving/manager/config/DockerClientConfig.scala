@@ -33,4 +33,8 @@ object DockerClientConfig {
     val fileContent = new String(fileBytes)
     fileContent.parseJson.convertTo[DockerClientConfig]
   }
+
+  def empty = {
+    DockerClientConfig(Map.empty)
+  }
 }

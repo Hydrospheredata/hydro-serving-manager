@@ -1,16 +1,24 @@
 package io.hydrosphere.serving.manager.api.http.controller.model
 
-import akka.actor.ActorSystem
+import java.util.UUID
+
+import akka.NotUsed
+import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import cats.effect.Effect
+import cats.effect.{ConcurrentEffect, ContextShift, Effect}
 import cats.syntax.functor._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, ModelService}
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionService, ModelVersionView}
 import io.swagger.annotations._
+import akka.stream.scaladsl.Source
 import javax.ws.rs.Path
+import streamz.converter._
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 
 @Path("/api/v2/model")
@@ -124,7 +132,6 @@ class ModelController[F[_]: Effect]()(
       }
     }
   }
-
 
   val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions
 }

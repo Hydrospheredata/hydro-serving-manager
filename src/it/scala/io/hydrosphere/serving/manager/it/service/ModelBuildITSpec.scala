@@ -28,7 +28,7 @@ class ModelBuildITSpec extends FullIntegrationSpec {
       ioAssert {
         for {
           models <- repositories.modelVersionRepository.all()
-          mv <- managerServices.modelService.uploadModel(uploadFile, uploadMetadata)
+          mv <- services.modelService.uploadModel(uploadFile, uploadMetadata)
           builtMv <- mv.completed.get
         } yield {
           println(models)

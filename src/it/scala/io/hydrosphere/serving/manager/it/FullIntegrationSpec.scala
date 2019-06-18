@@ -15,8 +15,7 @@ import io.hydrosphere.serving.manager._
 import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
-import io.hydrosphere.serving.manager.discovery.application.{ApplicationDiscoveryHub, ObservedApplicationDiscoveryHub}
-import io.hydrosphere.serving.manager.discovery.servable.{ObservedServableDiscoveryHub, ServableDiscoveryHub}
+import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, ApplicationSubscriber, ModelPublisher, ModelSubscriber, ServablePublisher, ServableSubscriber}
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
@@ -63,64 +62,22 @@ trait FullIntegrationSpec extends DatabaseAccessIT
 
   def configuration = originalConfiguration.unsafeRunSync()
 
-  var repositories: Repositories[IO] = _
-  var cloudDriver: CloudDriver[IO] = _
-  var managerServices: Services[IO] = _
-  var appHub: ObservedApplicationDiscoveryHub[IO] = _
-  var sHub: ObservedServableDiscoveryHub[IO] = _
-  var managerApi: HttpApiServer[IO] = _
+  var http: HttpApiServer[IO] = _
   var managerGRPC: Server = _
+  var services: Services[IO] = _
+  var repositories: Repositories[IO] = _
+  val grpcCtor: GrpcChannel.Factory[IO] = GrpcChannel.plaintextFactory[IO]
+  val predictionCtor: PredictionClient.Factory[IO] = PredictionClient.clientCtor[IO](grpcCtor)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    cloudDriver = CloudDriver.fromConfig[IO](configuration.cloudDriver, configuration.dockerRepository)
-    repositories = new Repositories[IO](configuration)
-      val appHubIO = for {
-      observed <- ApplicationDiscoveryHub.observed[IO]
-      apps     <- repositories.applicationRepository.all()
-      needToDiscover = apps.flatMap { app =>
-        app.status match {
-          case _: Application.Ready =>
-            Internals.toServingApp(app.asInstanceOf[ReadyApp]) :: Nil
-          case _ => Nil
-        }
-      }
-      _ <- needToDiscover.traverse(observed.added)
-    } yield observed
 
-    val servableHubIO = for {
-
-      sdh <- ServableDiscoveryHub.observed[IO]
-            servables <- repositories.servableRepository.all()
-      servablesToDiscover = servables.flatMap { s =>
-        s.status match {
-          case Servable.Serving(_, _, _) =>
-            Converters.fromServable(s) :: Nil
-          case _ => Nil
-        }
-      }
-      _ <- sdh.added(servablesToDiscover)
-    } yield sdh
-
-    appHub = appHubIO.unsafeRunSync()
-    sHub = servableHubIO.unsafeRunSync()
-    val channelCtor = GrpcChannel.plaintextFactory[IO]
-    val predictionClient = PredictionClient.clientCtor[IO](channelCtor)
-
-    managerServices = new Services[IO](
-      appHub,
-      sHub,
-      repositories,
-      configuration,
-      dockerClient,
-      DockerClientConfig(),
-      cloudDriver,
-      predictionClient
-    )
-    repositories = new Repositories(configuration)
-    managerApi = new HttpApiServer(repositories, managerServices, configuration)
-    managerGRPC = GrpcApiServer[IO](repositories, managerServices, configuration, appHub, sHub)
-    managerApi.start()
+    val res = Core.app(configuration, dockerClient, DockerClientConfig.empty, predictionCtor).unsafeRunSync()
+    http = res._1
+    managerGRPC = res._2
+    services = res._3
+    repositories = res._4
+    http.start().unsafeRunSync()
     managerGRPC.start()
   }
 

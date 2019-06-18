@@ -6,26 +6,30 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import cats.effect.Effect
+import cats.effect.{ConcurrentEffect, ContextShift, Effect}
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import io.hydrosphere.serving.BuildInfo
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationController
+import io.hydrosphere.serving.manager.api.http.controller.events.SSEController
 import io.hydrosphere.serving.manager.api.http.controller.host_selector.HostSelectorController
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelController
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
 import io.hydrosphere.serving.manager.api.http.controller.{AkkaHttpControllerDsl, SwaggerDocController}
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
+import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, ModelSubscriber}
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import io.hydrosphere.serving.manager.{Repositories, Services}
 
 import scala.collection.immutable.Seq
 import scala.concurrent.ExecutionContext
 
-class HttpApiServer[F[_]: Effect](
+class HttpApiServer[F[_]: ConcurrentEffect: ContextShift](
   managerRepositories: Repositories[F],
   managerServices: Services[F],
-  managerConfiguration: ManagerConfiguration
+  managerConfiguration: ManagerConfiguration,
+  applicationSub: ApplicationSubscriber[F],
+  modelSub: ModelSubscriber[F]
 )(
   implicit system: ActorSystem,
   materializer: ActorMaterializer,
@@ -43,12 +47,15 @@ class HttpApiServer[F[_]: Effect](
 
   val servableController = new ServableController[F]()
 
+  val sseController = new SSEController[F](applicationSub, modelSub)
+
   val swaggerController = new SwaggerDocController(
     Set(
       classOf[HostSelectorController[F]],
       classOf[ModelController[F]],
       classOf[ApplicationController[F]],
-      classOf[ServableController[F]]
+      classOf[ServableController[F]],
+      classOf[SSEController[F]]
     ),
     "2"
   )
@@ -59,7 +66,8 @@ class HttpApiServer[F[_]: Effect](
         modelController.routes ~
         applicationController.routes ~
         environmentController.routes ~
-        servableController.routes
+        servableController.routes ~
+        sseController.routes
     }
   }
 

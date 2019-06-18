@@ -64,7 +64,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           Option.empty
         )
         for {
-          appResult <- managerServices.appService.create(create)
+          appResult <- services.appService.create(create)
           started = appResult.started
           finished <- appResult.completed.get
           servables <- repositories.servableRepository.all()
@@ -107,7 +107,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           kafkaStreaming = None
         )
         for {
-          app <- managerServices.appService.create(appRequest)
+          app <- services.appService.create(appRequest)
           finished <- app.completed.get
         } yield {
           println(app)
@@ -151,9 +151,9 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
       )
       ioAssert {
         for {
-          app <- managerServices.appService.create(appRequest)
+          app <- services.appService.create(appRequest)
           _ <- app.completed.get
-          appNew <- managerServices.appService.update(UpdateApplicationRequest(
+          appNew <- services.appService.update(UpdateApplicationRequest(
             app.started.id,
             app.started.name,
             app.started.namespace,
@@ -190,7 +190,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           kafkaStreaming = None
         )
         for {
-          app <- managerServices.appService.create(appRequest)
+          app <- services.appService.create(appRequest)
           newGraph = ExecutionGraphRequest(
             stages = NonEmptyList.of(
               PipelineStageRequest(
@@ -203,7 +203,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
               )
             )
           )
-          appNew <- managerServices.appService.update(UpdateApplicationRequest(
+          appNew <- services.appService.update(UpdateApplicationRequest(
             app.started.id,
             app.started.name,
             app.started.namespace,
@@ -226,11 +226,11 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
     dockerClient.pull("hydrosphere/serving-runtime-dummy:latest")
 
     val f = for {
-      d1 <- managerServices.modelService.uploadModel(uploadFile, upload1)
+      d1 <- services.modelService.uploadModel(uploadFile, upload1)
       completed1 <- d1.completed.get
-      d2 <- managerServices.modelService.uploadModel(uploadFile, upload2)
+      d2 <- services.modelService.uploadModel(uploadFile, upload2)
       completed2 <- d2.completed.get
-      d3 <- managerServices.modelService.uploadModel(uploadFile, upload3)
+      d3 <- services.modelService.uploadModel(uploadFile, upload3)
       completed3 <- d3.completed.get
     } yield {
       println(s"UPLOADED: $completed1")

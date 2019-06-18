@@ -1,15 +1,14 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import cats.implicits._
-import cats.effect.implicits._
 import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
-import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
+import cats.effect.implicits._
+import cats.implicits._
+import io.hydrosphere.serving.manager.discovery.ApplicationPublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.application.Application.{Assembling, AssemblingApp, GenericApplication}
-import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
 import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Node, Variant, VersionGraphComposer}
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionStatus}
@@ -32,7 +31,7 @@ object ApplicationDeployer extends Logging {
     versionRepository: ModelVersionRepository[F],
     applicationRepository: ApplicationRepository[F],
     graphComposer: VersionGraphComposer,
-    discoveryHub: ApplicationDiscoveryHub[F]
+    discoveryHub: ApplicationPublisher[F]
   )(implicit F: Concurrent[F]): ApplicationDeployer[F] = {
     new ApplicationDeployer[F] {
       override def deploy(
@@ -49,9 +48,7 @@ object ApplicationDeployer extends Logging {
             genericApp <- startServices(app)
             _ <- F.delay(logger.debug("App services started. All ok."))
             _ <- applicationRepository.update(genericApp)
-            translated = Internals.toServingApp(genericApp)
-            _ <- F.delay(logger.debug(s"Sending to discovery stream $translated"))
-            _ <- discoveryHub.added(translated)
+            _ <- discoveryHub.update(genericApp)
             _ <- df.complete(genericApp)
           } yield ())
             .handleErrorWith { x =>
