@@ -10,15 +10,18 @@ import io.grpc.stub.StreamObserver
 import io.hydrosphere.serving.discovery.serving.ServingDiscoveryGrpc.ServingDiscovery
 import io.hydrosphere.serving.discovery.serving.{ApplicationDiscoveryEvent, ServableDiscoveryEvent}
 import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, DiscoverItemRemove, DiscoverItemUpdate, DiscoveryInitial, ServableSubscriber}
-import io.hydrosphere.serving.manager.domain.application.Application
+import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
+import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.util.grpc.Converters
 import org.apache.logging.log4j.scala.Logging
 
 
 class GrpcServingDiscovery[F[_]](
   appSub: ApplicationSubscriber[F],
-  servableSub: ServableSubscriber[F]
+  servableSub: ServableSubscriber[F],
+  applicationRepository: ApplicationRepository[F],
+  servableRepository: ServableRepository[F]
 )(
   implicit F: ConcurrentEffect[F]
 ) extends ServingDiscovery with Logging {
@@ -30,6 +33,16 @@ class GrpcServingDiscovery[F[_]](
     logger.debug(s"Application watcher  $id registered")
     runSync {
       for {
+        apps <- applicationRepository.all()
+        initEvents = apps.grouped(10).toList.map { batch =>
+          val converted = batch.filter(_.status.isInstanceOf[Application.Ready]).map { x =>
+            Converters.fromApp(x.asInstanceOf[ReadyApp])
+          }
+          ApplicationDiscoveryEvent(added = converted)
+        }
+        _ <- initEvents.traverse { ev =>
+          F.delay(observer.onNext(ev))
+        }
         stream <- appSub.sub(id)
         _ <- stream.map {
           case DiscoveryInitial =>
@@ -63,6 +76,14 @@ class GrpcServingDiscovery[F[_]](
     logger.debug(s"Servable subscriber $id registered")
     runSync {
       for {
+        servables <- servableRepository.all()
+        initEvents = servables.grouped(10).toList.map { batch =>
+          val converted = batch.map(Converters.fromServable)
+          ServableDiscoveryEvent(added = converted)
+        }
+        _ <- initEvents.traverse { ev =>
+          F.delay(responseObserver.onNext(ev))
+        }
         stream <- servableSub.sub(id)
         _ <- stream.map {
           case DiscoveryInitial => ServableDiscoveryEvent()
