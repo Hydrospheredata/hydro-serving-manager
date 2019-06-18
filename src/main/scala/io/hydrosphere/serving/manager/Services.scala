@@ -8,9 +8,7 @@ import cats.implicits._
 import cats.effect.implicits._
 import com.spotify.docker.client._
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
-import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
-import io.hydrosphere.serving.manager.discovery.model.ModelDiscoveryPublisher
-import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, ModelPublisher, ServablePublisher}
 import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationService}
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
@@ -33,9 +31,9 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 
 class Services[F[_]: ConcurrentEffect](
-  val discoveryHub: ApplicationDiscoveryHub[F],
-  val servableHub: ServableDiscoveryHub[F],
-  val modelHub: ModelDiscoveryPublisher[F],
+  val appPub: ApplicationPublisher[F],
+  val servablePub: ServablePublisher[F],
+  val modelPub: ModelPublisher[F],
   val managerRepositories: Repositories[F],
   val managerConfiguration: ManagerConfiguration,
   val dockerClient: DockerClient,
@@ -53,9 +51,9 @@ class Services[F[_]: ConcurrentEffect](
 
   import managerRepositories._
 
-  val progressHandler: ProgressHandler = InfoProgressHandler
+  val progressHandler = InfoProgressHandler
 
-  implicit val nameGen: NameGenerator[F] = NameGenerator.haiku()
+  implicit val nameGen = NameGenerator.haiku[F]()
 
   implicit val uuidGen = UUIDGenerator.default[F]()
 
@@ -73,7 +71,7 @@ class Services[F[_]: ConcurrentEffect](
   )
 
   val imageRepository: ImageRepository[F] =
-    ImageRepository.fromConfig(dockerClient, progressHandler, managerConfiguration.dockerRepository)
+    ImageRepository.fromConfig[F](dockerClient, progressHandler, managerConfiguration.dockerRepository)
 
   implicit val hostSelectorService: HostSelectorService[F] =
     HostSelectorService[F](managerRepositories.hostSelectorRepository)
@@ -89,7 +87,7 @@ class Services[F[_]: ConcurrentEffect](
     imageRepository = imageRepository,
     modelVersionService = versionService,
     storageOps = storageOps,
-    modelDiscoveryHub = modelHub
+    modelDiscoveryHub = modelPub
   )
 
   logger.info(s"Using ${cloudDriverService.getClass} cloud driver")
@@ -108,7 +106,7 @@ class Services[F[_]: ConcurrentEffect](
     managerRepositories.servableRepository,
     managerRepositories.modelVersionRepository,
     servableMonitor,
-    servableHub
+    servablePub
   )
 
   val graphComposer = VersionGraphComposer.default
@@ -118,14 +116,14 @@ class Services[F[_]: ConcurrentEffect](
     managerRepositories.modelVersionRepository,
     managerRepositories.applicationRepository,
     graphComposer,
-    discoveryHub
+    appPub
   )
 
   implicit val appService: ApplicationService[F] = ApplicationService[F](
     applicationRepository = managerRepositories.applicationRepository,
     versionRepository = managerRepositories.modelVersionRepository,
     servableService = servableService,
-    discoveryHub = discoveryHub,
+    discoveryHub = appPub,
     applicationDeployer = appDeployer
   )
 

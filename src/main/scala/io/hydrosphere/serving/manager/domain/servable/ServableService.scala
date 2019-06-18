@@ -5,13 +5,12 @@ import cats.effect._
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.implicits._
-import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
+import io.hydrosphere.serving.manager.discovery.ServablePublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator}
-import io.hydrosphere.serving.manager.util.grpc.Converters
 import io.hydrosphere.serving.manager.util.random.NameGenerator
 import org.apache.logging.log4j.scala.Logging
 
@@ -33,7 +32,7 @@ object ServableService extends Logging {
     servableRepository: ServableRepository[F],
     versionRepository: ModelVersionRepository[F],
     monitor: ServableMonitor[F],
-    servableDH: ServableDiscoveryHub[F]
+    servableDH: ServablePublisher[F]
   )(
     implicit F: Concurrent[F],
     timer: Timer[F],
@@ -65,9 +64,7 @@ object ServableService extends Logging {
         servableDef <- monitor.monitor(servable)
         resultServable <- servableDef.get
         _ <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))
-        ds = Converters.fromServable(resultServable)
-        _ <- servableDH.addedSingle(ds)
-        _ <- F.delay(s"Sent to discovery stream: $ds")
+        _ <- servableDH.update(resultServable)
       } yield resultServable
     }
 
@@ -75,7 +72,7 @@ object ServableService extends Logging {
       for {
         servable <- OptionT(servableRepository.get(name))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't stop Servable $name because it doesn't exist")))
-        _ <- servableDH.removedSignle(name)
+        _ <- servableDH.remove(name)
         _ <- cloudDriver.remove(name)
         _ <- servableRepository.delete(name)
       } yield servable

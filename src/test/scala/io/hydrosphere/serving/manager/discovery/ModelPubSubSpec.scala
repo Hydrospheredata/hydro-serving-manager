@@ -12,7 +12,6 @@ import fs2.{Pipe, Sink}
 import fs2.concurrent.{SignallingRef, Topic}
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.model.{ModelDelete, ModelDiscoveryPublisher, ModelEvent, ModelUpdate}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
@@ -42,14 +41,16 @@ class ModelPubSubSpec extends GenericUnitTest {
       val (pub, sub) = ModelDiscoveryPublisher.forTopic[IO](topic)
       val s1 = sub.subscribe("test1").unsafeRunSync().evalMap { mv =>
         IO(println(mv)).as(mv)
-      }
+      }.compile.toVector.unsafeToFuture()
       pub.update(mv).unsafeRunSync()
       pub.update(mv.copy(id = 2)).unsafeRunSync()
       pub.update(mv.copy(id = 3)).unsafeRunSync()
       pub.update(mv.copy(id = 4)).unsafeRunSync()
-
-      val res = s1.take(1).compile.toVector.unsafeRunSync()
-      assert(res.nonEmpty)
+      sub.unsubscribe("test1").unsafeRunSync()
+      s1.map {r =>
+        println(r)
+        assert(r.size == 5)
+      }
     }
 
   }

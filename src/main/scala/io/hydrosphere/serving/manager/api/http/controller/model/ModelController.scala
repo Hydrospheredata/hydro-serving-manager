@@ -13,10 +13,7 @@ import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, ModelService}
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionService, ModelVersionView}
 import io.swagger.annotations._
-import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
-import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.stream.scaladsl.Source
-import io.hydrosphere.serving.manager.discovery.model.ModelDiscoverySubscriber
 import javax.ws.rs.Path
 import streamz.converter._
 
@@ -136,17 +133,5 @@ class ModelController[F[_]: Effect]()(
     }
   }
 
-  def modelEvents = pathPrefix("model" / "events") {
-    get {
-      val subId = UUID.randomUUID().toString
-      complete {
-        Source.tick(2.seconds, 2.seconds, NotUsed)
-          .map(_ => ServerSentEvent(data = "hi", `type`="model-test", id = subId))
-          .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
-      }
-    }
-  }
-
-
-  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions ~ modelEvents
+  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions
 }

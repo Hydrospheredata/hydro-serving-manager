@@ -6,7 +6,7 @@ import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.implicits._
-import io.hydrosphere.serving.manager.discovery.model.ModelDiscoveryPublisher
+import io.hydrosphere.serving.manager.discovery.ModelPublisher
 import io.hydrosphere.serving.manager.domain.image.{ImageBuilder, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
@@ -25,7 +25,7 @@ object ModelVersionBuilder {
     imageRepository: ImageRepository[F],
     modelVersionService: ModelVersionService[F],
     storageOps: StorageOps[F],
-    modelDiscoveryHub: ModelDiscoveryPublisher[F]
+    modelDiscoveryHub: ModelPublisher[F]
   ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] with Logging {
     override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion]] = {
       for {

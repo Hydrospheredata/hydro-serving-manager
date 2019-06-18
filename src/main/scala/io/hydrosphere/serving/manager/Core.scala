@@ -9,19 +9,13 @@ import io.grpc.Server
 import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
-import io.hydrosphere.serving.manager.discovery.application.ApplicationDiscoveryHub
-import io.hydrosphere.serving.manager.discovery.model.ModelDiscoveryPublisher
-import io.hydrosphere.serving.manager.discovery.servable.ServableDiscoveryHub
-import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
-import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
-import io.hydrosphere.serving.manager.domain.application.Application
+import io.hydrosphere.serving.manager.discovery.DiscoveryCtor
+import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.model_version
-import io.hydrosphere.serving.manager.domain.servable.Servable
-import io.hydrosphere.serving.manager.grpc.entities.ModelVersion
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.infrastructure.db.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
-import io.hydrosphere.serving.manager.util.grpc.Converters
 import io.hydrosphere.serving.manager.util.random.RNG
 import org.apache.logging.log4j.scala.Logging
 
@@ -47,14 +41,24 @@ object Core extends Logging {
     val repositories = new Repositories[F](config)
 
     for {
-      dh <- ApplicationDiscoveryHub.observed[F]
-      sdh <- ServableDiscoveryHub.observed[F]
-      mdh = new ModelDiscoveryPublisher[F] {
-        override def update(modelVersion: model_version.ModelVersion): F[Unit] = F.unit
+      appDH <- DiscoveryCtor.topicBased[F, GenericApplication, Long]()
+      (appPub, appSub) = appDH
+      servDH <- DiscoveryCtor.topicBased[F, GenericServable, String]()
+      (servPub, servSub) = servDH
+      mdh <- DiscoveryCtor.topicBased[F, ModelVersion, Long]()
+      (modelPub, modelSub) = mdh
+      services = new Services[F] (
+        appPub,
+        servPub,
+        modelPub,
+        repositories,
+        config,
+        dockerClient,
+        dockerConfig,
+        cloudDriver,
+        predictionCtor
+      )
 
-        override def deleted(modelId: Long): F[Unit] = F.unit
-      }
-      services = new Services[F](dh, sdh, mdh, repositories, config, dockerClient, dockerConfig, cloudDriver, predictionCtor)
       n = ApplicationMigrationTool.default(
         repositories.applicationRepository,
         services.cloudDriverService,
@@ -62,27 +66,9 @@ object Core extends Logging {
         repositories.servableRepository
       )
       _ <- n.getAndRevive()
-      servables <- repositories.servableRepository.all()
-      servablesToDiscover = servables.flatMap { s =>
-        s.status match {
-          case Servable.Serving(_, _, _) =>
-            Converters.fromServable(s) :: Nil
-          case _ => Nil
-        }
-      }
-      _ <- sdh.added(servablesToDiscover)
-      apps <- repositories.applicationRepository.all()
-      appsToDiscover = apps.flatMap { app =>
-        app.status match {
-          case _: Application.Ready =>
-            Internals.toServingApp(app.asInstanceOf[ReadyApp]) :: Nil
-          case _ => Nil
-        }
-      }
-      _ <- appsToDiscover.traverse(dh.added)
     } yield {
       val httpApi = new HttpApiServer(repositories, services, config)
-      val grpcApi = GrpcApiServer(repositories, services, config, dh, sdh)
+      val grpcApi = GrpcApiServer(repositories, services, config, appSub, servSub)
       (httpApi, grpcApi)
     }
   }
