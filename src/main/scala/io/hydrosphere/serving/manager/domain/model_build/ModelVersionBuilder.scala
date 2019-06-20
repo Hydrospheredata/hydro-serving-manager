@@ -2,9 +2,9 @@ package io.hydrosphere.serving.manager.domain.model_build
 
 import java.time.LocalDateTime
 
-import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
+import cats.effect.{Concurrent, ConcurrentEffect}
 import cats.implicits._
 import io.hydrosphere.serving.manager.discovery.ModelPublisher
 import io.hydrosphere.serving.manager.domain.image.{ImageBuilder, ImageRepository}
@@ -19,13 +19,14 @@ trait ModelVersionBuilder[F[_]]{
 }
 
 object ModelVersionBuilder {
-  def apply[F[_] : Concurrent](
+  def apply[F[_] : ConcurrentEffect](
     imageBuilder: ImageBuilder[F],
     modelVersionRepository: ModelVersionRepository[F],
     imageRepository: ImageRepository[F],
     modelVersionService: ModelVersionService[F],
     storageOps: StorageOps[F],
-    modelDiscoveryHub: ModelPublisher[F]
+    modelDiscoveryHub: ModelPublisher[F],
+    buildLoggingService: BuildLoggingService[F]
   ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] with Logging {
     override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion]] = {
       for {
@@ -62,9 +63,11 @@ object ModelVersionBuilder {
     def handleBuild(mv: ModelVersion, modelFileStructure: ModelFileStructure) = {
       val innerCompleted = for {
         buildPath <- prepare(mv, modelFileStructure)
-        imageSha <- imageBuilder.build(buildPath.root, mv.image)
+        handler <- buildLoggingService.makeLogger(mv)
+        imageSha <- imageBuilder.build(buildPath.root, mv.image, handler)
         newDockerImage = mv.image.copy(sha256 = Some(imageSha))
         finishedVersion = mv.copy(image = newDockerImage, finished = Some(LocalDateTime.now()), status = ModelVersionStatus.Released)
+        _ <- buildLoggingService.finishLogging(mv.id)
         _ <- modelVersionRepository.update(finishedVersion.id, finishedVersion)
         _ <- modelDiscoveryHub.update(finishedVersion)
         _ <- imageRepository.push(finishedVersion.image)
@@ -74,6 +77,7 @@ object ModelVersionBuilder {
         for {
           _ <- Concurrent[F].delay(logger.error(err, err))
           failed = mv.copy(status = ModelVersionStatus.Failed)
+          _ <- buildLoggingService.finishLogging(mv.id)
           _ <- modelDiscoveryHub.update(failed)
           _ <- modelVersionRepository.update(failed.id, failed)
         } yield failed

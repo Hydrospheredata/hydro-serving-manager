@@ -21,6 +21,8 @@ class Repositories[F[_]: Async](config: ManagerConfiguration)(implicit execution
 
   implicit val applicationRepository = new DBApplicationRepository[F]
 
+  implicit val buildLogRepository = new DBBuildLogRepository[F]
+
   private def parseDatabase(hikariConfiguration: HikariConfiguration): HikariConfig = {
     val hikariConfig = new HikariConfig()
     hikariConfig.setJdbcUrl(hikariConfiguration.jdbcUrl)

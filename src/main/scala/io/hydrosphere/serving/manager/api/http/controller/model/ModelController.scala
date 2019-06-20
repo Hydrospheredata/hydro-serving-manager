@@ -14,6 +14,11 @@ import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, Mode
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionService, ModelVersionView}
 import io.swagger.annotations._
 import akka.stream.scaladsl.Source
+import akka.http.scaladsl.model.sse.ServerSentEvent
+import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
+import cats.data.OptionT
+import io.hydrosphere.serving.manager.domain.DomainError
+import io.hydrosphere.serving.manager.domain.model_build.BuildLoggingService
 import javax.ws.rs.Path
 import streamz.converter._
 
@@ -23,10 +28,13 @@ import scala.concurrent.duration._
 
 @Path("/api/v2/model")
 @Api(produces = "application/json", tags = Array("Model and Model Versions"))
-class ModelController[F[_]: Effect]()(
-  implicit modelManagementService: ModelService[F],
+class ModelController[F[_]]()(
+  implicit F: ConcurrentEffect[F],
+  cs: ContextShift[F],
+  modelManagementService: ModelService[F],
   modelRepo: ModelRepository[F],
   modelVersionManagementService: ModelVersionService[F],
+  buildLoggingService: BuildLoggingService[F],
   system: ActorSystem,
   materializer: ActorMaterializer,
 ) extends AkkaHttpControllerDsl {
@@ -133,5 +141,19 @@ class ModelController[F[_]: Effect]()(
     }
   }
 
-  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions
+  def buildLogs = pathPrefix("model" / "version" / LongNumber / "logs") { versionId =>
+    get {
+      completeF {
+        OptionT(buildLoggingService.getLogs(versionId))
+          .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find logs for model version id = ${versionId}")))
+          .map { stream =>
+            Source.fromGraph(stream.toSource)
+              .map(x => ServerSentEvent(x))
+              .keepAlive(15.seconds, () => ServerSentEvent.heartbeat)
+          }
+      }
+    }
+  }
+
+  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions ~ buildLogs
 }
