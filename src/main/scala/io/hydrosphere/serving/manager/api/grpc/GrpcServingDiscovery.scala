@@ -6,10 +6,12 @@ import cats.effect.ConcurrentEffect
 import cats.effect.implicits._
 import cats.implicits._
 import com.google.protobuf.empty.Empty
+import fs2.concurrent.SignallingRef
 import io.grpc.stub.StreamObserver
 import io.hydrosphere.serving.discovery.serving.ServingDiscoveryGrpc.ServingDiscovery
 import io.hydrosphere.serving.discovery.serving.{ApplicationDiscoveryEvent, ServableDiscoveryEvent}
-import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, DiscoverItemRemove, DiscoverItemUpdate, DiscoveryInitial, ServableSubscriber}
+import io.hydrosphere.serving.manager.discovery.DiscoveryEvent.{Initial, ItemRemove, ItemUpdate}
+import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, ServableSubscriber}
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
@@ -43,32 +45,30 @@ class GrpcServingDiscovery[F[_]](
         _ <- initEvents.traverse { ev =>
           F.delay(observer.onNext(ev))
         }
-        stream <- appSub.sub(id)
+        signal <- SignallingRef[F, Boolean](false)
+        stream = appSub.subscribe.interruptWhen(signal)
         _ <- stream.map {
-          case DiscoveryInitial =>
+          case Initial =>
             ApplicationDiscoveryEvent()
-          case DiscoverItemUpdate(items) =>
+          case ItemUpdate(items) =>
             val okApps = items.filter(_.status.isInstanceOf[Application.Ready]).map { x =>
               Converters.fromApp(x.asInstanceOf[ReadyApp])
             }
             ApplicationDiscoveryEvent(added = okApps)
-          case DiscoverItemRemove(items) => ApplicationDiscoveryEvent(removedIds = items.map(_.toString))
+          case ItemRemove(items) => ApplicationDiscoveryEvent(removedIds = items.map(_.toString))
         }.evalMap(x => F.delay(observer.onNext(x))).compile.drain.start
-      } yield ()
-    }
+      } yield new StreamObserver[Empty] {
+        override def onNext(value: Empty): Unit = ()
 
-    new StreamObserver[Empty] {
-      override def onNext(value: Empty): Unit = ()
+        override def onError(t: Throwable): Unit = {
+          logger.debug("Application stream failed", t)
+          runSync(signal.set(true))
+        }
 
-      override def onError(t: Throwable): Unit = {
-        logger.debug("Application stream failed", t)
-        runSync(appSub.unsub(id))
+        override def onCompleted(): Unit =
+          runSync(signal.set(true))
       }
-
-      override def onCompleted(): Unit =
-        runSync(appSub.unsub(id))
     }
-
   }
 
   override def watchServables(responseObserver: StreamObserver[ServableDiscoveryEvent]): StreamObserver[Empty] = {
@@ -84,26 +84,24 @@ class GrpcServingDiscovery[F[_]](
         _ <- initEvents.traverse { ev =>
           F.delay(responseObserver.onNext(ev))
         }
-        stream <- servableSub.sub(id)
-        _ <- stream.map {
-          case DiscoveryInitial => ServableDiscoveryEvent()
-          case DiscoverItemUpdate(items) => ServableDiscoveryEvent(added = items.map(Converters.fromServable))
-          case DiscoverItemRemove(items) => ServableDiscoveryEvent(removedIdx = items)
+        signal <- SignallingRef[F, Boolean](false)
+        _ <- servableSub.subscribe.interruptWhen(signal).map {
+          case Initial => ServableDiscoveryEvent()
+          case ItemUpdate(items) => ServableDiscoveryEvent(added = items.map(Converters.fromServable))
+          case ItemRemove(items) => ServableDiscoveryEvent(removedIdx = items)
         }.evalMap(x => F.delay(responseObserver.onNext(x)))
           .compile.drain.start
-      } yield ()
-    }
+      } yield new StreamObserver[Empty] {
+        override def onNext(value: Empty): Unit = ()
 
-    new StreamObserver[Empty] {
-      override def onNext(value: Empty): Unit = ()
+        override def onError(t: Throwable): Unit = {
+          logger.debug("Servable stream failed", t)
+          runSync(signal.set(true))
+        }
 
-      override def onError(t: Throwable): Unit = {
-        logger.debug("Servable stream failed", t)
-        runSync(servableSub.unsub(id))
-      }
-
-      override def onCompleted(): Unit = {
-        runSync(servableSub.unsub(id))
+        override def onCompleted(): Unit = {
+          runSync(signal.set(true))
+        }
       }
     }
   }

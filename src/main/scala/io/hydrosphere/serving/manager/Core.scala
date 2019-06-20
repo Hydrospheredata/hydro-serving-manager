@@ -9,7 +9,7 @@ import io.grpc.Server
 import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
-import io.hydrosphere.serving.manager.discovery.DiscoveryCtor
+import io.hydrosphere.serving.manager.discovery.DiscoveryTopic
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
@@ -41,11 +41,11 @@ object Core extends Logging {
     val repositories = new Repositories[F](config)
 
     for {
-      appDH <- DiscoveryCtor.topicBased[F, GenericApplication, Long]()
+      appDH <- DiscoveryTopic.make[F, GenericApplication, Long]()
       (appPub, appSub) = appDH
-      servDH <- DiscoveryCtor.topicBased[F, GenericServable, String]()
+      servDH <- DiscoveryTopic.make[F, GenericServable, String]()
       (servPub, servSub) = servDH
-      mdh <- DiscoveryCtor.topicBased[F, ModelVersion, Long]()
+      mdh <- DiscoveryTopic.make[F, ModelVersion, Long]()
       (modelPub, modelSub) = mdh
       repos = new Repositories[IO](config)
       services = new Services[F] (

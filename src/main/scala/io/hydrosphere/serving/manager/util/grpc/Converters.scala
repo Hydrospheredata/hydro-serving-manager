@@ -7,6 +7,7 @@ import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.graph.Variant
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
+import io.hydrosphere.serving.manager.grpc.entities.Servable.ServableStatus
 import io.hydrosphere.serving.manager.{domain, grpc}
 import io.hydrosphere.serving.manager.grpc.entities.{ServingApp, Servable => GServable, Stage => GStage}
 
@@ -26,16 +27,17 @@ object Converters {
 
    def fromServable(s: domain.servable.Servable.GenericServable): grpc.entities.Servable = {
       val (status, host, port) = s.status match {
-         case Servable.Serving(_, h, p) => ("Serving", h, p)
-         case Servable.NotServing(_, h, p) => ("NotServing", h.getOrElse(""), p.getOrElse(0))
-         case Servable.NotAvailable(_, h, p) => ("NotAvailable", h.getOrElse(""), p.getOrElse(0))
-         case Servable.Starting(_, h, p) => ("Starting", h.getOrElse(""), p.getOrElse(0))
+         case Servable.Serving(_, h, p) => (ServableStatus.SERVING, h, p)
+         case Servable.NotServing(_, h, p) => (ServableStatus.NOT_SERVING, h.getOrElse(""), p.getOrElse(0))
+         case Servable.NotAvailable(_, h, p) => (ServableStatus.NOT_AVAILABlE, h.getOrElse(""), p.getOrElse(0))
+         case Servable.Starting(_, h, p) => (ServableStatus.STARTING, h.getOrElse(""), p.getOrElse(0))
       }
       grpc.entities.Servable(
          host = host,
          port = port,
          modelVersion = fromModelVersion(s.modelVersion).some,
-         name = s.fullName
+         name = s.fullName,
+         status = status,
       )
    }
 
