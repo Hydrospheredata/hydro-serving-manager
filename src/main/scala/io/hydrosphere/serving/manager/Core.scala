@@ -41,11 +41,11 @@ object Core extends Logging {
     val repositories = new Repositories[F](config)
 
     for {
-      appDH <- DiscoveryCtor.topicBased[F, GenericApplication, String]()
+      appDH <- DiscoveryTopic.make[F, GenericApplication, String]()
       (appPub, appSub) = appDH
-      servDH <- DiscoveryCtor.topicBased[F, GenericServable, String]()
+      servDH <- DiscoveryTopic.make[F, GenericServable, String]()
       (servPub, servSub) = servDH
-      mdh <- DiscoveryCtor.topicBased[F, ModelVersion, Long]()
+      mdh <- DiscoveryTopic.make[F, ModelVersion, Long]()
       (modelPub, modelSub) = mdh
       repos = new Repositories[IO](config)
       services = new Services[F] (
