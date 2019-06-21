@@ -2,9 +2,9 @@ package io.hydrosphere.serving.manager.domain.model_build
 
 import java.time.LocalDateTime
 
+import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
-import cats.effect.{Concurrent, ConcurrentEffect}
 import cats.implicits._
 import io.hydrosphere.serving.manager.discovery.ModelPublisher
 import io.hydrosphere.serving.manager.domain.image.{ImageBuilder, ImageRepository}
@@ -19,7 +19,7 @@ trait ModelVersionBuilder[F[_]]{
 }
 
 object ModelVersionBuilder {
-  def apply[F[_] : ConcurrentEffect](
+  def apply[F[_] : Concurrent](
     imageBuilder: ImageBuilder[F],
     modelVersionRepository: ModelVersionRepository[F],
     imageRepository: ImageRepository[F],
