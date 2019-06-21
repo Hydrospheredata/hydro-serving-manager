@@ -56,7 +56,7 @@ object ApplicationService extends Logging {
     def delete(name: String): F[GenericApplication] = {
       for {
         app <- get(name)
-        _ <- discoveryHub.remove(app.id)
+        _ <- discoveryHub.remove(app.name)
         _ <- applicationRepository.delete(app.id)
         _ <- app.status match {
           case Application.Ready(graph) =>

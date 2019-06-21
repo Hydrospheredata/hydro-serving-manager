@@ -52,7 +52,7 @@ class GrpcServingDiscovery[F[_]](
               Converters.fromApp(x.asInstanceOf[ReadyApp])
             }
             ApplicationDiscoveryEvent(added = okApps)
-          case DiscoverItemRemove(items) => ApplicationDiscoveryEvent(removedIds = items.map(_.toString))
+          case DiscoverItemRemove(items) => ApplicationDiscoveryEvent(removedIds = items)
         }.evalMap(x => F.delay(observer.onNext(x))).compile.drain.start
       } yield ()
     }
