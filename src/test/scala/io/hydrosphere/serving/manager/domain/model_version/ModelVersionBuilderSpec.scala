@@ -4,13 +4,15 @@ import java.io.File
 import java.nio.file.{Path, Paths}
 
 import cats.effect.IO
+import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.ModelPublisher
+import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent, ModelPublisher}
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
-import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
+import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, DockerLogger, ModelVersionBuilder}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
+import io.hydrosphere.serving.manager.util.docker.InfoProgressHandler
 import org.mockito.Matchers
 
 import scala.concurrent.duration._
@@ -46,7 +48,7 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         )
 
         val imageBuilder = mock[ImageBuilder[IO]]
-        when(imageBuilder.build(Matchers.any(), Matchers.any())).thenReturn(
+        when(imageBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
           IO.pure("random-sha")
         )
 
@@ -87,9 +89,12 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def writeBytes(path: Path, bytes: Array[Byte]): IO[Path] = IO.pure(path)
         }
         val mh = new ModelPublisher[IO] {
-          override def update(modelVersion: ModelVersion): IO[Unit] = IO.unit
-
-          override def remove(itemId: Long): IO[Unit] = ???
+          override def publish(t: DiscoveryEvent[ModelVersion, Long]): IO[Unit] = IO.unit
+        }
+        val bl = new BuildLoggingService[IO] {
+          override def makeLogger(modelVersion: ModelVersion): IO[ProgressHandler] = IO(InfoProgressHandler)
+          override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
+          override def getLogs(modelVersionId: Long, sinceLine: Int): IO[Option[fs2.Stream[IO, String]]] = IO(None)
         }
         val builder = ModelVersionBuilder[IO](
           imageBuilder = imageBuilder,
@@ -97,7 +102,8 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           imageRepository = imageRepo,
           modelVersionService = versionService,
           storageOps = ops,
-          modelDiscoveryHub = mh
+          modelDiscoveryHub = mh,
+          buildLoggingService = bl
         )
         for {
           stateful <- builder.build(model, modelVersionMetadata, mfs)

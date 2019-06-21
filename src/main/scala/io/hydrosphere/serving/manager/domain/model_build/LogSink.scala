@@ -15,7 +15,7 @@ import org.apache.logging.log4j.scala.Logging
 import scala.collection.mutable.ListBuffer
 
 trait BuildLoggingService[F[_]] {
-  def makeLogger(modelVersion: ModelVersion): F[DockerLogger[F]]
+  def makeLogger(modelVersion: ModelVersion): F[ProgressHandler]
 
   def finishLogging(modelVersion: Long): F[Option[Unit]]
 
@@ -75,23 +75,18 @@ object BuildLoggingService extends Logging {
   }
 }
 
-trait DockerLogger[F[_]] extends TopicPublisher[F, String] with ProgressHandler
-
 object DockerLogger {
   final val ESC_CODE = 0x1B
 
   def make[F[_] : Effect](topic: Topic[F, String]) = {
-    new DockerLogger[F] {
-      override def publish(t: String): F[Unit] = {
-        topic.publish1(t)
-      }
+    new ProgressHandler {
 
       override def progress(message: ProgressMessage): Unit = {
         val msg = Option(message.error())
           .orElse(Option(message.stream()))
           .orElse(Option(message.status()))
           .getOrElse("")
-        publish(msg).toIO.unsafeRunSync()
+        topic.publish1(msg).toIO.unsafeRunSync()
       }
     }
   }
