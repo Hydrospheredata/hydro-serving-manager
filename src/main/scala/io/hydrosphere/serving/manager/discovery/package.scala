@@ -5,8 +5,8 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 
 package object discovery {
-  type ApplicationPublisher[F[_]] = DiscoveryPublisher[F, GenericApplication, Long]
-  type ApplicationSubscriber[F[_]] = DiscoverySubscriber[F, GenericApplication, Long]
+  type ApplicationPublisher[F[_]] = DiscoveryPublisher[F, GenericApplication, String]
+  type ApplicationSubscriber[F[_]] = DiscoverySubscriber[F, GenericApplication, String]
 
   type ServablePublisher[F[_]] = DiscoveryPublisher[F, GenericServable, String]
   type ServableSubscriber[F[_]] = DiscoverySubscriber[F, GenericServable, String]

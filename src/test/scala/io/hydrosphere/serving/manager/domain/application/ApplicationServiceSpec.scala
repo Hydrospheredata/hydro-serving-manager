@@ -93,7 +93,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val discoveryHub = new ApplicationPublisher[IO] {
           override def update(item: GenericApplication): IO[Unit] = IO.unit
 
-          override def remove(itemId: Long): IO[Unit] = IO.unit
+          override def remove(itemId: String): IO[Unit] = IO.unit
         }
         val appDeployer = ApplicationDeployer.default[IO](
           applicationRepository = appRepo,
@@ -154,7 +154,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val discoveryHub = new ApplicationPublisher[IO] {
           override def update(item: GenericApplication): IO[Unit] = IO.unit
 
-          override def remove(itemId: Long): IO[Unit] = IO.unit
+          override def remove(itemId: String): IO[Unit] = IO.unit
         }
         val appDeployer = ApplicationDeployer.default[IO](
           applicationRepository = appRepo,
@@ -225,7 +225,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
        val discoveryHub = new ApplicationPublisher[IO] {
          override def update(item: GenericApplication): IO[Unit] = IO(appChanged += item)
 
-         override def remove(itemId: Long): IO[Unit] = IO.unit
+         override def remove(itemId: String): IO[Unit] = IO.unit
        }
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -303,7 +303,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val eventPublisher = new ApplicationPublisher[IO] {
           override def update(item: GenericApplication): IO[Unit] = IO(apps += item)
 
-          override def remove(itemId: Long): IO[Unit] = IO(apps.filterNot(_.id == itemId))
+          override def remove(itemId: String): IO[Unit] = IO(apps.filterNot(_.name == itemId))
         }
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(

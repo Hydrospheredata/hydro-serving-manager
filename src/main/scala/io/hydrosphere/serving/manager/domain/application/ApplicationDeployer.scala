@@ -42,6 +42,7 @@ object ApplicationDeployer extends Logging {
         for {
           composedApp <- composeApp(name, None, executionGraph, kafkaStreaming)
           repoApp <- applicationRepository.create(composedApp)
+          _ <- discoveryHub.update(repoApp)
           app = composedApp.copy(id = repoApp.id)
           df <- Deferred[F, GenericApplication]
           _ <- (for {
