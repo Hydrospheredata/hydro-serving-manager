@@ -19,6 +19,7 @@ import streamz.converter._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.util.Try
 
 class SSEController[F[_]](
   applicationSubscriber: ApplicationSubscriber[F],

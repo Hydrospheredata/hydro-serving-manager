@@ -82,11 +82,15 @@ object DockerLogger {
     new ProgressHandler {
 
       override def progress(message: ProgressMessage): Unit = {
-        val msg = Option(message.error())
+        val maybeMsg = Option(message.error())
           .orElse(Option(message.stream()))
           .orElse(Option(message.status()))
-          .getOrElse("")
-        topic.publish1(msg).toIO.unsafeRunSync()
+        maybeMsg.foreach { msg =>
+          val trimmed = msg.trim
+          if (trimmed.nonEmpty) {
+            topic.publish1(trimmed).toIO.unsafeRunSync()
+          }
+        }
       }
     }
   }
