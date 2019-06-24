@@ -79,7 +79,8 @@ class Services[F[_]: ConcurrentEffect](
 
   implicit val versionService: ModelVersionService[F] = ModelVersionService[F](
     modelVersionRepository = managerRepositories.modelVersionRepository,
-    applicationRepo = managerRepositories.applicationRepository
+    applicationRepo = managerRepositories.applicationRepository,
+    modelPublisher = modelPub
   )
 
   val versionBuilder = ModelVersionBuilder(

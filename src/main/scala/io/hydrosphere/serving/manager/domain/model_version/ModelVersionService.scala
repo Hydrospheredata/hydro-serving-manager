@@ -3,6 +3,7 @@ package io.hydrosphere.serving.manager.domain.model_version
 import cats.data.OptionT
 import cats.implicits._
 import cats.{MonadError, Traverse}
+import io.hydrosphere.serving.manager.discovery.ModelPublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.model.ModelValidator
@@ -25,14 +26,15 @@ trait ModelVersionService[F[_]] {
 object ModelVersionService {
   def apply[F[_]](
     modelVersionRepository: ModelVersionRepository[F],
-    applicationRepo: ApplicationRepository[F]
+    applicationRepo: ApplicationRepository[F],
+    modelPublisher: ModelPublisher[F]
   )(
     implicit F: MonadError[F, Throwable],
     executionContext: ExecutionContext
   ): ModelVersionService[F] = new ModelVersionService[F] with Logging {
 
     def deleteVersions(mvs: Seq[ModelVersion]): F[Seq[ModelVersion]] = {
-      Traverse[List].traverse(mvs.toList) { version =>
+      mvs.toList.traverse { version =>
         delete(version.id)
       }.map(_.flatten)
     }
@@ -55,6 +57,7 @@ object ModelVersionService {
       val f = for {
         version <- OptionT(modelVersionRepository.get(versionId))
         _ <- OptionT.liftF(modelVersionRepository.delete(versionId))
+        _ <- OptionT.liftF(modelPublisher.remove(versionId))
       } yield version
       f.value
     }
