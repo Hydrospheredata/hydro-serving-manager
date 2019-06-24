@@ -18,7 +18,6 @@ class DockerImageBuilder[F[_]: Sync](
   dockerClient: DockerClient,
   dockerClientConfig: DockerClientConfig,
   modelStorage: ModelUnpacker[F],
-  progressHandler: ProgressHandler
 ) extends ImageBuilder[F] with Logging {
 
   private val buildParams: Seq[BuildParam] = {
@@ -27,7 +26,8 @@ class DockerImageBuilder[F[_]: Sync](
 
   override def build(
     buildPath: Path,
-    image: DockerImage
+    image: DockerImage,
+    progressHandler: ProgressHandler
   ): F[String] = {
     val idF = Sync[F].delay {
       logger.info(s"Building $image from $buildPath")

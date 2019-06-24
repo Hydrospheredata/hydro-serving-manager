@@ -15,7 +15,7 @@ import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorService
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model.ModelService
-import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
+import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, ModelVersionBuilder}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionService
 import io.hydrosphere.serving.manager.domain.servable.{ServableMonitor, ServableProbe, ServableService}
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
@@ -63,11 +63,12 @@ class Services[F[_]: ConcurrentEffect](
 
   val modelFetcher: ModelFetcher[F] = ModelFetcher.default[F](storageOps)
 
+  implicit val buildLogging = BuildLoggingService.make().toIO.unsafeRunSync()
+
   val imageBuilder = new DockerImageBuilder(
     dockerClient = dockerClient,
     dockerClientConfig = dockerClientConfig,
     modelStorage = modelStorage,
-    progressHandler = progressHandler
   )
 
   val imageRepository: ImageRepository[F] =
@@ -87,7 +88,8 @@ class Services[F[_]: ConcurrentEffect](
     imageRepository = imageRepository,
     modelVersionService = versionService,
     storageOps = storageOps,
-    modelDiscoveryHub = modelPub
+    modelDiscoveryHub = modelPub,
+    buildLoggingService = buildLogging
   )
 
   logger.info(s"Using ${cloudDriverService.getClass} cloud driver")

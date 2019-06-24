@@ -9,7 +9,7 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.ApplicationPublisher
+import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, DiscoveryEvent}
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.graph.{Variant, VersionGraphComposer}
@@ -91,9 +91,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         }
         val graphComposer = VersionGraphComposer.default
         val discoveryHub = new ApplicationPublisher[IO] {
-          override def update(item: GenericApplication): IO[Unit] = IO.unit
-
-          override def remove(itemId: String): IO[Unit] = IO.unit
+          override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = IO.unit
         }
         val appDeployer = ApplicationDeployer.default[IO](
           applicationRepository = appRepo,
@@ -152,9 +150,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
         val graphComposer = VersionGraphComposer.default
         val discoveryHub = new ApplicationPublisher[IO] {
-          override def update(item: GenericApplication): IO[Unit] = IO.unit
-
-          override def remove(itemId: String): IO[Unit] = IO.unit
+          override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = IO.unit
         }
         val appDeployer = ApplicationDeployer.default[IO](
           applicationRepository = appRepo,
@@ -223,9 +219,13 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
         val appChanged = ListBuffer.empty[GenericApplication]
        val discoveryHub = new ApplicationPublisher[IO] {
-         override def update(item: GenericApplication): IO[Unit] = IO(appChanged += item)
-
-         override def remove(itemId: String): IO[Unit] = IO.unit
+         override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = {
+           t match {
+             case DiscoveryEvent.Initial => IO.unit
+             case DiscoveryEvent.ItemUpdate(items) => IO(appChanged ++= items)
+             case DiscoveryEvent.ItemRemove(items) => IO.unit
+           }
+         }
        }
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -301,9 +301,13 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
         val apps = ListBuffer.empty[GenericApplication]
         val eventPublisher = new ApplicationPublisher[IO] {
-          override def update(item: GenericApplication): IO[Unit] = IO(apps += item)
-
-          override def remove(itemId: String): IO[Unit] = IO(apps.filterNot(_.name == itemId))
+          override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = {
+            t match {
+              case DiscoveryEvent.Initial => IO.unit
+              case DiscoveryEvent.ItemUpdate(items) => IO(apps ++= items)
+              case DiscoveryEvent.ItemRemove(items) => IO(apps.filterNot(a => items.contains(a)))
+            }
+          }
         }
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(

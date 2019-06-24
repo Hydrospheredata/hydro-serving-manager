@@ -36,23 +36,19 @@ class SSEController[F[_]](
     get {
       val id = UUID.randomUUID().toString
       complete {
-        val apps = applicationSubscriber.sub(id).toIO.unsafeRunSync()
-        val appsSSE = apps.flatMap(x => fs2.Stream.emits(SSEEvents.fromAppDiscovery(x)))
+        val apps = applicationSubscriber.subscribe
+        val appsSSE = apps.flatMap(x => fs2.Stream.emits(SSEController.fromAppDiscovery(x)))
 
-        val models = modelSubscriber.sub(id).toIO.unsafeRunSync()
-        val modelSSE = models.flatMap(x => fs2.Stream.emits(SSEEvents.fromModelDiscovery(x)))
+        val models = modelSubscriber.subscribe
+        val modelSSE = models.flatMap(x => fs2.Stream.emits(SSEController.fromModelDiscovery(x)))
 
         val joined = appsSSE.merge(modelSSE)
-        val akkaJoined = Source.fromGraph(joined.toSource)
 
-        akkaJoined
+        Source.fromGraph(joined.toSource)
           .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
           .watchTermination() { (_, b) =>
             b.foreach { _ =>
-              logger.debug(s"SSE ${id} terminated")
-              val shutdown = applicationSubscriber.unsub(id) >>
-                modelSubscriber.unsub(id)
-              shutdown.toIO.unsafeRunSync()
+              logger.debug(s"SSE $id terminated")
             }
           }
       }
@@ -63,18 +59,18 @@ class SSEController[F[_]](
 
 }
 
-object SSEEvents extends CompleteJsonProtocol {
+object SSEController extends CompleteJsonProtocol {
   def fromModelDiscovery[F[_]](x: ModelSubscriber[F]#Event): List[ServerSentEvent] = {
     x match {
-      case DiscoveryInitial => ServerSentEvent.heartbeat :: Nil
-      case DiscoverItemUpdate(items) =>
+      case DiscoveryEvent.Initial => ServerSentEvent.heartbeat :: Nil
+      case DiscoveryEvent.ItemUpdate(items) =>
         items.map { mv =>
           ServerSentEvent(
             data = mv.toJson.compactPrint,
             `type` = "ModelUpdate"
           )
         }
-      case DiscoverItemRemove(items) =>
+      case DiscoveryEvent.ItemRemove(items) =>
         items.map { i =>
           ServerSentEvent(
             data = i.toString,
@@ -86,22 +82,21 @@ object SSEEvents extends CompleteJsonProtocol {
 
   def fromAppDiscovery[F[_]](x: ApplicationSubscriber[F]#Event): List[ServerSentEvent] = {
     x match {
-      case DiscoveryInitial => ServerSentEvent.heartbeat :: Nil
-      case DiscoverItemUpdate(items) =>
+      case DiscoveryEvent.Initial => ServerSentEvent.heartbeat :: Nil
+      case DiscoveryEvent.ItemUpdate(items) =>
         items.map { app =>
           ServerSentEvent(
             data = ApplicationView.fromApplication(app).toJson.compactPrint,
             `type` = "ApplicationUpdate"
           )
         }
-      case DiscoverItemRemove(items) =>
+      case DiscoveryEvent.ItemRemove(items) =>
         items.map { i =>
           ServerSentEvent(
             data = i.toString,
             `type` = "ApplicationRemove"
           )
         }
-
     }
   }
 }

@@ -10,7 +10,7 @@ import cats.implicits._
 import fs2.concurrent.Queue
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.ServablePublisher
+import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent, ServablePublisher}
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
@@ -356,6 +356,14 @@ class ServableSpec extends GenericUnitTest {
         override def update(item: GenericServable): IO[Unit] = IO(events += item)
 
         override def remove(itemId: String): IO[Unit] = IO.unit
+
+        override def publish(t: DiscoveryEvent[GenericServable, String]): IO[Unit] = {
+          t match {
+            case DiscoveryEvent.Initial => IO.unit
+            case DiscoveryEvent.ItemUpdate(items) => IO(events ++= items)
+            case DiscoveryEvent.ItemRemove(items) => IO.unit
+          }
+        }
       }
       val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, monitor, dh)
       val result = service.deploy(mv).unsafeRunSync().completed.get.unsafeRunSync()
@@ -453,9 +461,13 @@ class ServableSpec extends GenericUnitTest {
 
       val events = ListBuffer.empty[GenericServable]
       val dh = new ServablePublisher[IO] {
-        override def update(item: GenericServable): IO[Unit] = IO(events += item)
-
-        override def remove(itemId: String): IO[Unit] = IO.unit
+        override def publish(t: DiscoveryEvent[GenericServable, String]): IO[Unit] = {
+          t match {
+            case DiscoveryEvent.Initial => IO.unit
+            case DiscoveryEvent.ItemUpdate(items) => IO(events ++= items)
+            case DiscoveryEvent.ItemRemove(items) => IO.unit
+          }
+        }
       }
       val service = ServableService[IO](cloudDriver, servableRepo, versionRepo, monitor, dh)
       val result = service.stop("test-model-1-delete-me").unsafeRunSync()
