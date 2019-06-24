@@ -153,9 +153,11 @@ class ModelController[F[_]]()(
           OptionT(buildLoggingService.getLogs(versionId, streamIdx))
             .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find logs for model version id = ${versionId}")))
             .map { stream =>
-              val s = stream.zipWithIndex.map { case (log, id) => (log, id + streamIdx) }
-              Source.fromGraph(s.toSource)
+              val s = stream.zipWithIndex
+                .map { case (log, id) => (log, id + streamIdx) }
                 .map { case (log, id) => ServerSentEvent(log, id = Some(id.toString)) }
+                .onComplete(fs2.Stream.emit[F, ServerSentEvent](ServerSentEvent("", `type` = "EndOfStream")))
+              Source.fromGraph(s.toSource)
                 .keepAlive(15.seconds, () => ServerSentEvent.heartbeat)
             }
         }

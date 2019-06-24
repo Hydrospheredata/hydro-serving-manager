@@ -55,7 +55,7 @@ object BuildLoggingService extends Logging {
             (topic, signal, buf) = row
             trimmedBuf = fs2.Stream.emits[F, String](buf.toList.drop(sinceLine).init) // `init` because `topic.subscribe` puts the latest message in the stream
             sub = topic.subscribe(32).interruptWhen(signal)
-          } yield trimmedBuf.merge(sub)
+          } yield trimmedBuf ++ sub
 
           dbLogs.orElse(runningLogs).value
         }
