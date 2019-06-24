@@ -9,7 +9,7 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.{GenericUnitTest, db}
 import io.hydrosphere.serving.manager.db.Tables
-import io.hydrosphere.serving.manager.db.Tables.ApplicationRow
+import io.hydrosphere.serving.manager.db.Tables.{ApplicationRow, HostSelector}
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.Variant
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
@@ -69,7 +69,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
 
         override def instance(name: String): IO[Option[CloudInstance]] = ???
 
-        override def run(name: String, modelVersionId: Long, image: DockerImage): IO[CloudInstance] = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = ???
 
         override def remove(name: String): IO[Unit] = IO(removed += name)
 
@@ -215,7 +215,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
 
         override def instance(name: String): IO[Option[CloudInstance]] = ???
 
-        override def run(name: String, modelVersionId: Long, image: DockerImage): IO[CloudInstance] = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = ???
 
         override def remove(name: String): IO[Unit] = ???
 

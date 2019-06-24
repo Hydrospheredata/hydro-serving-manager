@@ -44,7 +44,7 @@ class HostSelectorController[F[_]: Effect]()(
   def createHostSelector = pathPrefix("hostSelector") {
     entity(as[CreateHostSelector]) { r =>
       completeF(
-        hostSelectorService.create(r.name, r.placeholder)
+        hostSelectorService.create(r.name, r.nodeSelector)
       )
     }
   }

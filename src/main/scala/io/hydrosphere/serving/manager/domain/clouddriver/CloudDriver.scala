@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import cats.effect._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
+import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 
@@ -37,7 +38,7 @@ trait CloudDriver[F[_]] {
 
   def instance(name: String): F[Option[CloudInstance]]
 
-  def run(name: String, modelVersionId: Long, image: DockerImage): F[CloudInstance]
+  def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): F[CloudInstance]
 
   def remove(name: String): F[Unit]
 

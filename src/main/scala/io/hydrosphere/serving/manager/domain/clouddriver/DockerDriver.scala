@@ -7,6 +7,7 @@ import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContai
 import com.spotify.docker.client.messages._
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
 import io.hydrosphere.serving.manager.domain.clouddriver.DockerDriver.Internals.ContainerState
+import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 
@@ -41,7 +42,8 @@ class DockerDriver[F[_]](
   override def run(
     name: String,
     modelVersionId: Long,
-    image: DockerImage
+    image: DockerImage,
+    hostSelector: Option[HostSelector] = None
   ): F[CloudInstance] = {
     val container = Internals.mkContainerConfig(name, modelVersionId, image, config)
     for {
