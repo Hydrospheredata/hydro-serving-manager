@@ -6,6 +6,7 @@ import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.implicits._
+import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.manager.discovery.ModelPublisher
 import io.hydrosphere.serving.manager.domain.image.{ImageBuilder, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
@@ -31,9 +32,10 @@ object ModelVersionBuilder {
     override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion]] = {
       for {
         init <- initialVersion(model, metadata)
+        handler <- buildLoggingService.makeLogger(init)
         _ <- modelDiscoveryHub.update(init)
         deferred <- Deferred[F, ModelVersion]
-        fbr <- handleBuild(init, modelFileStructure).flatMap(deferred.complete).start
+        _ <- handleBuild(init, modelFileStructure, handler).flatMap(deferred.complete).start
       } yield DeferredResult(init, deferred)
     }
 
@@ -60,10 +62,9 @@ object ModelVersionBuilder {
       } yield modelVersion
     }
 
-    def handleBuild(mv: ModelVersion, modelFileStructure: ModelFileStructure) = {
+    def handleBuild(mv: ModelVersion, modelFileStructure: ModelFileStructure, handler: ProgressHandler) = {
       val innerCompleted = for {
         buildPath <- prepare(mv, modelFileStructure)
-        handler <- buildLoggingService.makeLogger(mv)
         imageSha <- imageBuilder.build(buildPath.root, mv.image, handler)
         newDockerImage = mv.image.copy(sha256 = Some(imageSha))
         finishedVersion = mv.copy(image = newDockerImage, finished = Some(LocalDateTime.now()), status = ModelVersionStatus.Released)
