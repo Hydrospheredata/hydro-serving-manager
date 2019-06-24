@@ -24,6 +24,7 @@ import streamz.converter._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.util.Try
 
 
 @Path("/api/v2/model")
@@ -143,14 +144,21 @@ class ModelController[F[_]]()(
 
   def buildLogs = pathPrefix("model" / "version" / LongNumber / "logs") { versionId =>
     get {
-      completeF {
-        OptionT(buildLoggingService.getLogs(versionId))
-          .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find logs for model version id = ${versionId}")))
-          .map { stream =>
-            Source.fromGraph(stream.toSource)
-              .map(x => ServerSentEvent(x))
-              .keepAlive(15.seconds, () => ServerSentEvent.heartbeat)
-          }
+      optionalHeaderValueByName("Last-Event-ID") { maybeId =>
+        val streamIdx = maybeId
+          .flatMap(v => Try(v.toInt).toOption)
+          .map(i => i + 1) // browser has event with id `i` so we continue stream starting with the next line
+          .getOrElse(0)
+        completeF {
+          OptionT(buildLoggingService.getLogs(versionId, streamIdx))
+            .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find logs for model version id = ${versionId}")))
+            .map { stream =>
+              val s = stream.zipWithIndex.map { case (log, id) => (log, id + streamIdx) }
+              Source.fromGraph(s.toSource)
+                .map { case (log, id) => ServerSentEvent(log, id = Some(id.toString)) }
+                .keepAlive(15.seconds, () => ServerSentEvent.heartbeat)
+            }
+        }
       }
     }
   }
