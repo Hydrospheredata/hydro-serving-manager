@@ -2,6 +2,7 @@ package io.hydrosphere.serving.manager.domain.clouddriver
 
 import cats.effect.Async
 import cats.implicits._
+import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 
 import scala.util.Try
@@ -22,10 +23,11 @@ class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDr
 
   override def instance(name: String): F[Option[CloudInstance]] = instances.map(_.find(_.name == name))
 
-  override def run(name: String, modelVersionId: Long, image: DockerImage): F[CloudInstance] = {
+
+  override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): F[CloudInstance] = {
     val servable = CloudInstance(modelVersionId, name, CloudInstance.Status.Starting)
     for {
-      _ <- client.runDeployment(name, servable, image)
+      _ <- client.runDeployment(name, servable, image, hostSelector)
       service <- client.runService(name, servable)
       maybeServable = kubeSvc2Servable(service)
       newServable <- maybeServable match {

@@ -4,6 +4,7 @@ import akka.stream.Materializer
 import cats.effect._
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
+import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import org.apache.logging.log4j.scala.Logging
@@ -19,7 +20,7 @@ trait KubernetesClient[F[_]] {
   def services: F[List[skuber.Service]]
   def deployments: F[List[Deployment]]
   
-  def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage): F[Deployment]
+  def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, hostSelector: Option[HostSelector]): F[Deployment]
   def runService(name: String, servable: CloudInstance): F[skuber.Service]
   
   def removeDeployment(name: String): F[Unit]
@@ -44,20 +45,29 @@ object KubernetesClient {
       AsyncUtil.futureAsync(underlying.list[DeploymentList]).map(_.toList)
     }
 
-    override def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage): F[Deployment] = {
+    override def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, hostSelector: Option[HostSelector]): F[Deployment] = {
       import LabelSelector.dsl._
       
       val dockerRepoHost = dockerRepoConf.pullHost.getOrElse(dockerRepoConf.host)
       val image = dockerImage.replaceUser(dockerRepoHost).toTry.get
-      val pod = Pod.Template.Spec(
+      var podSpec = Pod.Spec().addImagePullSecretRef(config.kubeRegistrySecretName) 
+      if (hostSelector.isDefined) {
+        hostSelector.get.nodeSelector.foreach(kv => podSpec = podSpec.addNodeSelector(kv))
+      }
+      val podTemplate = Pod.Template.Spec(
         metadata = ObjectMeta(name = servable.name),
-        spec = Some(Pod.Spec().addImagePullSecretRef(config.kubeRegistrySecretName))
+        spec = Some(podSpec)
       )
-        .addContainer(Container("model", image.fullName).exposePort(DefaultConstants.DEFAULT_APP_PORT).withImagePullPolicy(PullPolicy.Always).setEnvVar(DefaultConstants.ENV_APP_PORT, DefaultConstants.DEFAULT_APP_PORT.toString))
+        .addContainer(Container("model", image.fullName)
+          .exposePort(DefaultConstants.DEFAULT_APP_PORT)
+          .withImagePullPolicy(PullPolicy.Always)
+          .setEnvVar(DefaultConstants.ENV_APP_PORT, DefaultConstants.DEFAULT_APP_PORT.toString)
+        )
         .addLabels(Map(
           CloudDriver.Labels.ServiceName -> name,
           CloudDriver.Labels.ModelVersionId -> servable.modelVersionId.toString
         ))
+        
       val deployment = apps.v1.Deployment(metadata = ObjectMeta(name = servable.name, labels = Map(
           CloudDriver.Labels.ServiceName -> name,
           CloudDriver.Labels.ModelVersionId -> servable.modelVersionId.toString
@@ -65,7 +75,7 @@ object KubernetesClient {
       ))
         // TODO: make it configurable from api 
         .withReplicas(1)
-        .withTemplate(pod)
+        .withTemplate(podTemplate)
         .withLabelSelector(CloudDriver.Labels.ServiceName is name)
       
       for {

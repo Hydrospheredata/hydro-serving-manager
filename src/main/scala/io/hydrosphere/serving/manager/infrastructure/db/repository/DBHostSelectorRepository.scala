@@ -21,7 +21,7 @@ class DBHostSelectorRepository[F[_]: Async](implicit executionContext: Execution
       Tables.HostSelector returning Tables.HostSelector += Tables.HostSelectorRow(
         entity.id,
         entity.name,
-        entity.placeholder
+        entity.nodeSelector
       )
     ).map(mapFromDb)
   }
@@ -66,7 +66,7 @@ object DBHostSelectorRepository {
     HostSelector(
       id = dbType.hostSelectorId,
       name = dbType.name,
-      placeholder = dbType.placeholder
+      nodeSelector = dbType.nodeSelector
     )
   }
 }

@@ -42,10 +42,12 @@ class HostSelectorController[F[_]: Effect]()(
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def createHostSelector = pathPrefix("hostSelector") {
-    entity(as[CreateHostSelector]) { r =>
-      completeF(
-        hostSelectorService.create(r.name, r.placeholder)
-      )
+    post {
+      entity(as[CreateHostSelector]) { r =>
+        completeF(
+          hostSelectorService.create(r.name, r.nodeSelector)
+        )
+      }  
     }
   }
 

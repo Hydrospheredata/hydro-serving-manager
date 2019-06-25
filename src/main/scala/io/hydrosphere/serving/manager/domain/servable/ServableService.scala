@@ -60,7 +60,7 @@ object ServableService extends Logging {
 
     def awaitServable(servable: GenericServable): F[GenericServable] = {
       for {
-        _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image)
+        _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, servable.modelVersion.hostSelector)
         servableDef <- monitor.monitor(servable)
         resultServable <- servableDef.get
         _ <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))

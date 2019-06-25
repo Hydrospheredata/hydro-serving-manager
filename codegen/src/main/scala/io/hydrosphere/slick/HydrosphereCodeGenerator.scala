@@ -45,16 +45,23 @@ trait $container${parentType.map(t => s" extends $t").getOrElse("")} {
     override def Column = new Column(_) {
 
       override def rawType: String = {
-        model.tpe match {
-          case "java.sql.Date" => "java.time.LocalDate"
-          case "java.sql.Time" => "java.time.LocalTime"
-          case "java.sql.Timestamp" => "java.time.LocalDateTime"
-          case "scala.collection.Seq" => model.options.find(_.isInstanceOf[ColumnOption.SqlType]).map(_.asInstanceOf[ColumnOption.SqlType].typeName).map({
-            case "_text" => "List[String]"
-            case "_int8" => "List[Long]"
-            case _ => "List[String]"
-          }).getOrElse("String")
-          case _ => super.rawType
+        model.options.find(_.isInstanceOf[ColumnOption.SqlType]).flatMap { tpe =>
+          tpe.asInstanceOf[ColumnOption.SqlType].typeName match {
+            case "\"hydro_serving\".\"hstore\"" => Option("Map[String, String]")
+            case _ => None
+          }
+        }.getOrElse {
+          model.tpe match {
+            case "java.sql.Date" => "java.time.LocalDate"
+            case "java.sql.Time" => "java.time.LocalTime"
+            case "java.sql.Timestamp" => "java.time.LocalDateTime"
+            case "scala.collection.Seq" => model.options.find(_.isInstanceOf[ColumnOption.SqlType]).map(_.asInstanceOf[ColumnOption.SqlType].typeName).map({
+              case "_text" => "List[String]"
+              case "_int8" => "List[Long]"
+              case _ => "List[String]"
+            }).getOrElse("String")
+            case _ => super.rawType
+          }
         }
       }
     }
