@@ -1,28 +1,24 @@
 package io.hydrosphere.serving.manager.api.http.controller.model
 
-import java.util.UUID
-
-import akka.NotUsed
-import akka.actor.{ActorRefFactory, ActorSystem}
+import akka.actor.ActorSystem
+import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
+import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Source
+import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, Effect}
 import cats.syntax.functor._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
+import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, ModelService}
+import io.hydrosphere.serving.manager.domain.model_build.BuildLoggingService
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionService, ModelVersionView}
 import io.swagger.annotations._
-import akka.stream.scaladsl.Source
-import akka.http.scaladsl.model.sse.ServerSentEvent
-import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
-import cats.data.OptionT
-import io.hydrosphere.serving.manager.domain.DomainError
-import io.hydrosphere.serving.manager.domain.model_build.BuildLoggingService
 import javax.ws.rs.Path
 import streamz.converter._
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -155,7 +151,7 @@ class ModelController[F[_]]()(
             .map { stream =>
               val s = stream.zipWithIndex
                 .map { case (log, id) => (log, id + streamIdx) }
-                .map { case (log, id) => ServerSentEvent(log, id = Some(id.toString)) }
+                .map { case (log, id) => ServerSentEvent(log, id = Some(id.toString), eventType = Some("Log")) }
                 .onComplete(fs2.Stream.emit[F, ServerSentEvent](ServerSentEvent("", `type` = "EndOfStream")))
               Source.fromGraph(s.toSource)
                 .keepAlive(15.seconds, () => ServerSentEvent.heartbeat)
