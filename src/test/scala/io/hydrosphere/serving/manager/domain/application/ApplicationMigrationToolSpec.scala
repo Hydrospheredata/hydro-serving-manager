@@ -9,12 +9,14 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.{GenericUnitTest, db}
 import io.hydrosphere.serving.manager.db.Tables
-import io.hydrosphere.serving.manager.db.Tables.{ApplicationRow, HostSelector}
+import io.hydrosphere.serving.manager.db.Tables.ApplicationRow
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.Variant
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
+import io.hydrosphere.serving.manager.domain.host_selector
+import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}

@@ -5,8 +5,6 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository, HostSelectorService}
 import org.mockito.{Matchers, Mockito}
 
-import scala.concurrent.Future
-
 class HostSelectorServiceSpec extends GenericUnitTest {
   describe("Environment management service") {
     it("should return an environment by id") {
@@ -14,7 +12,7 @@ class HostSelectorServiceSpec extends GenericUnitTest {
 
       Mockito.when(envRepo.get("test")).thenReturn(
         Some(
-          HostSelector(1, "test", "placeholder")
+          HostSelector(1, "test", Map("foo" -> "bar"))
         )
       )
 
@@ -25,7 +23,7 @@ class HostSelectorServiceSpec extends GenericUnitTest {
       val env = res.right.get
       assert(env.name === "test")
       assert(env.id === 1)
-      assert(env.placeholder === "placeholder")
+      assert(env.nodeSelector === Map("foo" -> "bar"))
     }
 
     it("should create a new environment") {
@@ -37,17 +35,17 @@ class HostSelectorServiceSpec extends GenericUnitTest {
       val hostSelector = HostSelector(
         1,
         "new_test",
-        "placeholder"
+        Map("foo" -> "bar")
       )
       when(envRepo.create(Matchers.any())).thenReturn(hostSelector)
 
       val environmentService = HostSelectorService(envRepo)
 
-      val res = environmentService.create("new_test", "placeholder")
+      val res = environmentService.create("new_test", Map("foo" -> "bar"))
       assert(res.isRight, res)
       val env = res.right.get
       assert(env.name === "new_test")
-      assert(env.placeholder === "placeholder")
+      assert(env.nodeSelector === Map("foo" -> "bar"))
 
     }
 
@@ -55,11 +53,11 @@ class HostSelectorServiceSpec extends GenericUnitTest {
       val envRepo = mock[HostSelectorRepository[Id]]
 
       Mockito.when(envRepo.get("new_test")).thenReturn(
-        Some(HostSelector(1, "new_test", "placeholder"))
+        Some(HostSelector(1, "new_test", Map("foo" -> "bar")))
       )
 
       val environmentService = HostSelectorService(envRepo)
-      val res = environmentService.create("new_test", "placeholder")
+      val res = environmentService.create("new_test", Map("foo" -> "bar"))
       assert(res.isLeft, res)
     }
   }
