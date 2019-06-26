@@ -1,9 +1,14 @@
 package io.hydrosphere.serving.manager.api.http.controller.servable
 
+import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
+import akka.http.scaladsl.model.HttpEntity.ChunkStreamPart
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, MediaTypes}
+import akka.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.effect.Effect
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.domain.DomainError
+import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{ServableRepository, ServableService}
 import io.swagger.annotations._
@@ -14,7 +19,8 @@ import javax.ws.rs.Path
 class ServableController[F[_]]()(
   implicit F: Effect[F],
   servableService: ServableService[F],
-  servableRepository: ServableRepository[F]
+  servableRepository: ServableRepository[F],
+  cloudDriver: CloudDriver[F]
 ) extends AkkaHttpControllerDsl {
 
   @Path("/")
@@ -45,6 +51,30 @@ class ServableController[F[_]]()(
       completeF {
         OptionT(servableRepository.get(name))
           .getOrElseF(F.raiseError[GenericServable](DomainError.notFound(s"Can't find servable $name")))
+      }
+    }
+  }
+  
+  @Path("/{name}/logs")
+  @ApiOperation(value = "get servable logs", notes = "get servable logs", nickname="get-servable-logs", httpMethod="GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name="name", required=true, dataType="string", paramType = "path", value = "name")
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Logs", response = classOf[String]),
+    new ApiResponse(code = 500, message = "Internal server error")
+  ))
+  def getServableLogs = path("servable" / Segment / "logs") { name =>
+//    implicit val toResponseMarshaller: ToResponseMarshaller[Source[String, _]] =
+//      Marshaller.opaque { items =>
+//        val data = items.map(item => ChunkStreamPart(item))
+//        HttpResponse(entity = HttpEntity.Chunked(ContentTypes.`text/plain(UTF-8)`, data))
+//      }
+    get {
+      parameter('follow.as[Boolean].?) { follow: Option[Boolean] =>
+        completeF {
+          F.toIO(cloudDriver.getLogs(name, follow.getOrElse(false))).map(source => HttpEntity.Chunked(ContentTypes.`text/plain(UTF-8)`, source.map(ChunkStreamPart(_))))
+        }
       }
     }
   }
@@ -85,5 +115,5 @@ class ServableController[F[_]]()(
     }
   }
 
-  def routes = listServables ~ getServable ~ deployModel ~ stopServable
+  def routes = listServables ~ getServable ~ deployModel ~ stopServable ~ getServableLogs
 }

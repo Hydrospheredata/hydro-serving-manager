@@ -93,7 +93,7 @@ object Dependencies {
       "com.github.tminglei" %% "slick-pg" % slickPgVersion,
       "com.github.tminglei" %% "slick-pg_spray-json" % slickPgVersion,
       "org.flywaydb" % "flyway-core" % "4.2.0",
-      "com.spotify" % "docker-client" % "8.12.0" exclude("ch.qos.logback", "logback-classic"),
+      "com.spotify" % "docker-client" % "8.16.0" exclude("ch.qos.logback", "logback-classic"),
       "com.google.guava" % "guava" % "22.0",
       "com.github.pureconfig" %% "pureconfig" % "0.9.1",
       "co.fs2" %% "fs2-core" % "1.0.5",

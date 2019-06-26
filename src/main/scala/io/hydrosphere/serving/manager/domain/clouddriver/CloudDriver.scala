@@ -1,7 +1,9 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.Materializer
+import akka.stream.scaladsl.Source
 import cats.effect._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
@@ -43,6 +45,8 @@ trait CloudDriver[F[_]] {
   def remove(name: String): F[Unit]
 
   def getByVersionId(modelVersionId: Long): F[Option[CloudInstance]]
+  
+  def getLogs(name: String, follow: Boolean): F[Source[String, _]]
 }
 
 object CloudDriver {

@@ -1,10 +1,12 @@
 package io.hydrosphere.serving.manager.infrastructure.docker
 
+import java.nio.ByteBuffer
+
 import cats.effect.Sync
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContainerParam}
 import com.spotify.docker.client.messages.{Container, ContainerConfig, ContainerCreation}
-import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
+import com.spotify.docker.client.{DefaultDockerClient, DockerClient, LogStream}
 
 import scala.collection.JavaConverters._
 
@@ -20,6 +22,8 @@ trait DockerdClient[F[_]]{
   def listContainers(params: List[ListContainersParam]): F[List[Container]]
   def listRunningContainers: F[List[Container]] = listContainers(Nil)
   def listAllContainers: F[List[Container]] = listContainers(ListContainersParam.allContainers() :: Nil)
+  
+  def logs(id: String, follow: Boolean): F[LogStream]
 }
 
 object DockerdClient {
@@ -49,7 +53,14 @@ object DockerdClient {
       override def listContainers(params: List[ListContainersParam]): F[List[Container]] = {
         F.delay(underlying.listContainers(params: _*)).map(_.asScala.toList)
       }
-      
+
+      override def logs(id: String, follow: Boolean): F[LogStream] = {
+        if (follow) {
+          F.delay(underlying.logs(id, DockerClient.LogsParam.stderr(), DockerClient.LogsParam.stdout(), DockerClient.LogsParam.follow()))
+        } else {
+          F.delay(underlying.logs(id, DockerClient.LogsParam.stderr(), DockerClient.LogsParam.stdout()))
+        }
+      }
     }
   
 }
