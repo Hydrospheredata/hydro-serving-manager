@@ -2,6 +2,7 @@ package io.hydrosphere.serving.manager.domain.application
 
 import java.time.LocalDateTime
 
+import akka.stream.scaladsl.Source
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
@@ -78,6 +79,8 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = {
           IO(cd.some)
         }
+
+        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
       val modelVersion = ModelVersion(1, DockerImage("asd", "asd"), LocalDateTime.now(), None, 1,
         ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,
@@ -224,6 +227,8 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = {
           IO(cd.some)
         }
+
+        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
       val modelVersion = ModelVersion(1, DockerImage("asd", "asd"), LocalDateTime.now(), None, 1,
         ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,

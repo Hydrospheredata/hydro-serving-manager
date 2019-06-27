@@ -1,6 +1,7 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 import akka.actor.ActorSystem
 import akka.stream.Materializer
+import akka.stream.scaladsl.Source
 import cats.effect._
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
@@ -25,6 +26,9 @@ trait KubernetesClient[F[_]] {
   
   def removeDeployment(name: String): F[Unit]
   def removeService(name: String): F[Unit]
+  
+  def getLogs(podName: String, follow: Boolean): F[Source[String, _]]
+  def getPod(name: String): F[Pod]
 }
 
 object KubernetesClient {
@@ -123,6 +127,20 @@ object KubernetesClient {
         case None => Async[F].delay(logger.error(s"kube service with name `$name` not found"))
       }
     } yield Unit
+
+    override def getLogs(podName: String, follow: Boolean): F[Source[String, _]] = {
+      AsyncUtil.futureAsync(underlying.getPodLogSource(podName, Pod.LogQueryParams(follow = Some(follow))).map(_.map(_.utf8String)))
+    }
+
+    override def getPod(name: String): F[Pod] = {
+      import LabelSelector.dsl._
+      AsyncUtil.futureAsync(underlying.listSelected[PodList](CloudDriver.Labels.ServiceName is name)).flatMap { pods: PodList =>
+        pods.toList match {
+          case head::_ => Async[F].pure(head)
+          case Nil => Async[F].raiseError(new RuntimeException(s"There is no running pods for $name"))
+        }
+      }
+    }
   }
   
 }

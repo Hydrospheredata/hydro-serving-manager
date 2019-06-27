@@ -3,6 +3,7 @@ package io.hydrosphere.serving.manager.domain
 import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicInteger
 
+import akka.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.effect.concurrent.Deferred
 import cats.effect.{ContextShift, IO, Resource, Timer}
@@ -67,6 +68,8 @@ class ServableSpec extends GenericUnitTest {
         override def remove(name: String): IO[Unit] = ???
 
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
+
+        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
       implicit val clientCtor = new PredictionClient.Factory[IO] {
         override def make(host: String, port: Int): Resource[IO, PredictionClient[IO]] = {
@@ -115,6 +118,8 @@ class ServableSpec extends GenericUnitTest {
         override def remove(name: String): IO[Unit] = ???
 
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
+
+        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
       val probe = ServableProbe.default[IO]()
       val result = probe.probe(servable).unsafeRunSync()
@@ -143,6 +148,8 @@ class ServableSpec extends GenericUnitTest {
         override def remove(name: String): IO[Unit] = ???
 
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
+
+        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
       val probe = ServableProbe.default[IO]()
       val result = probe.probe(servable).unsafeRunSync()
@@ -305,6 +312,8 @@ class ServableSpec extends GenericUnitTest {
         override def remove(name: String): IO[Unit] = ???
 
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
+
+        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
       val repoState = ListBuffer.empty[GenericServable]
       val servableRepo = new ServableRepository[IO] {
@@ -413,6 +422,8 @@ class ServableSpec extends GenericUnitTest {
         }
 
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
+
+        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
       val repoState = ListBuffer.empty[GenericServable]
       repoState += initServable

@@ -1,5 +1,6 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
+import akka.stream.scaladsl.Source
 import cats.effect.Async
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
@@ -42,4 +43,9 @@ class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDr
   override def getByVersionId(modelVersionId: Long): F[Option[CloudInstance]] = {
     instances.map(_.find(_.modelVersionId == modelVersionId))
   }
+
+  override def getLogs(name: String, follow: Boolean): F[Source[String, _]] = for {
+    pod <- client.getPod(name)
+    logs <- client.getLogs(pod.metadata.name, follow)
+  } yield logs
 }

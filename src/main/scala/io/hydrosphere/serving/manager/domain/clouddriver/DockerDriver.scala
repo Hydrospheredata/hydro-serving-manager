@@ -1,5 +1,8 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
+import java.io.{PipedInputStream, PipedOutputStream}
+
+import akka.stream.scaladsl.{Source, StreamConverters}
 import cats._
 import cats.data.OptionT
 import cats.implicits._
@@ -10,8 +13,10 @@ import io.hydrosphere.serving.manager.domain.clouddriver.DockerDriver.Internals.
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
+import java.nio.charset.StandardCharsets
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Future
 import scala.util.Try
 
 class DockerDriver[F[_]](
@@ -110,6 +115,30 @@ class DockerDriver[F[_]](
       parsed <- OptionT.fromOption[F](containerToInstance(cont))
     } yield parsed
     r.value
+  }
+
+  override def getLogs(name: String, follow: Boolean): F[Source[String, _]] = {
+    val query = List(
+      ListContainersParam.withLabel(CloudDriver.Labels.ServiceName, name)
+    )
+    
+    for {
+      list <- client.listContainers(query)
+      container <- list match {
+        case head :: _ => F.pure(head)
+        case Nil => F.raiseError[Container](new RuntimeException(s"There is no running containers for $name"))
+      }
+      logStream <- client.logs(container.id(), follow)
+    } yield {
+      val stderr = new PipedInputStream()
+      val stdout = new PipedInputStream()
+      val stderrPipe = new PipedOutputStream(stderr)
+      val stdoutPipe = new PipedOutputStream(stdout)
+      Future {
+        logStream.attach(stdoutPipe, stderrPipe)
+      }(scala.concurrent.ExecutionContext.Implicits.global)
+      StreamConverters.fromInputStream(() => stdout).merge(StreamConverters.fromInputStream(() => stderr)).map(_.utf8String)
+    }
   }
 }
 
