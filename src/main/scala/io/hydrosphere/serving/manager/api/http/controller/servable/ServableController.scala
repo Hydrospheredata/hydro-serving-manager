@@ -1,11 +1,10 @@
 package io.hydrosphere.serving.manager.api.http.controller.servable
 
-import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.HttpEntity.ChunkStreamPart
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, MediaTypes}
-import akka.stream.scaladsl.Source
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import cats.data.OptionT
 import cats.effect.Effect
+import cats.implicits._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
@@ -32,7 +31,9 @@ class ServableController[F[_]]()(
   def listServables = path("servable") {
     get {
       completeF {
-        servableRepository.all()
+        servableRepository.all().map{ list =>
+          list.map(ServableView.fromServable)
+        }
       }
     }
   }
@@ -50,7 +51,8 @@ class ServableController[F[_]]()(
     get {
       completeF {
         OptionT(servableRepository.get(name))
-          .getOrElseF(F.raiseError[GenericServable](DomainError.notFound(s"Can't find servable $name")))
+          .map(ServableView.fromServable)
+          .getOrElseF(F.raiseError[ServableView](DomainError.notFound(s"Can't find servable $name")))
       }
     }
   }
@@ -65,15 +67,11 @@ class ServableController[F[_]]()(
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def getServableLogs = path("servable" / Segment / "logs") { name =>
-//    implicit val toResponseMarshaller: ToResponseMarshaller[Source[String, _]] =
-//      Marshaller.opaque { items =>
-//        val data = items.map(item => ChunkStreamPart(item))
-//        HttpResponse(entity = HttpEntity.Chunked(ContentTypes.`text/plain(UTF-8)`, data))
-//      }
     get {
       parameter('follow.as[Boolean].?) { follow: Option[Boolean] =>
         completeF {
-          F.toIO(cloudDriver.getLogs(name, follow.getOrElse(false))).map(source => HttpEntity.Chunked(ContentTypes.`text/plain(UTF-8)`, source.map(ChunkStreamPart(_))))
+          cloudDriver.getLogs(name, follow.getOrElse(false))
+            .map(source => HttpEntity.Chunked(ContentTypes.`text/plain(UTF-8)`, source.map(ChunkStreamPart(_))))
         }
       }
     }
@@ -93,6 +91,7 @@ class ServableController[F[_]]()(
       entity(as[DeployModelRequest]) { r =>
         completeF {
           servableService.findAndDeploy(r.modelName, r.version)
+            .map(x => ServableView.fromServable(x.started))
         }
       }
     }
@@ -111,6 +110,7 @@ class ServableController[F[_]]()(
     delete {
       completeF {
         servableService.stop(name)
+          .map(ServableView.fromServable)
       }
     }
   }

@@ -2,7 +2,11 @@ package io.hydrosphere.serving.manager.domain.servable
 
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
-case class Servable[+T <: Servable.Status](modelVersion: ModelVersion, nameSuffix: String, status: T) {
+case class Servable[+T <: Servable.Status](
+  modelVersion: ModelVersion,
+  nameSuffix: String,
+  status: T
+) {
   def fullName: String = Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, nameSuffix)
 }
 

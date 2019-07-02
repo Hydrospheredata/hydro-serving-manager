@@ -1,11 +1,11 @@
 package io.hydrosphere.serving.manager
+
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import cats.effect._
 import cats.implicits._
 import com.spotify.docker.client.DefaultDockerClient
-import io.grpc.Server
 import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
@@ -68,7 +68,7 @@ object Core extends Logging {
       )
       _ <- n.getAndRevive()
     } yield {
-      val httpApi = new HttpApiServer(repositories, services, config, appSub, modelSub)
+      val httpApi = new HttpApiServer(repositories, services, config, appSub, modelSub, servSub)
       val grpcApi = GrpcApiServer(repositories, services, config, appSub, servSub)
       (httpApi, grpcApi, services, repos)
     }
