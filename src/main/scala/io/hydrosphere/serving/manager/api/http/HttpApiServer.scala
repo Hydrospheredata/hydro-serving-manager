@@ -17,7 +17,7 @@ import io.hydrosphere.serving.manager.api.http.controller.model.ModelController
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
 import io.hydrosphere.serving.manager.api.http.controller.{AkkaHttpControllerDsl, SwaggerDocController}
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
-import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, ModelSubscriber}
+import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, ModelSubscriber, ServableSubscriber}
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import io.hydrosphere.serving.manager.{Repositories, Services}
 
@@ -29,7 +29,8 @@ class HttpApiServer[F[_]: ConcurrentEffect: ContextShift](
   managerServices: Services[F],
   managerConfiguration: ManagerConfiguration,
   applicationSub: ApplicationSubscriber[F],
-  modelSub: ModelSubscriber[F]
+  modelSub: ModelSubscriber[F],
+  servableSub: ServableSubscriber[F]
 )(
   implicit system: ActorSystem,
   materializer: ActorMaterializer,
@@ -47,7 +48,7 @@ class HttpApiServer[F[_]: ConcurrentEffect: ContextShift](
 
   val servableController = new ServableController[F]()
 
-  val sseController = new SSEController[F](applicationSub, modelSub)
+  val sseController = new SSEController[F](applicationSub, modelSub, servableSub)
 
   val swaggerController = new SwaggerDocController(
     Set(
