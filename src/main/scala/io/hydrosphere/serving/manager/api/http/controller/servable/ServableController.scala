@@ -65,11 +65,6 @@ class ServableController[F[_]]()(
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def getServableLogs = path("servable" / Segment / "logs") { name =>
-//    implicit val toResponseMarshaller: ToResponseMarshaller[Source[String, _]] =
-//      Marshaller.opaque { items =>
-//        val data = items.map(item => ChunkStreamPart(item))
-//        HttpResponse(entity = HttpEntity.Chunked(ContentTypes.`text/plain(UTF-8)`, data))
-//      }
     get {
       parameter('follow.as[Boolean].?) { follow: Option[Boolean] =>
         completeF {

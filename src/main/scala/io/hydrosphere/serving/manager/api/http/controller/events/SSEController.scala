@@ -7,14 +7,12 @@ import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
-import spray.json._
-import cats.implicits._
-import cats.effect.implicits._
 import cats.effect.{ConcurrentEffect, ContextShift}
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
 import io.hydrosphere.serving.manager.discovery._
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
+import spray.json._
 import streamz.converter._
 
 import scala.concurrent.ExecutionContext
@@ -22,7 +20,8 @@ import scala.concurrent.duration._
 
 class SSEController[F[_]](
   applicationSubscriber: ApplicationSubscriber[F],
-  modelSubscriber: ModelSubscriber[F]
+  modelSubscriber: ModelSubscriber[F],
+  servableSubscriber: ServableSubscriber[F]
 )(
   implicit F: ConcurrentEffect[F],
   cs: ContextShift[F],
@@ -42,7 +41,10 @@ class SSEController[F[_]](
         val models = modelSubscriber.subscribe
         val modelSSE = models.flatMap(x => fs2.Stream.emits(SSEController.fromModelDiscovery(x)))
 
-        val joined = appsSSE.merge(modelSSE)
+        val servables = servableSubscriber.subscribe
+        val servableSSE = servables.flatMap(x => fs2.Stream.emits(SSEController.fromServableDiscovery(x)))
+
+        val joined = appsSSE merge modelSSE merge servableSSE
 
         Source.fromGraph(joined.toSource)
           .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
@@ -60,9 +62,29 @@ class SSEController[F[_]](
 }
 
 object SSEController extends CompleteJsonProtocol {
+  def fromServableDiscovery[F[_]](x: ServableSubscriber[F]#Event): List[ServerSentEvent] = {
+    x match {
+      case DiscoveryEvent.Initial => Nil
+      case DiscoveryEvent.ItemUpdate(items) =>
+        items.map { s =>
+          ServerSentEvent(
+            data = s.toJson.compactPrint,
+            `type` = "ServableUpdate"
+          )
+        }
+      case DiscoveryEvent.ItemRemove(items) =>
+        items.map { s =>
+          ServerSentEvent(
+            data = s,
+            `type` = "ServableRemove"
+          )
+        }
+    }
+  }
+
   def fromModelDiscovery[F[_]](x: ModelSubscriber[F]#Event): List[ServerSentEvent] = {
     x match {
-      case DiscoveryEvent.Initial => ServerSentEvent.heartbeat :: Nil
+      case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
         items.map { mv =>
           ServerSentEvent(
@@ -82,7 +104,7 @@ object SSEController extends CompleteJsonProtocol {
 
   def fromAppDiscovery[F[_]](x: ApplicationSubscriber[F]#Event): List[ServerSentEvent] = {
     x match {
-      case DiscoveryEvent.Initial => ServerSentEvent.heartbeat :: Nil
+      case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
         items.map { app =>
           ServerSentEvent(
