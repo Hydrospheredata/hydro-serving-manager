@@ -22,4 +22,6 @@ trait ApplicationRepository[F[_]] {
   def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): F[List[GenericApplication]]
 
   def findVersionsUsage(versionIdx: Long): F[List[GenericApplication]]
+
+  def findServableUsage(servableName: String): F[List[GenericApplication]]
 }

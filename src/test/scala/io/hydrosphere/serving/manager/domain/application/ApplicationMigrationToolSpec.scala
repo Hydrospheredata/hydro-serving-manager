@@ -64,6 +64,8 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         override def findVersionsUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
 
         override def updateRow(row: db.Tables.ApplicationRow): IO[Int] = ???
+
+        override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
       }
       val cd = CloudInstance(1, "aaa", CloudInstance.Status.Running("host", 9090))
       val removed = ListBuffer.empty[String]
@@ -213,6 +215,8 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         override def findVersionsUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
 
         override def updateRow(row: db.Tables.ApplicationRow): IO[Int] = IO(updatedRows += row).as(1)
+
+        override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
       }
       val cd = CloudInstance(1, "aaa", CloudInstance.Status.Running("host", 9090))
       val cloudDriver = new CloudDriver[IO] {

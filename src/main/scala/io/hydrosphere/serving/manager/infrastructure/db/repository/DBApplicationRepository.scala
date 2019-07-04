@@ -192,6 +192,23 @@ class DBApplicationRepository[F[_]](
     } yield app
     f.value
   }
+
+  override def findServableUsage(servableName: String): F[List[GenericApplication]] = {
+    for {
+      appTable <- db.task {
+          Tables.Application
+            .filter(a => a.usedServables @> List(servableName))
+            .result
+        }
+      sNames = appTable.flatMap(_.usedServables)
+      servables <- servableDb.get(sNames)
+      sMap = servables.map(x => x.fullName -> x).toMap
+      versions <- versionDb.get(appTable.flatMap(_.usedModelVersions))
+      vMap = versions.map(x => x.id -> x).toMap
+      apps <- appTable.toList
+        .traverse(appT => F.fromEither(mapFromDb(appT, vMap, sMap)))
+    } yield apps
+  }
 }
 
 object DBApplicationRepository extends CompleteJsonProtocol {

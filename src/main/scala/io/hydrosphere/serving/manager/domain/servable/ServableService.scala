@@ -7,6 +7,7 @@ import cats.effect.implicits._
 import cats.implicits._
 import io.hydrosphere.serving.manager.discovery.ServablePublisher
 import io.hydrosphere.serving.manager.domain.DomainError
+import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
@@ -30,6 +31,7 @@ object ServableService extends Logging {
   def apply[F[_]](
     cloudDriver: CloudDriver[F],
     servableRepository: ServableRepository[F],
+    appRepo: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     monitor: ServableMonitor[F],
     servableDH: ServablePublisher[F]
@@ -68,13 +70,20 @@ object ServableService extends Logging {
       } yield resultServable
     }
 
-    override def stop(name: String): F[Servable.GenericServable] = {
+    override def stop(name: String): F[GenericServable] = {
       for {
         servable <- OptionT(servableRepository.get(name))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't stop Servable $name because it doesn't exist")))
-        _ <- servableDH.remove(name)
-        _ <- cloudDriver.remove(name)
-        _ <- servableRepository.delete(name)
+        apps <- appRepo.findServableUsage(name)
+        _ <- apps match {
+          case Nil =>
+            servableDH.remove(name) >>
+              cloudDriver.remove(name) >>
+              servableRepository.delete(name).void
+          case usedApps =>
+            val appNames = usedApps.map(_.name)
+            F.raiseError[Unit](DomainError.invalidRequest(s"Can't delete servable $name. It's used by $appNames apps."))
+        }
       } yield servable
     }
 

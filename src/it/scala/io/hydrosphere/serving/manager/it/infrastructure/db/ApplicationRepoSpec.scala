@@ -8,9 +8,10 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.application.Application
-import io.hydrosphere.serving.manager.domain.application.graph.Variant
+import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Variant}
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 
@@ -29,6 +30,7 @@ class ApplicationRepoSpec extends FullIntegrationSpec {
     ).some
   )
   var mv1: ModelVersion = _
+  var servable: Servable.OkServable = _
 
   describe("DbApplicationRepository") {
     it("should create") {
@@ -36,10 +38,10 @@ class ApplicationRepoSpec extends FullIntegrationSpec {
         id = 0,
         name = "repo-spec-app",
         namespace = None,
-        status = Application.Assembling(
+        status = Application.Ready(
           NonEmptyList.of(
-            PipelineStage(
-              NonEmptyList.of(Variant(mv1, 100)),
+            ExecutionNode(
+              NonEmptyList.of(Variant(servable, 100)),
               ModelSignature.defaultInstance
             )
           )
@@ -61,6 +63,14 @@ class ApplicationRepoSpec extends FullIntegrationSpec {
       println(result)
       assert(result.id === 1)
     }
+    it("should find app usages") {
+      val oldApp = repositories.applicationRepository.get("repo-spec-app").unsafeRunSync().get
+      val result = repositories.applicationRepository.findServableUsage(servable.fullName).unsafeRunSync()
+      assert(result.head.name == oldApp.name)
+
+      val failResult = repositories.applicationRepository.findServableUsage("hackermans").unsafeRunSync()
+      assert(failResult.isEmpty, failResult)
+    }
   }
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -68,9 +78,12 @@ class ApplicationRepoSpec extends FullIntegrationSpec {
     val f = for {
       d1 <- services.modelService.uploadModel(uploadFile, upload1)
       completed1 <- d1.completed.get
+      s = Servable(completed1, "test-suffix", Servable.Serving("ok", "localhost", 9090))
+      _ <- repositories.servableRepository.upsert(s)
     } yield {
       println(s"UPLOADED: $completed1")
       mv1 = completed1
+      servable = s
     }
     f.unsafeRunSync()
   }

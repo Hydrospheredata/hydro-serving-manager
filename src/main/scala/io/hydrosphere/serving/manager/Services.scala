@@ -107,6 +107,7 @@ class Services[F[_]: ConcurrentEffect](
   implicit val servableService: ServableService[F] = ServableService[F](
     cloudDriverService,
     managerRepositories.servableRepository,
+    managerRepositories.applicationRepository,
     managerRepositories.modelVersionRepository,
     servableMonitor,
     servablePub
