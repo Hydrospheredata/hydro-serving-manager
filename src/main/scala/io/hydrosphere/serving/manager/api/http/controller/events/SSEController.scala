@@ -10,6 +10,7 @@ import akka.stream.scaladsl.Source
 import cats.effect.{ConcurrentEffect, ContextShift}
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
+import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
 import io.hydrosphere.serving.manager.discovery._
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import spray.json._
@@ -68,7 +69,7 @@ object SSEController extends CompleteJsonProtocol {
       case DiscoveryEvent.ItemUpdate(items) =>
         items.map { s =>
           ServerSentEvent(
-            data = s.toJson.compactPrint,
+            data = ServableView.fromServable(s).toJson.compactPrint,
             `type` = "ServableUpdate"
           )
         }
