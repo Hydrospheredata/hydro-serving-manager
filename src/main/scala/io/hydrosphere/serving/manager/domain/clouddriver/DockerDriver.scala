@@ -1,6 +1,7 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
 import java.io.{PipedInputStream, PipedOutputStream}
+import java.util.concurrent.Executors
 
 import akka.stream.scaladsl.{Source, StreamConverters}
 import cats._
@@ -13,10 +14,9 @@ import io.hydrosphere.serving.manager.domain.clouddriver.DockerDriver.Internals.
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
-import java.nio.charset.StandardCharsets
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 class DockerDriver[F[_]](
@@ -136,8 +136,13 @@ class DockerDriver[F[_]](
       val stdoutPipe = new PipedOutputStream(stdout)
       Future {
         logStream.attach(stdoutPipe, stderrPipe)
-      }(scala.concurrent.ExecutionContext.Implicits.global)
+      }(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(50)))
+      
       StreamConverters.fromInputStream(() => stdout).merge(StreamConverters.fromInputStream(() => stderr)).map(_.utf8String)
+        .watchTermination() { (_, b) => b.foreach { _ =>
+          stdoutPipe.close()
+          stderrPipe.close()
+        }(ExecutionContext.Implicits.global)}
     }
   }
 }

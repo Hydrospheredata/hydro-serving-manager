@@ -1,7 +1,7 @@
 package io.hydrosphere.serving.manager.api.http.controller.servable
 
-import akka.http.scaladsl.model.HttpEntity.ChunkStreamPart
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
+import akka.http.scaladsl.model.sse.ServerSentEvent
 import cats.data.OptionT
 import cats.effect.Effect
 import cats.implicits._
@@ -12,6 +12,8 @@ import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{ServableRepository, ServableService}
 import io.swagger.annotations._
 import javax.ws.rs.Path
+
+import scala.concurrent.duration._
 
 @Path("/api/v2/servable")
 @Api(produces = "application/json", tags = Array("Servable"))
@@ -56,22 +58,26 @@ class ServableController[F[_]]()(
       }
     }
   }
-  
+
   @Path("/{name}/logs")
-  @ApiOperation(value = "get servable logs", notes = "get servable logs", nickname="get-servable-logs", httpMethod="GET")
+  @ApiOperation(value = "get servable logs", notes = "get servable logs", nickname = "get-servable-logs", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name="name", required=true, dataType="string", paramType = "path", value = "name")
+    new ApiImplicitParam(name = "name", required = true, dataType = "string", paramType = "path", value = "name")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Logs", response = classOf[String]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
-  def getServableLogs = path("servable" / Segment / "logs") { name =>
+  def sseServableLogs = path("servable" / Segment / "logs") { name =>
     get {
       parameter('follow.as[Boolean].?) { follow: Option[Boolean] =>
         completeF {
           cloudDriver.getLogs(name, follow.getOrElse(false))
-            .map(source => HttpEntity.Chunked(ContentTypes.`text/plain(UTF-8)`, source.map(ChunkStreamPart(_))))
+            .map(source => {
+              source
+                .map(ServerSentEvent(_))
+                .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
+            })
         }
       }
     }
@@ -115,5 +121,5 @@ class ServableController[F[_]]()(
     }
   }
 
-  def routes = listServables ~ getServable ~ deployModel ~ stopServable ~ getServableLogs
+  def routes = listServables ~ getServable ~ deployModel ~ stopServable ~ sseServableLogs
 }
