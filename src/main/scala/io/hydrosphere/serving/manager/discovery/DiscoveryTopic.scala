@@ -12,7 +12,7 @@ object DiscoveryTopic {
       topic <- Topic[F, DiscoveryEvent[T, K]](DiscoveryEvent.Initial)
       sub = new DiscoverySubscriber[F, T, K] {
         override def subscribe: fs2.Stream[F, DiscoveryEvent[T, K]] = {
-          topic.subscribe(32)
+          topic.subscribe(32).drop(1)
         }
       }
       pub = new DiscoveryPublisher[F, T, K] {
