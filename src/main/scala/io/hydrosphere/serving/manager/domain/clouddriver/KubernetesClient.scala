@@ -1,4 +1,6 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
+import java.util.concurrent.Executors
+
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
@@ -129,7 +131,7 @@ object KubernetesClient {
     } yield Unit
 
     override def getLogs(podName: String, follow: Boolean): F[Source[String, _]] = {
-      AsyncUtil.futureAsync(underlying.getPodLogSource(podName, Pod.LogQueryParams(follow = Some(follow))).map(_.map(_.utf8String)))
+      AsyncUtil.futureAsync(underlying.getPodLogSource(podName, Pod.LogQueryParams(follow = Some(follow)))).map(_.map(_.utf8String))
     }
 
     override def getPod(name: String): F[Pod] = {
