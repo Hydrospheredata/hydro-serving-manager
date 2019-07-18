@@ -102,7 +102,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   }
 
   implicit def servableFormat[T <: Servable.Status](implicit j: JsonFormat[T]) =
-    jsonFormat3(Servable.apply[T])
+    jsonFormat4(Servable.apply[T])
 
   implicit val servableStageFormat = jsonFormat2(ServableStage.apply)
   implicit val servableAdapter     = jsonFormat1(ServableGraphAdapter.apply)

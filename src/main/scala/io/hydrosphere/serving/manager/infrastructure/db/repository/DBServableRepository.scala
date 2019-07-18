@@ -15,16 +15,26 @@ class DBServableRepository[F[_]](
   implicit F: Async[F],
   executionContext: ExecutionContext,
   databaseService: DatabaseService,
-  modelVersionRepository: DBModelVersionRepository[F]
+  modelVersionRepository: DBModelVersionRepository[F],
 ) extends ServableRepository[F] with Logging {
 
   import DBServableRepository._
   import databaseService._
   import databaseService.driver.api._
 
-  val joineqQ = Tables.Servable
+  /*
+SELECT *, 	
+(SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables))
+ FROM hydro_serving.servable
+  */
+  
+  val joineqQ =
+    sql"SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable"
+      .as[(String, Long, String, Option[String], Option[Int], String, List[String])]
     .joinLeft(modelVersionRepository.joinedQ)
-    .on { case (s, (m, _, _)) => s.modelVersionId === m.modelVersionId }
+    .on { case ((s, _), (m, _, _)) =>
+      s.modelVersionId === m.modelVersionId
+    }
 
   override def upsert(entity: GenericServable): F[GenericServable] = {
     AsyncUtil.futureAsync {
@@ -57,12 +67,12 @@ class DBServableRepository[F[_]](
   override def all(): F[List[GenericServable]] = {
     for {
       res <- AsyncUtil.futureAsync {
-        db.run (joineqQ.result)
+        db.run(joineqQ.result)
       }
     } yield {
       res.flatMap {
-        case (servable, Some(version)) => mapFrom(servable, version) :: Nil
-        case (x, _) =>
+        case ((servable, apps), Some(version)) => mapFrom(servable, apps, version) :: Nil
+        case ((x, _), _) =>
           logger.error(s"Trying to get servable ${x.serviceName} but it doesn't have ModelVersion")
           Nil
       }.toList
@@ -74,11 +84,11 @@ class DBServableRepository[F[_]](
       res <- AsyncUtil.futureAsync {
         logger.debug(s"get $name")
         db.run {
-          joineqQ.filter { case (s, _) => s.serviceName === name }.result.headOption
+          joineqQ.filter { case ((s, _), _) => s.serviceName === name }.result.headOption
         }
       }
     } yield res.flatMap {
-      case (servable, Some(version)) => mapFrom(servable, version).some
+      case ((servable, apps), Some(version)) => mapFrom(servable, apps, version).some
       case _ => None
     }
   }
@@ -88,12 +98,12 @@ class DBServableRepository[F[_]](
       res <- AsyncUtil.futureAsync {
         logger.debug(s"get $names")
         db.run {
-          joineqQ.filter { case (s, _) => s.serviceName inSetBind names }
+          joineqQ.filter { case ((s, _), _) => s.serviceName inSetBind names }
             .result
         }
       }
       servables = res.toList.flatMap {
-        case (servable, Some(version)) => mapFrom(servable, version) :: Nil
+        case ((servable, apps), Some(version)) => mapFrom(servable, apps, version) :: Nil
         case _ => Nil
       }
     } yield servables
@@ -102,9 +112,7 @@ class DBServableRepository[F[_]](
 
 object DBServableRepository {
 
-
-
-  def mapFrom(service: Tables.ServableRow, version: (Tables.ModelVersionRow, Tables.ModelRow, Option[Tables.HostSelectorRow])): GenericServable = {
+  def mapFrom(service: Tables.ServableRow, apps: List[String], version: (Tables.ModelVersionRow, Tables.ModelRow, Option[Tables.HostSelectorRow])): GenericServable = {
 
     val mv = DBModelVersionRepository.mapFromDb(version)
     val suffix = Servable.extractSuffix(version._2.name, version._1.modelVersion, service.serviceName)
@@ -115,6 +123,6 @@ object DBServableRepository {
       case ("NotAvailable", host, port) => Servable.NotAvailable(service.statusText, host, port)
       case (_, host, port) => Servable.Starting(service.statusText, host, port)
     }
-    Servable(mv, suffix, status)
+    Servable(mv, suffix, status, apps)
   }
 }

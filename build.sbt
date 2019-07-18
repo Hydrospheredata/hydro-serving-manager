@@ -35,21 +35,12 @@ lazy val dockerSettings = Seq(
   }
 )
 
-lazy val codegen = project.in(file("codegen"))
-  .settings(Common.all)
-  .settings(
-    exportJars := true,
-    libraryDependencies ++= Dependencies.codegenDependencies
-  )
-
 resolvers += "krasserm at bintray" at "http://dl.bintray.com/krasserm/maven"
 
 lazy val manager = project.in(file("."))
-  .dependsOn(codegen)
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
   .settings(Common.all)
-  .settings(SlickGen.settings)
   .settings(ManagerDev.settings)
   .settings(buildInfoSettings)
   .settings(dockerSettings)
