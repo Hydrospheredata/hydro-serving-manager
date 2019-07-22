@@ -15,19 +15,19 @@ object DBModelRepository {
 
   def toModel(mr: ModelRow) = Model(mr.model_id, mr.name)
 
-  final val modelTableName = sql"hydro_serving.model"
+  final val modelTableName = "hydro_serving.model"
 
-  def allQ = sql"SELECT * FROM $modelTableName"
+  def allQ = sql"SELECT * FROM $modelTableName".query[ModelRow]
 
-  def getByNameQ(name: String) = sql"$allQ WHERE name = $name"
+  def getByNameQ(name: String) = sql"${allQ.sql} WHERE name = $name".query[ModelRow]
 
-  def getByIdQ(id: Long) = sql"$allQ WHERE id = $id"
+  def getByIdQ(id: Long) = sql"${allQ.sql} WHERE id = $id".query[ModelRow]
 
-  def createQ(m: Model) = sql"INSERT INTO $modelTableName (name) VALUES (${m.name})"
+  def createQ(m: Model) = sql"INSERT INTO $modelTableName (name) VALUES (${m.name})".update
 
-  def updateQ(m: Model) = sql"UPDATE $modelTableName SET name = ${m.name} WHERE id = ${m.id}"
+  def updateQ(m: Model) = sql"UPDATE $modelTableName SET name = ${m.name} WHERE id = ${m.id}".update
 
-  def deleteQ(id: Long) = sql"DELETE FROM $modelTableName WHERE id = id"
+  def deleteQ(id: Long) = sql"DELETE FROM $modelTableName WHERE id = id".update
 
   def make[F[_] : Sync](tx: Transactor[F]) = {
     new ModelRepository[F] {
@@ -39,25 +39,25 @@ object DBModelRepository {
 
       override def get(id: Long): F[Option[Model]] = {
         for {
-          row <- getByIdQ(id).query[ModelRow].option.transact(tx)
+          row <- getByIdQ(id).option.transact(tx)
         } yield row.map(toModel)
       }
 
       override def all(): F[Seq[Model]] = {
         for {
-          row <- allQ.query[ModelRow].to[Seq].transact(tx)
+          row <- allQ.to[Seq].transact(tx)
         } yield row.map(toModel)
       }
 
       override def get(name: String): F[Option[Model]] = {
         for {
-          row <- getByNameQ(name).query[ModelRow].option.transact(tx)
+          row <- getByNameQ(name).option.transact(tx)
         } yield row.map(toModel)
       }
 
-      override def update(value: Model): F[Int] = updateQ(value).update.run.transact(tx)
+      override def update(value: Model): F[Int] = updateQ(value).run.transact(tx)
 
-      override def delete(id: Long): F[Int] = deleteQ(id).update.run.transact(tx)
+      override def delete(id: Long): F[Int] = deleteQ(id).run.transact(tx)
     }
   }
 }

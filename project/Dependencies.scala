@@ -79,8 +79,9 @@ object Dependencies {
     Seq(
       "org.typelevel" %% "cats-effect" % catsV,
       "org.tpolecat" %% "doobie-core" % "0.7.0",
-      "org.tpolecat" %% "doobie-postgres"  % "0.7.0",
       "org.tpolecat" %% "doobie-hikari"    % "0.7.0",
+      "org.tpolecat" %% "doobie-postgres"  % "0.7.0",
+      "org.tpolecat" %% "doobie-h2"  % "0.7.0",
       "org.tpolecat" %% "doobie-scalatest" % "0.7.0" % "test",
       "io.hydrosphere" %% "typed-sql" % "0.1.0",
       "org.postgresql" % "postgresql" % postgresqlVersion,
