@@ -33,7 +33,7 @@ object DBModelRepository {
     new ModelRepository[F] {
       override def create(entity: Model): F[Model] = {
         for {
-          id <- createQ(entity).update.withUniqueGeneratedKeys[Long]("model_id").transact(tx)
+          id <- createQ(entity).withUniqueGeneratedKeys[Long]("model_id").transact(tx)
         } yield Model(id, entity.name)
       }
 
