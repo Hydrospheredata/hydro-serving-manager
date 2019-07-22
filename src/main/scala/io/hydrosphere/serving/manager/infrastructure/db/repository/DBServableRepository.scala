@@ -1,119 +1,17 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
-import cats.effect.{Async, Bracket}
+import cats.effect.Bracket
 import cats.implicits._
-import doobie.util.transactor.Transactor
 import doobie.implicits._
+import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
-import io.hydrosphere.serving.manager.util.AsyncUtil
-import org.apache.logging.log4j.scala.Logging
-
-import scala.concurrent.ExecutionContext
-
-//class DBServableRepository[F[_]](
-//  implicit F: Async[F],
-//  executionContext: ExecutionContext,
-//  databaseService: DatabaseService,
-//  modelVersionRepository: DBModelVersionRepository[F],
-//) extends ServableRepository[F] with Logging {
-//
-//  import DBServableRepository._
-//  import databaseService._
-//  import databaseService.driver.api._
-//
-//  /*
-//SELECT *,
-//(SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables))
-// FROM hydro_serving.servable
-//  */
-//
-//  val joineqQ =
-//    sql"SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable"
-//      .as[(String, Long, String, Option[String], Option[Int], String, List[String])]
-//    .joinLeft(modelVersionRepository.joinedQ)
-//    .on { case ((s, _), (m, _, _)) =>
-//      s.modelVersionId === m.modelVersionId
-//    }
-//
-//  override def upsert(entity: GenericServable): F[GenericServable] = {
-//    AsyncUtil.futureAsync {
-//      logger.debug(s"upsert $entity")
-//      val (status, statusText, host, port) = entity.status match {
-//        case Servable.Serving(msg, h, p) => ("Serving", msg, h.some, p.some)
-//        case Servable.NotServing(msg, h, p) => ("NotServing", msg, h, p)
-//        case Servable.Starting(msg, h, p) => ("Starting", msg, h, p)
-//        case Servable.NotAvailable(msg, h, p) => ("NotAvailable", msg, h, p)
-//      }
-//
-//      val row = Tables.ServableRow(
-//        serviceName = entity.fullName,
-//        modelVersionId = entity.modelVersion.id,
-//        statusText = statusText,
-//        host = host,
-//        port = port,
-//        status = status
-//      )
-//      val q = Tables.Servable.insertOrUpdate(row)
-//      db.run(q)
-//    }.as(entity)
-//  }
-//
-//
-//  override def delete(name: String): F[Int] = AsyncUtil.futureAsync {
-//    db.run(Tables.Servable.filter(_.serviceName === name).delete)
-//  }
-//
-//  override def all(): F[List[GenericServable]] = {
-//    for {
-//      res <- AsyncUtil.futureAsync {
-//        db.run(joineqQ.result)
-//      }
-//    } yield {
-//      res.flatMap {
-//        case ((servable, apps), Some(version)) => mapFrom(servable, apps, version) :: Nil
-//        case ((x, _), _) =>
-//          logger.error(s"Trying to get servable ${x.serviceName} but it doesn't have ModelVersion")
-//          Nil
-//      }.toList
-//    }
-//  }
-//
-//  override def get(name: String): F[Option[GenericServable]] = {
-//    for {
-//      res <- AsyncUtil.futureAsync {
-//        logger.debug(s"get $name")
-//        db.run {
-//          joineqQ.filter { case ((s, _), _) => s.serviceName === name }.result.headOption
-//        }
-//      }
-//    } yield res.flatMap {
-//      case ((servable, apps), Some(version)) => mapFrom(servable, apps, version).some
-//      case _ => None
-//    }
-//  }
-//
-//  override def get(names: Seq[String]): F[List[GenericServable]] = {
-//    for {
-//      res <- AsyncUtil.futureAsync {
-//        logger.debug(s"get $names")
-//        db.run {
-//          joineqQ.filter { case ((s, _), _) => s.serviceName inSetBind names }
-//            .result
-//        }
-//      }
-//      servables = res.toList.flatMap {
-//        case ((servable, apps), Some(version)) => mapFrom(servable, apps, version) :: Nil
-//        case _ => Nil
-//      }
-//    } yield servables
-//  }
-//}
 
 object DBServableRepository {
+  final val tableName = "hydro_serving.servable"
 
   case class ServableRow(
     service_name: String,
@@ -123,6 +21,23 @@ object DBServableRepository {
     port: Option[Int],
     status: String
   )
+
+  def fromServable(s: GenericServable): ServableRow = {
+    val (status, statusText, host, port) = s.status match {
+      case Servable.Serving(msg, h, p) => ("Serving", msg, h.some, p.some)
+      case Servable.NotServing(msg, h, p) => ("NotServing", msg, h, p)
+      case Servable.Starting(msg, h, p) => ("Starting", msg, h, p)
+      case Servable.NotAvailable(msg, h, p) => ("NotAvailable", msg, h, p)
+    }
+    ServableRow(
+      service_name = s.fullName,
+      model_version_id = s.modelVersion.id,
+      status_text = statusText,
+      host = host,
+      port = port,
+      status = status
+    )
+  }
 
   def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow], apps: List[String]) = {
     val modelVersion = DBModelVersionRepository.toModelVersion(mvr, mr, hsr)
@@ -141,10 +56,42 @@ object DBServableRepository {
   def allQ =
     sql"""
          |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
-         |  LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
-         |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         |  LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
+         | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
+         | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
+         | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |""".stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
+
+  def upsertQ(sr: ServableRow) =
+    sql"""
+         |INSERT INTO $tableName(service_name, model_version_id, status_text, host, port, status)
+         | VALUES(${sr.service_name}, ${sr.model_version_id}, ${sr.status_text}, ${sr.host}, ${sr.port}, ${sr.status})
+         | ON CONFLICT (service_name)
+         |  DO UPDATE
+         |   SET service_name = ${sr.service_name},
+         |       model_version_id = ${sr.model_version_id},
+         |       status_text = ${sr.status_text},
+         |       host = ${sr.host},
+         |       port = ${sr.port},
+         |       status = ${sr.status}
+      """.stripMargin.update
+
+  def deleteQ(name: String) =
+    sql"""
+         |DELETE FROM $tableName
+         | WHERE service_name = $name
+      """.stripMargin.update
+
+  def getQ(name: String) =
+    sql"""
+         |${allQ.sql}
+         | WHERE service_name = $name
+      """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
+
+  def getQ(names: Seq[String]) =
+    sql"""
+         |${allQ.sql}
+         | WHERE service_name IN ($names)
+      """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
 
   def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]) = new ServableRepository[F] {
     override def all(): F[List[GenericServable]] = {
@@ -153,12 +100,25 @@ object DBServableRepository {
       } yield rows.map(toServableT)
     }
 
-    override def upsert(servable: GenericServable): F[GenericServable] = ???
+    override def upsert(servable: GenericServable): F[GenericServable] = {
+      val row = fromServable(servable)
+      upsertQ(row).run.transact(tx).as(servable)
+    }
 
-    override def delete(name: String): F[Int] = ???
+    override def delete(name: String): F[Int] = {
+      deleteQ(name).run.transact(tx)
+    }
 
-    override def get(name: String): F[Option[GenericServable]] = ???
+    override def get(name: String): F[Option[GenericServable]] = {
+      for {
+        row <- getQ(name).option.transact(tx)
+      } yield row.map(toServableT)
+    }
 
-    override def get(names: Seq[String]): F[List[GenericServable]] = ???
+    override def get(names: Seq[String]): F[List[GenericServable]] = {
+      for {
+        rows <- getQ(names).to[List].transact(tx)
+      } yield rows.map(toServableT)
+    }
   }
 }
