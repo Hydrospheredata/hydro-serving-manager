@@ -13,8 +13,6 @@ trait ApplicationRepository[F[_]] {
 
   def update(value: GenericApplication): F[Int]
 
-  def updateRow(row: Tables.ApplicationRow): F[Int]
-
   def delete(id: Long): F[Int]
 
   def all(): F[List[GenericApplication]]

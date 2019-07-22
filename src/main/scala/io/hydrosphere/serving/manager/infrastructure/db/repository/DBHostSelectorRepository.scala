@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
-import cats.effect.Sync
+import cats.effect.{Bracket, Sync}
 import cats.implicits._
 import doobie.implicits._
 import doobie.util.transactor.Transactor
@@ -16,19 +16,19 @@ object DBHostSelectorRepository {
 
   def toHostSelector(hs: HostSelectorRow) = HostSelector(hs.host_selector_id, hs.name, hs.node_selector)
 
-  def selTableName = sql"hydro_serving.host_selector"
+  def selTableName = "hydro_serving.host_selector"
 
-  def allQ = sql"SELECT * FROM $selTableName".query[HostSelectorRow]
+  def allQ: doobie.Query0[HostSelectorRow] = sql"SELECT * FROM $selTableName".query[HostSelectorRow]
 
-  def insertQ(entity: HostSelector) = sql"INSERT INTO $selTableName (name, node_selector) VALUES (${entity.name}, ${entity.nodeSelector})".update
+  def insertQ(entity: HostSelector): doobie.Update0 = sql"INSERT INTO $selTableName (name, node_selector) VALUES (${entity.name}, ${entity.nodeSelector})".update
 
-  def getByIdQ(id: Long) = sql"SELECT * FROM $selTableName WHERE id = $id".query[HostSelectorRow]
+  def getByIdQ(id: Long): doobie.Query0[HostSelectorRow] = sql"SELECT * FROM $selTableName WHERE id = $id".query[HostSelectorRow]
 
-  def getByNameQ(name: String) = sql"SELECT * FROM $selTableName WHERE name = $name".query[HostSelectorRow]
+  def getByNameQ(name: String): doobie.Query0[HostSelectorRow] = sql"SELECT * FROM $selTableName WHERE name = $name".query[HostSelectorRow]
 
-  def deleteQ(id: Long) = sql"DELETE FROM $selTableName WHERE id = $id".update
+  def deleteQ(id: Long): doobie.Update0 = sql"DELETE FROM $selTableName WHERE id = $id".update
 
-  def make[F[_] : Sync](tx: Transactor[F]) = {
+  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]): HostSelectorRepository[F] = {
     new HostSelectorRepository[F] {
       override def create(entity: HostSelector): F[HostSelector] = {
         for {

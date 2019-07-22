@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
-import cats.effect.Async
+import cats.effect.{Async, Bracket}
 import cats.implicits._
 import doobie.util.transactor.Transactor
 import doobie.implicits._
@@ -115,20 +115,6 @@ import scala.concurrent.ExecutionContext
 
 object DBServableRepository {
 
-//  def mapFrom(service: Tables.ServableRow, apps: List[String], version: (Tables.ModelVersionRow, Tables.ModelRow, Option[Tables.HostSelectorRow])): GenericServable = {
-//
-//    val mv = DBModelVersionRepository.mapFromDb(version)
-//    val suffix = Servable.extractSuffix(version._2.name, version._1.modelVersion, service.serviceName)
-//
-//    val status = (service.status, service.host, service.port) match {
-//      case ("Serving", Some(host), Some(port)) => Servable.Serving(service.statusText, host, port)
-//      case ("NotServing", host, port) => Servable.NotServing(service.statusText, host, port)
-//      case ("NotAvailable", host, port) => Servable.NotAvailable(service.statusText, host, port)
-//      case (_, host, port) => Servable.Starting(service.statusText, host, port)
-//    }
-//    Servable(mv, suffix, status, apps)
-//  }
-
   case class ServableRow(
     service_name: String,
     model_version_id: Long,
@@ -138,7 +124,7 @@ object DBServableRepository {
     status: String
   )
 
-  def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow]) = {
+  def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow], apps: List[String]) = {
     val modelVersion = DBModelVersionRepository.toModelVersion(mvr, mr, hsr)
     val suffix = Servable.extractSuffix(mr.name, mvr.model_version, sr.service_name)
     val status = (sr.status, sr.host, sr.port) match {
@@ -147,8 +133,10 @@ object DBServableRepository {
       case ("NotAvailable", host, port) => Servable.NotAvailable(sr.status_text, host, port)
       case (_, host, port) => Servable.Starting(sr.status_text, host, port)
     }
-    Servable(modelVersion, suffix, status, ???)
+    Servable(modelVersion, suffix, status, apps)
   }
+
+  def toServableT = (toServable _).tupled
 
   def allQ =
     sql"""
@@ -156,12 +144,14 @@ object DBServableRepository {
          |  LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |  LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |""".stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow])]
+         |""".stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
 
-
-
-  def make[F[_]](tx: Transactor[F]) = new ServableRepository[F] {
-    override def all(): F[List[GenericServable]] = ???
+  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]) = new ServableRepository[F] {
+    override def all(): F[List[GenericServable]] = {
+      for {
+        rows <- allQ.to[List].transact(tx)
+      } yield rows.map(toServableT)
+    }
 
     override def upsert(servable: GenericServable): F[GenericServable] = ???
 

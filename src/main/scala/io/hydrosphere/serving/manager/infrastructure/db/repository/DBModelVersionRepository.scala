@@ -2,7 +2,7 @@ package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import java.time.LocalDateTime
 
-import cats.effect.Sync
+import cats.effect.Bracket
 import cats.implicits._
 import doobie.implicits._
 import doobie.util.transactor.Transactor
@@ -68,14 +68,14 @@ object DBModelVersionRepository {
     metadata = mvr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
   )
 
-  def allQ =
+  def allQ: doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] =
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |  LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
 
-  def getQ(id: Long) =
+  def getQ(id: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] =
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
@@ -83,7 +83,7 @@ object DBModelVersionRepository {
          |  WHERE model_version_id = $id
          |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
 
-  def getQ(name: String, version: Long) =
+  def getQ(name: String, version: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] =
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
@@ -91,7 +91,7 @@ object DBModelVersionRepository {
          |  WHERE name = $name AND model_version = $version
          |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
 
-  def listVersionsQ(modelId: Long) =
+  def listVersionsQ(modelId: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] =
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
@@ -99,7 +99,7 @@ object DBModelVersionRepository {
          |  WHERE model_id = $modelId
          |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
 
-    def lastModelVersionQ(modelId: Long) =
+    def lastModelVersionQ(modelId: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] =
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
@@ -109,7 +109,7 @@ object DBModelVersionRepository {
          |  LIMIT 1
          |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
 
-  def insertQ(mv: ModelVersion) =
+  def insertQ(mv: ModelVersion): doobie.Update0 =
     sql"""
          |INSERT INTO hydro_serving.model_version (
          | model_id,
@@ -143,7 +143,7 @@ object DBModelVersionRepository {
          | ${mv.metadata.toJson.compactPrint}
          |)""".stripMargin.update
 
-  def updateQ(mv: ModelVersion) =
+  def updateQ(mv: ModelVersion): doobie.Update0 =
     sql"""
          |UPDATE hydro_serving.model_version SET
          | model_id = ${mv.model.id},
@@ -162,14 +162,14 @@ object DBModelVersionRepository {
          | metadata = ${mv.metadata.toJson.compactPrint}
          | WHERE model_version_id = ${mv.id}""".stripMargin.update
 
-  def deleteQ(id: Long) =
+  def deleteQ(id: Long): doobie.Update0 =
     sql"""
          |DELETE FROM hydro_serving.model_version
          |  WHERE model_version_id = $id
       """.stripMargin.update
 
 
-  def make[F[_] : Sync](tx: Transactor[F]) = new ModelVersionRepository[F] {
+  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]): ModelVersionRepository[F] = new ModelVersionRepository[F] {
     override def all(): F[Seq[ModelVersion]] = {
       for {
         rows <- allQ.to[Seq].transact(tx)
