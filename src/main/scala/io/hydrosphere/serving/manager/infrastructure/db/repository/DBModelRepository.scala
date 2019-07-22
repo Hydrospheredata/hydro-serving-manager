@@ -25,7 +25,7 @@ object DBModelRepository {
 
   def createQ(m: Model) = sql"INSERT INTO $modelTableName (name) VALUES (${m.name})"
 
-  def updateQ(m: Model) = sql"UPDATE $modelTableName set name = ${m.name} WHERE id = ${m.id}"
+  def updateQ(m: Model) = sql"UPDATE $modelTableName SET name = ${m.name} WHERE id = ${m.id}"
 
   def deleteQ(id: Long) = sql"DELETE FROM $modelTableName WHERE id = id"
 

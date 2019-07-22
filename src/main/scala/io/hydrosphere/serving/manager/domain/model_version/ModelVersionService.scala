@@ -64,7 +64,7 @@ object ModelVersionService {
 
     def getNextModelVersion(modelId: Long): F[Long] = {
       for {
-        versions <- modelVersionRepository.lastModelVersionByModel(modelId, 1)
+        versions <- modelVersionRepository.lastModelVersionByModel(modelId)
       } yield versions.headOption.fold(1L)(_.modelVersion + 1)
     }
 
