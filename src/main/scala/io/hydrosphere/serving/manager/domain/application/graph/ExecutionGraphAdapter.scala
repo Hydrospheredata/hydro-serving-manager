@@ -6,7 +6,7 @@ import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphCompo
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
 
-sealed trait ExecutionGraphAdapter
+sealed trait ExecutionGraphAdapter extends Product with Serializable
 
 case class VersionGraphAdapter(
   stages: NonEmptyList[VersionStage]

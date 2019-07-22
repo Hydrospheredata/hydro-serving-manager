@@ -1,7 +1,6 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
-import cats.data.OptionT
-import cats.effect.{Async, Bracket}
+import cats.effect.Bracket
 import cats.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
@@ -12,9 +11,7 @@ import io.hydrosphere.serving.manager.domain.application.graph._
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
-import io.hydrosphere.serving.manager.util.AsyncUtil
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import spray.json._
 
 import scala.util.{Failure, Success, Try}
@@ -207,7 +204,7 @@ import scala.util.{Failure, Success, Try}
 //  }
 //}
 
-object DBApplicationRepository extends CompleteJsonProtocol {
+object DBApplicationRepository {
 
   final case class ApplicationRow(
     id: Long,
@@ -216,21 +213,99 @@ object DBApplicationRepository extends CompleteJsonProtocol {
     status: String,
     application_contract: String,
     execution_graph: String,
-    used_servables: Array[String],
-    kafka_streams: Array[String],
+    used_servables: List[String],
+    kafka_streams: List[String],
     status_message: Option[String],
-    used_model_versions: Array[Long]
+    used_model_versions: List[Long]
   )
 
-  def toApplication(
-    ar: ApplicationRow,
-    versions: Map[Long, ModelVersion],
-    servables: Map[String, GenericServable]
-  ): Either[AppDBSchemaError, GenericApplication]  = {
-    ???
+  def toApplication(ar: ApplicationRow, versions: Map[Long, ModelVersion], servables: Map[String, GenericServable]): Either[AppDBSchemaError, GenericApplication]  = {
+    val jsonGraph = ar.execution_graph.parseJson
+    for {
+      status <- ar.status match {
+        case "Assembling" =>
+          val adapterGraph = jsonGraph.convertTo[VersionGraphAdapter]
+          val mappedStages = adapterGraph.stages.traverse { stage =>
+            val signature = stage.signature
+            val variants = stage.modelVariants.traverse { m =>
+              versions.get(m.modelVersion.id)
+                .toRight(UsingModelVersionIsMissing(ar, adapterGraph.asLeft))
+                .map(Variant(_, m.weight))
+            }
+            variants.map(PipelineStage(_, signature))
+          }
+          mappedStages.map(Application.Assembling.apply)
+        case "Failed" =>
+          val adapterGraph = jsonGraph.convertTo[VersionGraphAdapter]
+          val mappedStages = adapterGraph.stages.traverse { stage =>
+            val signature = stage.signature
+            val variants = stage.modelVariants.traverse { m =>
+              versions.get(m.modelVersion.id)
+                .toRight(UsingModelVersionIsMissing(ar, adapterGraph.asLeft))
+                .map(Variant(_, m.weight))
+            }
+            variants.map(PipelineStage(_, signature))
+          }
+          mappedStages.map(Application.Failed(_, ar.status_message))
+        case "Ready" =>
+          val mappedStages = Try(jsonGraph.convertTo[ServableGraphAdapter]) match {
+            case Failure(exception) => // old application recovery logic
+              IncompatibleExecutionGraphError(ar).asLeft
+            case Success(adapterGraph) =>
+              adapterGraph.stages.traverse { stage =>
+                val variants = stage.modelVariants.traverse { s =>
+                  for {
+                    servable <- servables.get(s.item).toRight(UsingServableIsMissing(ar, s.item))
+                    r <- servable.status match {
+                      case _: Servable.Serving => Variant(servable.asInstanceOf[OkServable], s.weight).asRight
+                      case _ => IncompatibleExecutionGraphError(ar).asLeft
+                    }
+                    _ <- versions.get(r.item.modelVersion.id).toRight(UsingModelVersionIsMissing(ar, adapterGraph.asRight))
+                  } yield r
+                }
+                variants.map(ExecutionNode(_, stage.signature))
+              }
+          }
+          mappedStages.map(Application.Ready)
+        case _ => InvalidAppStatus(ar).asLeft
+      }
+    } yield Application(
+      id = ar.id,
+      name = ar.application_name,
+      signature = ModelSignature.fromAscii(ar.application_contract),
+      kafkaStreaming = ar.kafka_streams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
+      namespace = ar.namespace,
+      status = status
+    )
   }
 
-  import spray.json._
+  def fromApplication(app: GenericApplication): ApplicationRow = {
+    val (status, msg, servables, versions, graph) = app.status match {
+      case Application.Assembling(versionGraph) =>
+        val versionsIdx = versionGraph.flatMap(_.modelVariants.map(_.item.id)).toList
+        ("Assembling", None, List.empty, versionsIdx, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
+      case Application.Failed(versionGraph, reason) =>
+        val versionsIdx = versionGraph.flatMap(_.modelVariants.map(_.item.id)).toList
+        ("Failed", reason, List.empty, versionsIdx, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
+      case Application.Ready(servableGraph) =>
+        val adapter = ExecutionGraphAdapter.fromServablePipeline(servableGraph)
+        val versionsIdx = servableGraph.flatMap(_.variants.map(_.item.modelVersion.id)).toList
+        val servables = adapter.stages.flatMap(_.modelVariants.map(_.item))
+        ("Ready", None, servables.toList, versionsIdx, adapter)
+    }
+    ApplicationRow(
+      id = app.id,
+      application_name = app.name,
+      namespace = app.namespace,
+      status = status,
+      application_contract = app.signature.toProtoString,
+      execution_graph = graph.toJson.compactPrint,
+      used_servables = servables,
+      used_model_versions = versions,
+      kafka_streams = app.kafkaStreaming.map(_.toJson.compactPrint),
+      status_message = msg
+    )
+  }
 
   case class AppDBSchemaErrors(errs: List[AppDBSchemaError]) extends Throwable
 
@@ -244,31 +319,7 @@ object DBApplicationRepository extends CompleteJsonProtocol {
 
   case class InvalidAppStatus(app: ApplicationRow) extends AppDBSchemaError
 
-  case class FlattenedStatus(
-    status: String,
-    message: Option[String],
-    usedServables: List[String],
-    usedVersions: List[Long],
-    graph: ExecutionGraphAdapter
-  )
-
-  def flatten(app: GenericApplication): FlattenedStatus = {
-    app.status match {
-      case Application.Assembling(versionGraph) =>
-        val versionsIdx = versionGraph.flatMap(_.modelVariants.map(_.item.id)).toList
-        FlattenedStatus("Assembling", None, List.empty, versionsIdx, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
-      case Application.Failed(versionGraph, reason) =>
-        val versionsIdx = versionGraph.flatMap(_.modelVariants.map(_.item.id)).toList
-        FlattenedStatus("Failed", reason, List.empty, versionsIdx, ExecutionGraphAdapter.fromVersionPipeline(versionGraph))
-      case Application.Ready(servableGraph) =>
-        val adapter = ExecutionGraphAdapter.fromServablePipeline(servableGraph)
-        val versionsIdx = servableGraph.flatMap(_.variants.map(_.item.modelVersion.id)).toList
-        val servables = adapter.stages.flatMap(_.modelVariants.map(_.item))
-        FlattenedStatus("Ready", None, servables.toList, versionsIdx, adapter)
-    }
-  }
-
-  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]) = new ApplicationRepository[F] {
+  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]): ApplicationRepository[F] = new ApplicationRepository[F] {
     override def create(entity: GenericApplication): F[GenericApplication] = ???
 
     override def get(id: Long): F[Option[GenericApplication]] = ???
@@ -281,84 +332,9 @@ object DBApplicationRepository extends CompleteJsonProtocol {
 
     override def all(): F[List[GenericApplication]] = ???
 
-    override def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): F[List[GenericApplication]] = ???
-
     override def findVersionsUsage(versionIdx: Long): F[List[GenericApplication]] = ???
 
     override def findServableUsage(servableName: String): F[List[GenericApplication]] = ???
   }
 
-//  def mapFromDb(
-//    dbApp: Tables.Application#TableElementType,
-//    versions: Map[Long, ModelVersion],
-//    servables: Map[String, GenericServable]
-//  ): Either[AppDBSchemaError, GenericApplication] = {
-//    val appName = dbApp.applicationName
-//    val jsonGraph = dbApp.executionGraph.parseJson
-//    val maybeStatus: Either[AppDBSchemaError, Application.Status] = dbApp.status match {
-//      case "Assembling" =>
-//        val adapterGraph = jsonGraph.convertTo[VersionGraphAdapter]
-//        val mappedStages = adapterGraph.stages.traverse { stage =>
-//          val signature = stage.signature
-//          val variants = stage.modelVariants.traverse { m =>
-//            versions.get(m.modelVersion.id)
-//              .toRight(UsingModelVersionIsMissing(dbApp, adapterGraph.asLeft))
-//              .map(Variant(_, m.weight))
-//          }
-//          variants.map(PipelineStage(_, signature))
-//        }
-//        mappedStages.map(Application.Assembling.apply)
-//      case "Failed" =>
-//        val adapterGraph = jsonGraph.convertTo[VersionGraphAdapter]
-//        val mappedStages = adapterGraph.stages.traverse { stage =>
-//          val signature = stage.signature
-//          val variants = stage.modelVariants.traverse { m =>
-//            versions.get(m.modelVersion.id)
-//              .toRight(UsingModelVersionIsMissing(dbApp, adapterGraph.asLeft))
-//              .map(Variant(_, m.weight))
-//          }
-//          variants.map(PipelineStage(_, signature))
-//        }
-//        mappedStages.map(Application.Failed(_, dbApp.statusMessage))
-//      case "Ready" =>
-//        val mappedStages = Try(jsonGraph.convertTo[ServableGraphAdapter]) match {
-//          case Failure(exception) => // old application recovery logic
-//            logger.error(s"$appName execution graph read error: $exception")
-//            IncompatibleExecutionGraphError(dbApp).asLeft
-//          case Success(adapterGraph) =>
-//            adapterGraph.stages.traverse { stage =>
-//              val variants = stage.modelVariants.traverse { s =>
-//                servables.get(s.item)
-//                  .toRight(UsingServableIsMissing(dbApp, s.item))
-//                  .flatMap { servable =>
-//                    servable.status match {
-//                      case _: Servable.Serving =>
-//                        Variant(servable.asInstanceOf[OkServable], s.weight).asRight
-//                      case _ =>
-//                        IncompatibleExecutionGraphError(dbApp).asLeft
-//                    }
-//                  }
-//                  .flatMap{ s =>
-//                    versions.get(s.item.modelVersion.id)
-//                      .map(_ => s)
-//                      .toRight(UsingModelVersionIsMissing(dbApp, adapterGraph.asRight))
-//                  }
-//              }
-//              variants.map(ExecutionNode(_, stage.signature))
-//            }
-//        }
-//        mappedStages.map(Application.Ready)
-//      case _ => InvalidAppStatus(dbApp).asLeft
-//    }
-//    maybeStatus.map { s =>
-//      Application(
-//        id = dbApp.id,
-//        name = dbApp.applicationName,
-//        signature = ModelSignature.fromAscii(dbApp.applicationContract),
-//        kafkaStreaming = dbApp.kafkaStreams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
-//        namespace = dbApp.namespace,
-//        status = s
-//      )
-//    }
-//  }
 }
