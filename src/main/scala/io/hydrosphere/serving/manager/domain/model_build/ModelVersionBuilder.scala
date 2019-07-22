@@ -66,9 +66,9 @@ object ModelVersionBuilder {
         buildPath <- prepare(mv, modelFileStructure)
         imageSha <- imageBuilder.build(buildPath.root, mv.image, handler)
         newDockerImage = mv.image.copy(sha256 = Some(imageSha))
-        finishedVersion = mv.copy(image = newDockerImage, finished = Some(LocalDateTime.now()), status = ModelVersionStatus.Released)
+        finishedVersion = mv.copy(image = newDockerImage, finished = LocalDateTime.now().some, status = ModelVersionStatus.Released)
         _ <- buildLoggingService.finishLogging(mv.id)
-        _ <- modelVersionRepository.update(finishedVersion.id, finishedVersion)
+        _ <- modelVersionRepository.update(finishedVersion)
         _ <- modelDiscoveryHub.update(finishedVersion)
         _ <- imageRepository.push(finishedVersion.image)
       } yield finishedVersion
@@ -76,10 +76,10 @@ object ModelVersionBuilder {
       innerCompleted.handleErrorWith { err =>
         for {
           _ <- Concurrent[F].delay(logger.error(err, err))
-          failed = mv.copy(status = ModelVersionStatus.Failed)
+          failed = mv.copy(status = ModelVersionStatus.Failed, finished = LocalDateTime.now().some)
           _ <- buildLoggingService.finishLogging(mv.id)
           _ <- modelDiscoveryHub.update(failed)
-          _ <- modelVersionRepository.update(failed.id, failed)
+          _ <- modelVersionRepository.update(failed)
         } yield failed
       }
     }

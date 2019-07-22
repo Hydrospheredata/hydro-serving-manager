@@ -16,7 +16,6 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelReposi
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import spray.json._
 
-// TODO finished_timestamp is not set when build fails
 object DBModelVersionRepository {
 
   final case class ModelVersionRow(
