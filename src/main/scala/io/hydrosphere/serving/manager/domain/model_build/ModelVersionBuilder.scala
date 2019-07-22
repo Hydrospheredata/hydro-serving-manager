@@ -54,7 +54,6 @@ object ModelVersionBuilder {
           model = model,
           hostSelector = metadata.hostSelector,
           status = ModelVersionStatus.Assembling,
-          profileTypes = metadata.profileTypes,
           installCommand = metadata.installCommand,
           metadata = metadata.metadata
         )

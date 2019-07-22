@@ -3,7 +3,6 @@ package io.hydrosphere.serving.manager.infrastructure.db
 import cats.MonadError
 import cats.data.OptionT
 import cats.implicits._
-import io.hydrosphere.serving.manager.db.Tables.ApplicationRow
 import io.hydrosphere.serving.manager.domain.application.graph.{ServableGraphAdapter, VersionGraphAdapter}
 import io.hydrosphere.serving.manager.domain.application.requests.{ExecutionGraphRequest, ModelVariantRequest, PipelineStageRequest}
 import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationKafkaStream, ApplicationRepository}

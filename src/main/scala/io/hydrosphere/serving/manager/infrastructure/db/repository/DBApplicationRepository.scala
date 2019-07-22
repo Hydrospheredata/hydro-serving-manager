@@ -3,9 +3,8 @@ package io.hydrosphere.serving.manager.infrastructure.db.repository
 import cats.data.OptionT
 import cats.effect.Async
 import cats.implicits._
+import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
-import io.hydrosphere.serving.manager.db.Tables
-import io.hydrosphere.serving.manager.db.Tables.ApplicationRow
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
@@ -13,7 +12,6 @@ import io.hydrosphere.serving.manager.domain.application.graph._
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
-import io.hydrosphere.serving.manager.infrastructure.db.DatabaseService
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import org.apache.logging.log4j.scala.Logging
@@ -24,8 +22,7 @@ import scala.util.{Failure, Success, Try}
 
 class DBApplicationRepository[F[_]](
   implicit F: Async[F],
-  executionContext: ExecutionContext,
-  databaseService: DatabaseService,
+  tx: Transactor[F],
   servableDb: DBServableRepository[F],
   versionDb: DBModelVersionRepository[F]
 ) extends ApplicationRepository[F] with Logging with CompleteJsonProtocol {

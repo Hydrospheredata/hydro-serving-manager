@@ -20,7 +20,6 @@ case class ModelVersion(
   model: Model,
   hostSelector: Option[HostSelector],
   status: ModelVersionStatus,
-  profileTypes: Map[String, DataProfileType],
   installCommand: Option[String],
   metadata: Map[String, String]
 ) {

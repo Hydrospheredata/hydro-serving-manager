@@ -1,94 +1,63 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
-import cats.effect.Async
-import io.hydrosphere.serving.manager.db.Tables
+import cats.effect.Sync
+import cats.implicits._
+import doobie.implicits._
+import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository}
-import io.hydrosphere.serving.manager.infrastructure.db.DatabaseService
-import io.hydrosphere.serving.manager.util.AsyncUtil
-import org.apache.logging.log4j.scala.Logging
-
-import scala.concurrent.ExecutionContext
-
-class DBModelRepository[F[_]: Async](
-  implicit executionContext: ExecutionContext,
-  databaseService: DatabaseService
-) extends ModelRepository[F] with Logging {
-
-  import DBModelRepository._
-  import databaseService._
-  import databaseService.driver.api._
-
-  override def create(entity: Model): F[Model] = AsyncUtil.futureAsync {
-    db.run(
-      Tables.Model returning Tables.Model += Tables.ModelRow(
-        modelId = entity.id,
-        name = entity.name,
-      )
-    ).map(mapFromDb)
-  }
-
-
-  override def get(id: Long): F[Option[Model]] = AsyncUtil.futureAsync {
-    db.run(
-      Tables.Model
-        .filter(_.modelId === id)
-        .result.headOption
-    ).map(mapFromDb)
-  }
-
-  override def get(name: String): F[Option[Model]] = AsyncUtil.futureAsync {
-    db.run(
-      Tables.Model
-        .filter(_.name === name)
-        .result.headOption
-    ).map(mapFromDb)
-  }
-
-  override def delete(id: Long): F[Int] = AsyncUtil.futureAsync {
-    db.run(
-      Tables.Model
-        .filter(_.modelId === id)
-        .delete
-    )
-  }
-
-  override def all(): F[Seq[Model]] = AsyncUtil.futureAsync {
-    db.run(
-      Tables.Model
-        .result
-    ).map(mapFromDb)
-  }
-
-  override def update(model: Model): F[Int] = AsyncUtil.futureAsync {
-    val query = for {
-      models <- Tables.Model if models.modelId === model.id
-    } yield models.name
-
-    db.run(query.update(model.name))
-  }
-
-  override def getMany(ids: Set[Long]): F[Seq[Model]] = AsyncUtil.futureAsync {
-    db.run(
-      Tables.Model
-        .filter(_.modelId inSetBind ids)
-        .result
-    ).map(mapFromDb)
-  }
-}
 
 object DBModelRepository {
 
-  def mapFromDb(model: Option[Tables.Model#TableElementType]): Option[Model] =
-    model.map(mapFromDb)
+  case class ModelRow(
+    model_id: Long,
+    name: String
+  )
 
-  def mapFromDb(models: Seq[Tables.Model#TableElementType]): Seq[Model] =
-    models.map { model =>
-      mapFromDb(model)
+  def toModel(mr: ModelRow) = Model(mr.model_id, mr.name)
+
+  final val modelTableName = sql"hydro_serving.model"
+
+  def allQ = sql"SELECT * FROM $modelTableName"
+
+  def getByNameQ(name: String) = sql"$allQ WHERE name = $name"
+
+  def getByIdQ(id: Long) = sql"$allQ WHERE id = $id"
+
+  def createQ(m: Model) = sql"INSERT INTO $modelTableName (name) VALUES (${m.name})"
+
+  def updateQ(m: Model) = sql"UPDATE $modelTableName set name = ${m.name} WHERE id = ${m.id}"
+
+  def deleteQ(id: Long) = sql"DELETE FROM $modelTableName WHERE id = id"
+
+  def make[F[_] : Sync](tx: Transactor[F]) = {
+    new ModelRepository[F] {
+      override def create(entity: Model): F[Model] = {
+        for {
+          id <- createQ(entity).update.withUniqueGeneratedKeys[Long]("model_id").transact(tx)
+        } yield Model(id, entity.name)
+      }
+
+      override def get(id: Long): F[Option[Model]] = {
+        for {
+          row <- getByIdQ(id).query[ModelRow].option.transact(tx)
+        } yield row.map(toModel)
+      }
+
+      override def all(): F[Seq[Model]] = {
+        for {
+          row <- allQ.query[ModelRow].to[Seq].transact(tx)
+        } yield row.map(toModel)
+      }
+
+      override def get(name: String): F[Option[Model]] = {
+        for {
+          row <- getByNameQ(name).query[ModelRow].option.transact(tx)
+        } yield row.map(toModel)
+      }
+
+      override def update(value: Model): F[Int] = updateQ(value).update.run.transact(tx)
+
+      override def delete(id: Long): F[Int] = deleteQ(id).update.run.transact(tx)
     }
-
-  def mapFromDb(model: Tables.Model#TableElementType): Model =
-    Model(
-      id = model.modelId,
-      name = model.name,
-    )
+  }
 }

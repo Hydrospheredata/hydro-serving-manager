@@ -6,9 +6,12 @@ import akka.util.Timeout
 import cats.effect._
 import cats.implicits._
 import com.spotify.docker.client.DefaultDockerClient
+import com.zaxxer.hikari.HikariDataSource
+import doobie.hikari.HikariTransactor
+import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
-import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
+import io.hydrosphere.serving.manager.config.{DockerClientConfig, HikariConfiguration, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.DiscoveryTopic
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
@@ -22,6 +25,7 @@ import org.apache.logging.log4j.scala.Logging
 import scala.concurrent.ExecutionContext
 
 object Core extends Logging {
+
   def app[F[_]](
     config: ManagerConfiguration,
     dockerClient: DefaultDockerClient,
@@ -48,7 +52,7 @@ object Core extends Logging {
       mdh <- DiscoveryTopic.make[F, ModelVersion, Long]()
       (modelPub, modelSub) = mdh
       repos = new Repositories[IO](config)
-      services = new Services[F] (
+      services = new Services[F](
         appPub,
         servPub,
         modelPub,
