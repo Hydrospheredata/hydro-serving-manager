@@ -1,26 +1,42 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
-import cats.data.OptionT
 import cats.implicits._
-import cats.effect.Async
-import io.hydrosphere.serving.manager.db.Tables
-import io.hydrosphere.serving.manager.db.Tables.BuildLogRow
+import cats.effect.Bracket
+import doobie.implicits._
+import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
-import io.hydrosphere.serving.manager.infrastructure.db.DatabaseService
 
-class DBBuildLogRepository[F[_]: Async](implicit databaseService: DatabaseService) extends BuildLogRepository[F] {
+object DBBuildLogRepository {
+  final val tableName = "hydro_serving.build_log"
 
-  import databaseService._
-  import databaseService.driver.api._
+  final case class BuildLogRow(
+    version_id: Long,
+    logs: List[String]
+  )
 
-  override def add(modelVersionId: Long, logs: List[String]): F[Unit] = {
-    db.task(Tables.BuildLog += BuildLogRow(modelVersionId, logs)).void
-  }
+  def getQ(modelVersionId: Long): doobie.Query0[BuildLogRow] =
+    sql"""
+         |SELECT * FROM $tableName
+         |  WHERE version_id = $modelVersionId
+      """.stripMargin.query[BuildLogRow]
 
-  override def get(modelVersionId: Long): F[Option[fs2.Stream[F, String]]] = {
-    val f = for {
-      result <- OptionT(db.task(Tables.BuildLog.filter(_.versionId === modelVersionId).result.headOption))
-    } yield fs2.Stream.emits(result.logs).covary[F]
-    f.value
-  }
+  def insertQ(br: BuildLogRow): doobie.Update0 =
+    sql"""
+         |INSERT INTO $tableName(version_id, logs)
+         |  VALUES(${br.version_id}, ${br.logs})
+      """.stripMargin.update
+
+  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]): BuildLogRepository[F] =
+    new BuildLogRepository[F] {
+      override def add(modelVersionId: Long, logs: List[String]): F[Unit] = {
+        val row = BuildLogRow(modelVersionId, logs)
+        insertQ(row).run.transact(tx).void
+      }
+
+      override def get(modelVersionId: Long): F[Option[fs2.Stream[F, String]]] = {
+        for {
+          row <- getQ(modelVersionId).option.transact(tx)
+        } yield row.map(x => fs2.Stream.emits(x.logs).covary[F])
+      }
+    }
 }
