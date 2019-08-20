@@ -31,7 +31,7 @@ object DBBuildLogRepository {
          |  VALUES(${br.version_id}, ${br.logs})
       """.stripMargin.update
 
-  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]): BuildLogRepository[F] =
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): BuildLogRepository[F] =
     new BuildLogRepository[F] {
       override def add(modelVersionId: Long, logs: List[String]): F[Unit] = {
         val row = BuildLogRow(modelVersionId, logs)

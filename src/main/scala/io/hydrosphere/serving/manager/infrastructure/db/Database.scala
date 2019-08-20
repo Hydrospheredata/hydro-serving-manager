@@ -26,7 +26,7 @@ object Database {
   )(
     implicit F: Async[F],
     cs: ContextShift[F]
-  ): F[Transactor[F]] = {
+  ): F[HikariTransactor[F]] = {
     F.delay {
       HikariTransactor.apply[F](
         dataSource,

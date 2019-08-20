@@ -223,7 +223,7 @@ object DBApplicationRepository {
       """.stripMargin.update
 
 
-  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]): ApplicationRepository[F] = new ApplicationRepository[F] {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): ApplicationRepository[F] = new ApplicationRepository[F] {
     override def create(entity: GenericApplication): F[GenericApplication] = {
       val row = fromApplication(entity)
       for {

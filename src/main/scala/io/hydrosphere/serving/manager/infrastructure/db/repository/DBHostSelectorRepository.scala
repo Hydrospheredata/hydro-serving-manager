@@ -34,7 +34,7 @@ object DBHostSelectorRepository {
 
   def deleteQ(id: Long): doobie.Update0 = sql"DELETE FROM $selTableName WHERE id = $id".update
 
-  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]): HostSelectorRepository[F] = {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): HostSelectorRepository[F] = {
     new HostSelectorRepository[F] {
       override def create(entity: HostSelector): F[HostSelector] = {
         for {

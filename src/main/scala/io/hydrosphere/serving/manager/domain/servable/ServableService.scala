@@ -18,6 +18,8 @@ import org.apache.logging.log4j.scala.Logging
 import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
+  def all(): F[List[GenericServable]]
+
   def findAndDeploy(name: String, version: Long): F[DeferredResult[F, GenericServable]]
 
   def findAndDeploy(modelId: Long): F[DeferredResult[F, GenericServable]]
@@ -118,5 +120,7 @@ object ServableService extends Logging {
 
       _gen(0)
     }
+
+    override def all(): F[List[GenericServable]] = servableRepository.all()
   }
 }

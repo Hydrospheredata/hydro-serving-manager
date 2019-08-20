@@ -31,7 +31,7 @@ object DBModelRepository {
 
   def deleteQ(id: Long): doobie.Update0 = sql"DELETE FROM $modelTableName WHERE id = id".update
 
-  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]): ModelRepository[F] = {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): ModelRepository[F] = {
     new ModelRepository[F] {
       override def create(entity: Model): F[Model] = {
         for {

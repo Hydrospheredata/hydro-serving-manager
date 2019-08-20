@@ -19,6 +19,8 @@ import spray.json.JsObject
 import scala.concurrent.ExecutionContext
 
 trait ApplicationService[F[_]] {
+  def all(): F[List[GenericApplication]]
+
   def generateInputs(name: String): F[JsObject]
 
   def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]]
@@ -95,5 +97,7 @@ object ApplicationService extends Logging {
       OptionT(applicationRepository.get(name))
         .getOrElseF(F.raiseError(NotFound(s"Application with name $name is not found")))
     }
+
+    override def all(): F[List[GenericApplication]] = applicationRepository.all()
   }
 }

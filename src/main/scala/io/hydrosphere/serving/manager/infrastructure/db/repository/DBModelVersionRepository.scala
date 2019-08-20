@@ -190,10 +190,10 @@ object DBModelVersionRepository {
       """.stripMargin.update
   }
 
-  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]): ModelVersionRepository[F] = new ModelVersionRepository[F] {
-    override def all(): F[Seq[ModelVersion]] = {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): ModelVersionRepository[F] = new ModelVersionRepository[F] {
+    override def all(): F[List[ModelVersion]] = {
       for {
-        rows <- allQ.to[Seq].transact(tx)
+        rows <- allQ.to[List].transact(tx)
       } yield rows.map((toModelVersion _).tupled)
     }
 
@@ -223,9 +223,9 @@ object DBModelVersionRepository {
       deleteQ(id).run.transact(tx)
     }
 
-    override def listForModel(modelId: Long): F[Seq[ModelVersion]] = {
+    override def listForModel(modelId: Long): F[List[ModelVersion]] = {
       for {
-        rows <- listVersionsQ(modelId).to[Seq].transact(tx)
+        rows <- listVersionsQ(modelId).to[List].transact(tx)
       } yield rows.map(toModelVersionT)
     }
 

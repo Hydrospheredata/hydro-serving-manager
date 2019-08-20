@@ -11,9 +11,9 @@ trait ModelVersionRepository[F[_]] {
 
   def delete(id: Long): F[Int]
 
-  def all(): F[Seq[ModelVersion]]
+  def all(): F[List[ModelVersion]]
 
-  def listForModel(modelId: Long): F[Seq[ModelVersion]]
+  def listForModel(modelId: Long): F[List[ModelVersion]]
 
   def lastModelVersionByModel(modelId: Long): F[Option[ModelVersion]]
 }

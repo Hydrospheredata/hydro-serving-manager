@@ -95,7 +95,7 @@ object DBServableRepository {
          | WHERE service_name IN ${names.toList}
       """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
 
-  def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]) = new ServableRepository[F] {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]) = new ServableRepository[F] {
     override def all(): F[List[GenericServable]] = {
       for {
         rows <- allQ.to[List].transact(tx)

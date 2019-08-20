@@ -12,9 +12,9 @@ import io.hydrosphere.serving.discovery.serving.ServingDiscoveryGrpc.ServingDisc
 import io.hydrosphere.serving.discovery.serving.{ApplicationDiscoveryEvent, ServableDiscoveryEvent}
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent.{Initial, ItemRemove, ItemUpdate}
 import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, ServableSubscriber}
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
-import io.hydrosphere.serving.manager.domain.servable.ServableRepository
+import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationService}
+import io.hydrosphere.serving.manager.domain.servable.ServableService
 import io.hydrosphere.serving.manager.util.grpc.Converters
 import org.apache.logging.log4j.scala.Logging
 
@@ -22,8 +22,8 @@ import org.apache.logging.log4j.scala.Logging
 class GrpcServingDiscovery[F[_]](
   appSub: ApplicationSubscriber[F],
   servableSub: ServableSubscriber[F],
-  applicationRepository: ApplicationRepository[F],
-  servableRepository: ServableRepository[F]
+  appService: ApplicationService[F],
+  servableService: ServableService[F]
 )(implicit F: ConcurrentEffect[F]) extends ServingDiscovery with Logging {
 
   private def runSync[A](f: => F[A]): A = f.toIO.unsafeRunSync()
@@ -33,7 +33,7 @@ class GrpcServingDiscovery[F[_]](
     logger.debug(s"Application watcher  $id registered")
     runSync {
       for {
-        apps <- applicationRepository.all()
+        apps <- appService.all()
         initEvents = apps.grouped(10).toList.map { batch =>
           val converted = batch.filter(_.status.isInstanceOf[Application.Ready]).map { x =>
             Converters.fromApp(x.asInstanceOf[ReadyApp])
@@ -74,7 +74,7 @@ class GrpcServingDiscovery[F[_]](
     logger.debug(s"Servable subscriber $id registered")
     runSync {
       for {
-        servables <- servableRepository.all()
+        servables <- servableService.all()
         initEvents = servables.grouped(10).toList.map { batch =>
           val converted = batch.map(Converters.fromServable)
           ServableDiscoveryEvent(added = converted)
