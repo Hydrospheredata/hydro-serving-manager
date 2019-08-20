@@ -1,7 +1,8 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
-import java.time.LocalDateTime
+import java.time.Instant
 
+import cats.MonadError
 import cats.effect.IO
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
@@ -15,8 +16,9 @@ class ModelVersionServiceSpec extends GenericUnitTest {
   describe("ModelVersionService") {
     it("should calculate first version") {
       val versionRepo = mock[ModelVersionRepository[IO]]
-      when(versionRepo.lastModelVersionByModel(1L, 1)).thenReturn(IO(Seq.empty))
-      val versionService = ModelVersionService.apply[IO](
+      when(versionRepo.lastModelVersionByModel(1)).thenReturn(IO(None))
+      val versionService = ModelVersionService.apply[IO]()(
+        MonadError[IO, Throwable],
         modelVersionRepository = versionRepo,
         applicationRepo = null,
         modelPublisher = null
@@ -25,11 +27,11 @@ class ModelVersionServiceSpec extends GenericUnitTest {
     }
     it("should calculate second version") {
       val versionRepo = mock[ModelVersionRepository[IO]]
-      when(versionRepo.lastModelVersionByModel(1L, 1)).thenReturn(IO(
-        Seq(ModelVersion(
+      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(IO(
+        Some(ModelVersion(
           id = 1,
           image = DockerImage("asd", "asd"),
-          created = LocalDateTime.now(),
+          created = Instant.now(),
           finished = None,
           modelVersion = 1,
           modelContract = ModelContract.defaultInstance,
@@ -37,12 +39,12 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           model = Model(1, "asd"),
           hostSelector = None,
           status = ModelVersionStatus.Released,
-          profileTypes = Map.empty,
           installCommand = None,
           metadata = Map.empty
         )))
       )
-      val versionService = ModelVersionService.apply[IO](
+      val versionService = ModelVersionService.apply[IO]()(
+        MonadError[IO, Throwable],
         modelVersionRepository = versionRepo,
         applicationRepo = null,
         modelPublisher = null
@@ -51,11 +53,11 @@ class ModelVersionServiceSpec extends GenericUnitTest {
     }
     it("should calculate third version") {
       val versionRepo = mock[ModelVersionRepository[IO]]
-      when(versionRepo.lastModelVersionByModel(1L, 1)).thenReturn(IO(
-        Seq(ModelVersion(
+      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(IO(
+        Some(ModelVersion(
           id = 1,
           image = DockerImage("asd", "asd"),
-          created = LocalDateTime.now(),
+          created = Instant.now(),
           finished = None,
           modelVersion = 2,
           modelContract = ModelContract.defaultInstance,
@@ -63,12 +65,12 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           model = Model(1, "asd"),
           hostSelector = None,
           status = ModelVersionStatus.Released,
-          profileTypes = Map.empty,
           installCommand = None,
           metadata = Map.empty
         )))
       )
-      val versionService = ModelVersionService.apply[IO](
+      val versionService = ModelVersionService.apply[IO]()(
+        MonadError[IO, Throwable],
         modelVersionRepository = versionRepo,
         applicationRepo = null,
         modelPublisher = null
@@ -79,14 +81,12 @@ class ModelVersionServiceSpec extends GenericUnitTest {
       val versionRepo = new ModelVersionRepository[IO] {
         override def create(entity: ModelVersion): IO[ModelVersion] = ???
 
-        override def update(id: Long, entity: ModelVersion): IO[Int] = ???
-
         override def get(id: Long): IO[Option[ModelVersion]] = IO {
           Some(
             ModelVersion(
               id = 1,
               image = DockerImage("", ""),
-              created = LocalDateTime.now(),
+              created = Instant.now(),
               finished = None,
               modelVersion = 4,
               modelContract = ModelContract.defaultInstance,
@@ -94,7 +94,6 @@ class ModelVersionServiceSpec extends GenericUnitTest {
               model = Model(1, "aaaa"),
               hostSelector = None,
               status = ModelVersionStatus.Assembling,
-              profileTypes = Map.empty,
               installCommand = None,
               metadata = Map.empty
             )
@@ -103,15 +102,15 @@ class ModelVersionServiceSpec extends GenericUnitTest {
 
         override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
 
-        override def get(idx: Seq[Long]): IO[Seq[ModelVersion]] = ???
-
         override def delete(id: Long): IO[Int] = IO(1)
 
-        override def all(): IO[Seq[ModelVersion]] = ???
+        override def update(entity: ModelVersion): IO[Int] = ???
 
-        override def listForModel(modelId: Long): IO[Seq[ModelVersion]] = ???
+        override def all(): IO[List[ModelVersion]] = ???
 
-        override def lastModelVersionByModel(modelId: Long, max: Int): IO[Seq[ModelVersion]] = ???
+        override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
+
+        override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]] = ???
       }
       val events = ListBuffer.empty[Long]
       val modelPub = new ModelPublisher[IO] {
@@ -123,7 +122,8 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           }
         }
       }
-      val versionService = ModelVersionService[IO](
+      val versionService = ModelVersionService[IO]()(
+        MonadError[IO, Throwable],
         modelVersionRepository = versionRepo,
         applicationRepo = null,
         modelPublisher = modelPub
@@ -136,10 +136,10 @@ class ModelVersionServiceSpec extends GenericUnitTest {
       it("for a new model") {
         ioAssert {
           val versionRepo = mock[ModelVersionRepository[IO]]
-          when(versionRepo.lastModelVersionByModel(1, 1)).thenReturn(
-            IO(Seq.empty)
+          when(versionRepo.lastModelVersionByModel(1)).thenReturn(
+            IO(None)
           )
-          val versionService = ModelVersionService[IO](versionRepo, null, null)
+          val versionService = ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null, null)
           versionService.getNextModelVersion(1).map { x =>
             assert(x === 1)
           }
@@ -149,11 +149,11 @@ class ModelVersionServiceSpec extends GenericUnitTest {
       it("for a built model") {
         ioAssert {
           val versionRepo = mock[ModelVersionRepository[IO]]
-          when(versionRepo.lastModelVersionByModel(1, 1)).thenReturn(
-            IO(Seq(ModelVersion(
+          when(versionRepo.lastModelVersionByModel(1)).thenReturn(
+            IO(Some(ModelVersion(
               id = 1,
               image = DockerImage("", ""),
-              created = LocalDateTime.now(),
+              created = Instant.now(),
               finished = None,
               modelVersion = 4,
               modelContract = ModelContract.defaultInstance,
@@ -161,12 +161,11 @@ class ModelVersionServiceSpec extends GenericUnitTest {
               model = Model(1, "aaaa"),
               hostSelector = None,
               status = ModelVersionStatus.Assembling,
-              profileTypes = Map.empty,
               installCommand = None,
               metadata = Map.empty
             )))
           )
-          val versionService = ModelVersionService[IO](versionRepo, null, null)
+          val versionService = ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null, null)
           versionService.getNextModelVersion(1).map { x =>
             assert(x === 5)
           }

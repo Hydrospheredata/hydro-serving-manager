@@ -303,6 +303,10 @@ object DBApplicationRepository {
       } yield res
       t.transact(tx).map(_.leftWiden[Throwable]).rethrow
     }
+
+    override def updateRow(row: ApplicationRow): F[Int] = {
+      updateQ(row).run.transact(tx)
+    }
   }
 
   def fetchAppsInfo(apps: List[ApplicationRow]): Free[connection.ConnectionOp, (Map[Long, ModelVersion], Map[String, Servable[Servable.Status]])] = {

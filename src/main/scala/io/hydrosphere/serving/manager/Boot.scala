@@ -30,7 +30,7 @@ object Boot extends IOApp with Logging {
         .load[IO](DockerClientConfig.defaultConfigPath)
         .recover { case _ => DockerClientConfig() }
       _ <- IO(logger.info(s"Using docker client config: ${ReflectionUtils.prettyPrint(dockerClientConfig)}"))
-      _ <- Application.make[IO](configuration, dockerClient, dockerClientConfig).use { app =>
+      _ <- App.make[IO](configuration, dockerClient, dockerClientConfig).use { app =>
         (app.httpServer.start() >> app.grpcServer.start())
       }
     } yield ExitCode.Success

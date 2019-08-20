@@ -1,10 +1,16 @@
 package io.hydrosphere.serving.manager.it
 
+import cats.effect.IO
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
+import doobie.util.transactor.Transactor
+import io.hydrosphere.serving.manager.config.HikariConfiguration
+import io.hydrosphere.serving.manager.infrastructure.db.Database
 
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext
 
 trait DatabaseAccessIT extends IsolatedDockerAccessIT {
+
   def config = ContainerConfig.builder()
     .image("postgres:9.6-alpine")
     .hostConfig(

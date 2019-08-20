@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.infrastructure.db
+package io.hydrosphere.serving.manager.it.infrastructure.db
 
 import io.hydrosphere.serving.manager.GenericUnitTest
 

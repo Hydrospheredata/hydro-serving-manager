@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.api
 
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime}
 
 import cats.effect.IO
 import com.google.protobuf.empty.Empty
@@ -10,7 +10,7 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.grpc.ManagerGrpcService
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionStatus, ModelVersion => DMV}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionService, ModelVersionStatus, ModelVersion => DMV}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableService
 import io.hydrosphere.serving.manager.grpc.entities.ModelVersion
@@ -23,12 +23,12 @@ import scala.util.{Failure, Success}
 class GrpcSpec extends GenericUnitTest {
   describe("Manager GRPC API") {
     it("should return ModelVersion for id") {
-      val versionRepo = mock[ModelVersionRepository[IO]]
-      when(versionRepo.get(1)).thenReturn(IO(Option(
+      val versionService = mock[ModelVersionService[IO]]
+      when(versionService.get(1)).thenReturn(IO(
         DMV(
           id = 1,
           image = DockerImage("test", "test"),
-          created = LocalDateTime.now(),
+          created = Instant.now(),
           finished = None,
           modelVersion = 1,
           modelContract = ModelContract.defaultInstance,
@@ -36,12 +36,11 @@ class GrpcSpec extends GenericUnitTest {
           model = Model(1, "asd"),
           hostSelector = None,
           status = ModelVersionStatus.Assembling,
-          profileTypes = Map.empty,
           installCommand = None,
           metadata = Map.empty
         )
-      )))
-      when(versionRepo.get(1000)).thenReturn(IO(None))
+      ))
+      when(versionService.get(1000)).thenReturn(IO.raiseError(new IllegalArgumentException("1000")))
       val s = new ServableService[IO] {
         override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
 
@@ -50,8 +49,10 @@ class GrpcSpec extends GenericUnitTest {
         override def stop(name: String): IO[GenericServable] = ???
 
         override def deploy(modelVersion: DMV): IO[DeferredResult[IO, GenericServable]] = ???
+
+        override def all(): IO[List[GenericServable]] = ???
       }
-      val grpcApi = new ManagerGrpcService(versionRepo, s)
+      val grpcApi = new ManagerGrpcService(versionService, s)
 
       grpcApi.getVersion(GetVersionRequest(1000)).onComplete {
         case Success(_) => fail("Value instead of exception")
@@ -63,12 +64,12 @@ class GrpcSpec extends GenericUnitTest {
       }
     }
     it("should return a stream of all ModelVersions") {
-      val versionRepo = mock[ModelVersionRepository[IO]]
-      when(versionRepo.all()).thenReturn(IO(Seq(
+      val versionService = mock[ModelVersionService[IO]]
+      when(versionService.all()).thenReturn(IO(List(
         DMV(
           id = 1,
           image = DockerImage("test", "test"),
-          created = LocalDateTime.now(),
+          created = Instant.now(),
           finished = None,
           modelVersion = 1,
           modelContract = ModelContract.defaultInstance,
@@ -76,14 +77,13 @@ class GrpcSpec extends GenericUnitTest {
           model = Model(1, "asd"),
           hostSelector = None,
           status = ModelVersionStatus.Assembling,
-          profileTypes = Map.empty,
           installCommand = None,
           metadata = Map.empty
         ),
         DMV(
           id = 2,
           image = DockerImage("test", "test"),
-          created = LocalDateTime.now(),
+          created = Instant.now(),
           finished = None,
           modelVersion = 1,
           modelContract = ModelContract.defaultInstance,
@@ -91,7 +91,6 @@ class GrpcSpec extends GenericUnitTest {
           model = Model(1, "asd"),
           hostSelector = None,
           status = ModelVersionStatus.Assembling,
-          profileTypes = Map.empty,
           installCommand = None,
           metadata = Map.empty
         )
@@ -115,8 +114,10 @@ class GrpcSpec extends GenericUnitTest {
         override def stop(name: String): IO[GenericServable] = ???
 
         override def deploy(modelVersion: DMV): IO[DeferredResult[IO, GenericServable]] = ???
+
+        override def all(): IO[List[GenericServable]] = ???
       }
-      val grpcApi = new ManagerGrpcService(versionRepo, s)
+      val grpcApi = new ManagerGrpcService(versionService, s)
       grpcApi.getAllVersions(Empty(), observer)
 
       Future {
@@ -125,7 +126,7 @@ class GrpcSpec extends GenericUnitTest {
       }
     }
     it("should handle ModelVersion stream error") {
-      val versionRepo = mock[ModelVersionRepository[IO]]
+      val versionRepo = mock[ModelVersionService[IO]]
       when(versionRepo.all()).thenReturn(IO.raiseError(new IllegalStateException("AAAAAAA")))
 
       val errors = ListBuffer.empty[Throwable]
@@ -144,6 +145,8 @@ class GrpcSpec extends GenericUnitTest {
         override def stop(name: String): IO[GenericServable] = ???
 
         override def deploy(modelVersion: DMV): IO[DeferredResult[IO, GenericServable]] = ???
+
+        override def all(): IO[List[GenericServable]] = ???
       }
       val grpcApi = new ManagerGrpcService(versionRepo, s)
       grpcApi.getAllVersions(Empty(), observer)

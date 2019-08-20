@@ -1,7 +1,6 @@
-package io.hydrosphere.serving.manager.infrastructure.db
+package io.hydrosphere.serving.manager.it.infrastructure.db
 
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 
 class DBApplicationRepositorySpec extends GenericUnitTest {
   describe("Queries") {

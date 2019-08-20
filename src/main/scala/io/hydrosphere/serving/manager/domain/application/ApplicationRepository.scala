@@ -1,6 +1,7 @@
 package io.hydrosphere.serving.manager.domain.application
 
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.ApplicationRow
 
 trait ApplicationRepository[F[_]] {
   def create(entity: GenericApplication): F[GenericApplication]
@@ -10,6 +11,8 @@ trait ApplicationRepository[F[_]] {
   def get(name: String): F[Option[GenericApplication]]
 
   def update(value: GenericApplication): F[Int]
+
+  def updateRow(row: ApplicationRow): F[Int]  // NB: not good, need to provide low-level API for Application tool
 
   def delete(id: Long): F[Int]
 

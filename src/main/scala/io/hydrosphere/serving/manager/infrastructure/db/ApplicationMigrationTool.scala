@@ -26,7 +26,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
     cloudDriver: CloudDriver[F],
     appDeployer: ApplicationDeployer[F],
     servableRepository: ServableRepository[F],
-  )(implicit F: Bracket[F, Throwable], tx: Transactor[F]): ApplicationMigrationTool[F] = new ApplicationMigrationTool[F] {
+  )(implicit F: Bracket[F, Throwable]): ApplicationMigrationTool[F] = new ApplicationMigrationTool[F] {
     override def getAndRevive() = {
       for {
         maybeApps <- appsRepo.all().attempt
@@ -66,7 +66,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
       }
       for {
         newApp <- fixedApp
-        _ <- DBApplicationRepository.updateQ(newApp).run.transact(tx)
+        _ <- appsRepo.updateRow(newApp)
       } yield newApp
     }
 

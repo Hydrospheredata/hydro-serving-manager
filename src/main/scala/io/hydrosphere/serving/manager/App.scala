@@ -7,12 +7,19 @@ import cats.implicits._
 import cats.effect.implicits._
 import cats.effect.{ConcurrentEffect, ContextShift, Effect, IO, Resource, Sync, Timer}
 import com.spotify.docker.client.DockerClient
+import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.api.ManagerServiceGrpc
 import io.hydrosphere.serving.manager.api.grpc.{GrpcServer, GrpcServingDiscovery, ManagerGrpcService}
 import io.hydrosphere.serving.manager.api.http.HttpServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
+import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
+import io.hydrosphere.serving.manager.domain.model.ModelRepository
+import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersionRepository
+import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.Database
 import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBBuildLogRepository, DBHostSelectorRepository, DBModelRepository, DBModelVersionRepository, DBServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
@@ -24,19 +31,22 @@ import io.hydrosphere.serving.manager.util.random.RNG
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 
-case class Application[F[_]](
+
+
+case class App[F[_]](
   config: ManagerConfiguration,
   core: Core[F],
   grpcServer: GrpcServer[F],
-  httpServer: HttpServer[F]
+  httpServer: HttpServer[F],
+  transactor: Transactor[F],
 )
 
-object Application {
+object App {
   def make[F[_] : ConcurrentEffect : ContextShift : Timer](
     config: ManagerConfiguration,
     dockerClient: DockerClient,
     dockerClientConfig: DockerClientConfig
-  ): Resource[F, Application[F]] = {
+  ): Resource[F, App[F]] = {
     implicit val system = ActorSystem("manager")
     implicit val materializer = ActorMaterializer()
     implicit val timeout = Timeout(5.minute)
@@ -79,6 +89,6 @@ object Application {
         servableRoutes = ???,
         sseRoutes = ???
       )
-    } yield Application(config, core, grpc, http)
+    } yield App(config, core, grpc, http, tx)
   }
 }

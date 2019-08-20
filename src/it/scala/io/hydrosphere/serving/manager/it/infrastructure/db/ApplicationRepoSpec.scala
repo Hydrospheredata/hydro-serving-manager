@@ -47,9 +47,10 @@ class ApplicationRepoSpec extends FullIntegrationSpec {
           )
         ),
         signature = ModelSignature.defaultInstance,
-        kafkaStreaming = List.empty
+        kafkaStreaming = List.empty,
+        versionGraph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(mv1, 100)), ModelSignature.defaultInstance))
       )
-      val result = repositories.applicationRepository.create(application).unsafeRunSync()
+      val result = app .applicationRepository.create(application).unsafeRunSync()
       println(result)
       assert(result.id !== 0)
     }

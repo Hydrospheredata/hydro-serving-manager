@@ -16,7 +16,7 @@ import io.hydrosphere.serving.tensorflow.TensorShape
 import io.hydrosphere.serving.tensorflow.types.DataType
 
 class FetcherSpecs extends GenericUnitTest {
-  val ops = StorageOps.default[IO]
+  implicit val ops = StorageOps.default[IO]
 
   def getModel(modelName: String) = {
     getTestResourcePath("test_models").resolve(modelName)
@@ -178,7 +178,7 @@ class FetcherSpecs extends GenericUnitTest {
   describe("Default fetcher") {
     it("should parse tensorflow model") {
       ioAssert {
-        val defaultFetcher = ModelFetcher.default[IO](ops)
+        val defaultFetcher = ModelFetcher.default[IO]()
         defaultFetcher.fetch(getModel("tensorflow_model")).map { model =>
           assert(model.isDefined, model)
         }

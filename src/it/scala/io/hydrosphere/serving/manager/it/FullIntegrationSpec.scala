@@ -10,11 +10,12 @@ import cats.effect.IO
 import cats.instances.list._
 import cats.syntax.traverse._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import doobie.util.transactor.Transactor
 import io.grpc.Server
 import io.hydrosphere.serving.manager._
 import io.hydrosphere.serving.manager.api.grpc.GrpcServer
-import io.hydrosphere.serving.manager.api.http.HttpApiServer
-import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
+import io.hydrosphere.serving.manager.api.http.{HttpApiServer, HttpServer}
+import io.hydrosphere.serving.manager.config.{DockerClientConfig, HikariConfiguration, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, ApplicationSubscriber, ModelPublisher, ModelSubscriber, ServablePublisher, ServableSubscriber}
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.Application
@@ -23,6 +24,7 @@ import io.hydrosphere.serving.manager.domain.application.ApplicationService.Inte
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.servable.Servable
+import io.hydrosphere.serving.manager.infrastructure.db.Database
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.util.TarGzUtils
 import io.hydrosphere.serving.manager.util.grpc.Converters
@@ -62,27 +64,19 @@ trait FullIntegrationSpec extends DatabaseAccessIT
 
   def configuration = originalConfiguration.unsafeRunSync()
 
-  var http: HttpApiServer[IO] = _
-  var managerGRPC: Server = _
-  var services: Services[IO] = _
-  var repositories: Repositories[IO] = _
+  var app: App[IO] = _
+  var transactor: Transactor[IO] = _
   val grpcCtor: GrpcChannel.Factory[IO] = GrpcChannel.plaintextFactory[IO]
   val predictionCtor: PredictionClient.Factory[IO] = PredictionClient.clientCtor[IO](grpcCtor)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-
-    val res = Core.app(configuration, dockerClient, DockerClientConfig.empty, predictionCtor).unsafeRunSync()
-    http = res._1
-    managerGRPC = res._2
-    services = res._3
-    repositories = res._4
-    http.start().unsafeRunSync()
-    managerGRPC.start()
+    app = App.make(configuration, dockerClient, DockerClientConfig.empty).unsafeRunSync()
+    transactor = app.tra
   }
 
   override def afterAll(): Unit = {
-    managerGRPC.shutdown()
+    app.grpcServer.shutdown().unsafeRunSync()
     system.terminate()
     super.afterAll()
   }

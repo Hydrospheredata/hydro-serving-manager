@@ -24,8 +24,17 @@ import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
+case class Repositories[F[_]](
+  appRepo: ApplicationRepository[F],
+  hsRepo: HostSelectorRepository[F],
+  modelRepo: ModelRepository[F],
+  versionRepo: ModelVersionRepository[F],
+  servableRepo: ServableRepository[F],
+  buildLogRepo: BuildLogRepository[F]
+)
 
 final case class Core[F[_]](
+  repos: Repositories[F],
   hostSelectorService: HostSelectorService[F],
   modelService: ModelService[F],
   versionService: ModelVersionService[F],
@@ -85,7 +94,10 @@ object Core {
           implicit val appDeployer: ApplicationDeployer[F] = ApplicationDeployer.default()
           implicit val appService: ApplicationService[F] = ApplicationService[F]()
           implicit val modelService: ModelService[F] = ModelService[F]()
+
+          val repos = Repositories(appRepo, hostSelectorRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo)
           Core(
+            repos = repos,
             hostSelectorService = hostSelectorService,
             modelService = modelService,
             versionService = versionService,
