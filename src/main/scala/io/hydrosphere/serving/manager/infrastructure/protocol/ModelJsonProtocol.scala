@@ -118,7 +118,6 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       }
     }
 
-
     override def write(obj: ExecutionGraphAdapter): JsValue = {
       obj match {
         case x: VersionGraphAdapter => x.toJson
@@ -130,22 +129,6 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val applicationStageFormat          = jsonFormat2(PipelineStage.apply)
   implicit val applicationKafkaStreamingFormat = jsonFormat4(ApplicationKafkaStream)
   implicit val execNode = jsonFormat2(ExecutionNode.apply)
-  implicit val appOk = jsonFormat1(Application.Ready)
-  implicit val appAssembling = jsonFormat1(Application.Assembling)
-  implicit val appFail = jsonFormat2(Application.Failed)
-
-  implicit val appSFormat = new RootJsonFormat[Application.Status] {
-    override def read(json: JsValue): Application.Status = throw DeserializationException(s"Can't deserialize Application json: $json")
-
-    override def write(obj: Application.Status): JsValue = obj match {
-      case x: Application.Assembling => x.toJson
-      case x: Application.Failed => x.toJson
-      case x: Application.Ready => x.toJson
-    }
-  }
-
-  implicit def applicationFormat[T <: Application.Status](implicit jf: JsonFormat[T]) =
-    jsonFormat6(Application.apply[T])
 }
 
 object ModelJsonProtocol extends ModelJsonProtocol
