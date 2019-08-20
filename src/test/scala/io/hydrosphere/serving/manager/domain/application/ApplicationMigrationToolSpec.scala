@@ -27,7 +27,6 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplication
 import io.hydrosphere.serving.manager.util.DeferredResult
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.ExecutionContext
 
 class ApplicationMigrationToolSpec extends GenericUnitTest {
   describe("ApplicationMigrationTool") {

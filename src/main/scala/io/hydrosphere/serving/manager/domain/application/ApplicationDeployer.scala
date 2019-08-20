@@ -29,7 +29,7 @@ object ApplicationDeployer extends Logging {
   def default[F[_]]()(
     implicit
     F: Concurrent[F],
-      servableService: ServableService[F],
+    servableService: ServableService[F],
     versionRepository: ModelVersionRepository[F],
     applicationRepository: ApplicationRepository[F],
     graphComposer: VersionGraphComposer,
