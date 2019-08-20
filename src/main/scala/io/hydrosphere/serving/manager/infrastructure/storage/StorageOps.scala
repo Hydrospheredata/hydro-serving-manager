@@ -4,7 +4,9 @@ import java.io.File
 import java.nio.file.Path
 
 import cats.effect.Sync
+import simulacrum._
 
+@typeclass
 trait StorageOps[F[_]] {
   def getReadableFile(path: Path): F[Option[File]]
 

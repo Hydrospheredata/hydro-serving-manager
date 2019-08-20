@@ -15,5 +15,5 @@ trait ModelVersionRepository[F[_]] {
 
   def listForModel(modelId: Long): F[Seq[ModelVersion]]
 
-  def lastModelVersionByModel(modelId: Long): F[Seq[ModelVersion]]
+  def lastModelVersionByModel(modelId: Long): F[Option[ModelVersion]]
 }

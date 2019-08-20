@@ -61,7 +61,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
 
         override def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): IO[List[GenericApplication]] = ???
 
-        override def findVersionsUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
 
         override def updateRow(row: db.Tables.ApplicationRow): IO[Int] = ???
 
@@ -212,7 +212,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
 
         override def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): IO[List[GenericApplication]] = ???
 
-        override def findVersionsUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
 
         override def updateRow(row: db.Tables.ApplicationRow): IO[Int] = IO(updatedRows += row).as(1)
 

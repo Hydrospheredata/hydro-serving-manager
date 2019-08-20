@@ -24,9 +24,7 @@ class GrpcServingDiscovery[F[_]](
   servableSub: ServableSubscriber[F],
   applicationRepository: ApplicationRepository[F],
   servableRepository: ServableRepository[F]
-)(
-  implicit F: ConcurrentEffect[F]
-) extends ServingDiscovery with Logging {
+)(implicit F: ConcurrentEffect[F]) extends ServingDiscovery with Logging {
 
   private def runSync[A](f: => F[A]): A = f.toIO.unsafeRunSync()
 

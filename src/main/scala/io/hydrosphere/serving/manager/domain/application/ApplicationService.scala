@@ -32,13 +32,15 @@ trait ApplicationService[F[_]] {
 
 object ApplicationService extends Logging {
 
-  def apply[F[_]](
+  def apply[F[_]]()(
+    implicit
+    F: Concurrent[F],
     applicationRepository: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     servableService: ServableService[F],
     discoveryHub: ApplicationPublisher[F],
     applicationDeployer: ApplicationDeployer[F]
-  )(implicit F: Concurrent[F], ex: ExecutionContext): ApplicationService[F] = new ApplicationService[F] {
+  ): ApplicationService[F] = new ApplicationService[F] {
 
     def generateInputs(name: String): F[JsObject] = {
       for {
@@ -94,9 +96,4 @@ object ApplicationService extends Logging {
         .getOrElseF(F.raiseError(NotFound(s"Application with name $name is not found")))
     }
   }
-
-  object Internals extends Logging {
-
-  }
-
 }

@@ -26,7 +26,7 @@ object BuildLoggingService extends Logging {
   def make[F[_]]()(
     implicit F: ConcurrentEffect[F],
     buildLogRepository: BuildLogRepository[F]
-  ) = {
+  ): F[BuildLoggingService[F]] = {
     for {
       state <- Ref.of[F, Map[Long, (Topic[F, String], SignallingRef[F, Boolean], ListBuffer[String])]](Map.empty)
     } yield {

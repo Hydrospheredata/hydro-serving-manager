@@ -2,7 +2,9 @@ package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import cats.effect.{Bracket, Sync}
 import cats.implicits._
+import doobie._
 import doobie.implicits._
+import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository}
 
@@ -15,7 +17,7 @@ object DBModelRepository {
 
   def toModel(mr: ModelRow) = Model(mr.model_id, mr.name)
 
-  final val modelTableName = "hydro_serving.model"
+  val modelTableName = "hydro_serving.model"
 
   def allQ: doobie.Query0[ModelRow] = sql"SELECT * FROM $modelTableName".query[ModelRow]
 

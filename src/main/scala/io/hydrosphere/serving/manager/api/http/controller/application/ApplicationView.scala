@@ -19,12 +19,12 @@ case class ApplicationView(
 object ApplicationView {
   def fromApplication(app: GenericApplication): ApplicationView = {
     val (status, graph, message) = app.status match {
-      case Application.Assembling(versionGraph) =>
-        val graph = ExecutionGraphAdapter.fromVersionPipeline(versionGraph)
+      case Application.Assembling =>
+        val graph = ExecutionGraphAdapter.fromVersionPipeline(app.versionGraph)
         val status = "Assembling"
         (status, graph, None)
-      case Application.Failed(versionGraph, reason) =>
-        val graph = ExecutionGraphAdapter.fromVersionPipeline(versionGraph)
+      case Application.Failed(reason) =>
+        val graph = ExecutionGraphAdapter.fromVersionPipeline(app.versionGraph)
         val status = "Failed"
         (status, graph, reason)
       case Application.Ready(stages) =>

@@ -31,7 +31,9 @@ trait ModelService[F[_]] {
 }
 
 object ModelService {
-  def apply[F[_]](
+  def apply[F[_]]()(
+    implicit
+    F: MonadError[F, Throwable],
     modelRepository: ModelRepository[F],
     modelVersionService: ModelVersionService[F],
     modelVersionRepository: ModelVersionRepository[F],
@@ -40,9 +42,9 @@ object ModelService {
     hostSelectorRepository: HostSelectorRepository[F],
     fetcher: ModelFetcher[F],
     modelVersionBuilder: ModelVersionBuilder[F]
-  )(implicit F: MonadError[F, Throwable]): ModelService[F] = new ModelService[F] with Logging {
+  ): ModelService[F] = new ModelService[F] with Logging {
 
-    def deleteModel(modelId: Long): F[ Model] = {
+    def deleteModel(modelId: Long): F[Model] = {
       for {
         model <- get(modelId)
         versions <- modelVersionRepository.listForModel(model.id)
@@ -74,14 +76,14 @@ object ModelService {
     }
 
     def createIfNecessary(modelName: String): F[Model] = {
-      modelRepository.get(modelName).flatMap{
+      modelRepository.get(modelName).flatMap {
         case Some(x) => Monad[F].pure(x)
         case None => modelRepository.create(Model(0, modelName))
       }
     }
 
     def checkIfUnique(targetModel: Model, newModelInfo: Model): F[Model] = {
-      modelRepository.get(newModelInfo.name).flatMap{
+      modelRepository.get(newModelInfo.name).flatMap {
         case Some(model) if model.id == targetModel.id => // it's the same model - ok
           F.pure(targetModel)
 
@@ -108,7 +110,7 @@ object ModelService {
       }
 
       for {
-        usedApps <- versions.map(_.id).toList.traverse(appRepo.findVersionsUsage)
+        usedApps <- versions.map(_.id).toList.traverse(appRepo.findVersionUsage)
         _ <- F.fromEither(_checkApps(usedApps))
       } yield ()
     }
@@ -116,7 +118,7 @@ object ModelService {
     override def get(modelId: Long): F[Model] = {
       OptionT(modelRepository.get(modelId))
         .getOrElseF(F.raiseError(NotFound(s"Can't find a model with id $modelId"))
-      )
+        )
     }
   }
 }

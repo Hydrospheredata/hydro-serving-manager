@@ -8,7 +8,7 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.discovery.ApplicationPublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
-import io.hydrosphere.serving.manager.domain.application.Application.{Assembling, AssemblingApp, GenericApplication}
+import io.hydrosphere.serving.manager.domain.application.Application.{AssemblingApp, GenericApplication}
 import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Node, Variant, VersionGraphComposer}
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionStatus}
@@ -26,13 +26,15 @@ trait ApplicationDeployer[F[_]] {
 }
 
 object ApplicationDeployer extends Logging {
-  def default[F[_]](
-    servableService: ServableService[F],
+  def default[F[_]]()(
+    implicit
+    F: Concurrent[F],
+      servableService: ServableService[F],
     versionRepository: ModelVersionRepository[F],
     applicationRepository: ApplicationRepository[F],
     graphComposer: VersionGraphComposer,
     discoveryHub: ApplicationPublisher[F]
-  )(implicit F: Concurrent[F]): ApplicationDeployer[F] = {
+  ): ApplicationDeployer[F] = {
     new ApplicationDeployer[F] {
       override def deploy(
         name: String,
@@ -53,7 +55,7 @@ object ApplicationDeployer extends Logging {
             _ <- df.complete(genericApp)
           } yield ())
             .handleErrorWith { x =>
-              val failedApp = app.copy(status = Application.Failed(composedApp.status.versionGraph, Some(x.getMessage)))
+              val failedApp = app.copy(status = Application.Failed(Option(x.getMessage)))
               F.delay(logger.error(s"Error while buidling application $failedApp", x)) >>
                 applicationRepository.update(failedApp) >>
                 df.complete(failedApp).attempt.void
@@ -67,7 +69,7 @@ object ApplicationDeployer extends Logging {
         namespace: Option[String],
         executionGraph: ExecutionGraphRequest,
         kafkaStreaming: List[ApplicationKafkaStream]
-      ): F[Application[Assembling]] = {
+      ): F[AssemblingApp] = {
         for {
           _ <- checkApplicationName(name)
           versions <- executionGraph.stages.traverse { f =>
@@ -95,7 +97,8 @@ object ApplicationDeployer extends Logging {
             namespace = namespace,
             signature = graph.pipelineSignature,
             kafkaStreaming = kafkaStreaming,
-            status = Application.Assembling(graph.stages)
+            status = Application.Assembling,
+            versionGraph = graph.stages
           )
       }
 
@@ -121,7 +124,7 @@ object ApplicationDeployer extends Logging {
 
       private def startServices(app: AssemblingApp) = {
         for {
-          deployedServables <- app.status.versionGraph.traverse { stage =>
+          deployedServables <- app.versionGraph.traverse { stage =>
             for {
               variants <- stage.modelVariants.traverse { i =>
                 for {

@@ -2,12 +2,17 @@ package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import cats.implicits._
 import cats.effect.Bracket
+import doobie._
 import doobie.implicits._
+import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
 
 object DBBuildLogRepository {
-  final val tableName = "hydro_serving.build_log"
+  val tableName = "hydro_serving.build_log"
+
+  val version = 1
+  val testQ = sql"SELECT * FROM $tableName hydro_serving.build_log WHERE version_id = $version"
 
   final case class BuildLogRow(
     version_id: Long,

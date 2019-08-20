@@ -17,7 +17,6 @@ import spray.json._
 class DockerImageBuilder[F[_]: Sync](
   dockerClient: DockerClient,
   dockerClientConfig: DockerClientConfig,
-  modelStorage: ModelUnpacker[F],
 ) extends ImageBuilder[F] with Logging {
 
   private val buildParams: Seq[BuildParam] = {

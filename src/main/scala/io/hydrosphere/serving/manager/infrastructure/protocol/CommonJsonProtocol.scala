@@ -12,6 +12,7 @@ import scalapb._
 import spray.json._
 
 import scala.language.reflectiveCalls
+import java.time.Instant
 
 trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with Logging {
 
@@ -103,7 +104,15 @@ trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with 
 
     def read(value: JsValue) = value match {
       case JsString(x) => LocalDateTime.parse(x, DateTimeFormatter.ISO_DATE_TIME)
-      case x => throw new RuntimeException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
+      case x => throw new DeserializationException(s"Unexpected type ${x.getClass.getName} when trying to parse LocalDateTime")
+    }
+  }
+
+  implicit val instantFormat = new JsonFormat[Instant] {
+    def write(obj: Instant): JsValue = JsString(DateTimeFormatter.ISO_DATE_TIME.format(obj))
+    def read(json: JsValue): Instant = json match {
+      case JsString(value) => Instant.parse(value)
+      case x => throw new DeserializationException(s"Unexpected JSON for java.time.Instant: ${x.getClass.getName()}")
     }
   }
 

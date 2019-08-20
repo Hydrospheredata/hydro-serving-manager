@@ -28,18 +28,17 @@ trait ServableService[F[_]] {
 }
 
 object ServableService extends Logging {
-  def apply[F[_]](
+  def apply[F[_]]()(
+    implicit F: Concurrent[F],
+    timer: Timer[F],
+    nameGenerator: NameGenerator[F],
+    idGenerator: UUIDGenerator[F],
     cloudDriver: CloudDriver[F],
     servableRepository: ServableRepository[F],
     appRepo: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     monitor: ServableMonitor[F],
     servableDH: ServablePublisher[F]
-  )(
-    implicit F: Concurrent[F],
-    timer: Timer[F],
-    nameGenerator: NameGenerator[F],
-    idGenerator: UUIDGenerator[F]
   ): ServableService[F] = new ServableService[F] {
 
     override def deploy(modelVersion: ModelVersion): F[DeferredResult[F, GenericServable]] = {
@@ -116,6 +115,7 @@ object ServableService extends Logging {
           }
         } yield res
       }
+
       _gen(0)
     }
   }

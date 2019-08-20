@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.domain.model_build
 
-import java.time.LocalDateTime
+import java.time.Instant
 
 import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
@@ -20,7 +20,8 @@ trait ModelVersionBuilder[F[_]]{
 }
 
 object ModelVersionBuilder {
-  def apply[F[_] : Concurrent](
+  def apply[F[_] : Concurrent]()(
+  implicit
     imageBuilder: ImageBuilder[F],
     modelVersionRepository: ModelVersionRepository[F],
     imageRepository: ImageRepository[F],
@@ -46,7 +47,7 @@ object ModelVersionBuilder {
         mv = ModelVersion(
           id = 0,
           image = image,
-          created = LocalDateTime.now(),
+          created = Instant.now(),
           finished = None,
           modelVersion = version,
           modelContract = metadata.contract,
@@ -66,7 +67,7 @@ object ModelVersionBuilder {
         buildPath <- prepare(mv, modelFileStructure)
         imageSha <- imageBuilder.build(buildPath.root, mv.image, handler)
         newDockerImage = mv.image.copy(sha256 = Some(imageSha))
-        finishedVersion = mv.copy(image = newDockerImage, finished = LocalDateTime.now().some, status = ModelVersionStatus.Released)
+        finishedVersion = mv.copy(image = newDockerImage, finished = Instant.now().some, status = ModelVersionStatus.Released)
         _ <- buildLoggingService.finishLogging(mv.id)
         _ <- modelVersionRepository.update(finishedVersion)
         _ <- modelDiscoveryHub.update(finishedVersion)
@@ -76,7 +77,7 @@ object ModelVersionBuilder {
       innerCompleted.handleErrorWith { err =>
         for {
           _ <- Concurrent[F].delay(logger.error(err, err))
-          failed = mv.copy(status = ModelVersionStatus.Failed, finished = LocalDateTime.now().some)
+          failed = mv.copy(status = ModelVersionStatus.Failed, finished = Instant.now().some)
           _ <- buildLoggingService.finishLogging(mv.id)
           _ <- modelDiscoveryHub.update(failed)
           _ <- modelVersionRepository.update(failed)

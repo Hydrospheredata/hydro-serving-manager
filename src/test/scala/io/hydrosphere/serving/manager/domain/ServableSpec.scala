@@ -388,7 +388,7 @@ class ServableSpec extends GenericUnitTest {
         override def delete(id: Long): IO[Int] = ???
         override def all(): IO[List[GenericApplication]] = ???
         override def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): IO[List[GenericApplication]] = ???
-        override def findVersionsUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
         override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
       }
       val service = ServableService[IO](cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh)
@@ -506,7 +506,7 @@ class ServableSpec extends GenericUnitTest {
         override def delete(id: Long): IO[Int] = ???
         override def all(): IO[List[GenericApplication]] = ???
         override def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): IO[List[GenericApplication]] = ???
-        override def findVersionsUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
         override def findServableUsage(servableName: String): IO[List[GenericApplication]] = IO(Nil)
       }
       val service = ServableService[IO](cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh)
@@ -622,7 +622,7 @@ class ServableSpec extends GenericUnitTest {
         override def delete(id: Long): IO[Int] = ???
         override def all(): IO[List[GenericApplication]] = ???
         override def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): IO[List[GenericApplication]] = ???
-        override def findVersionsUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
         override def findServableUsage(servableName: String): IO[List[GenericApplication]] = IO{
           List(Application(1, "test", None, Application.Ready(null), ModelSignature.defaultInstance, Nil))
         }

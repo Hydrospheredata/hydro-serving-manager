@@ -24,13 +24,11 @@ trait ModelVersionService[F[_]] {
 }
 
 object ModelVersionService {
-  def apply[F[_]](
+  def apply[F[_]]()(
+    implicit F: MonadError[F, Throwable],
     modelVersionRepository: ModelVersionRepository[F],
     applicationRepo: ApplicationRepository[F],
     modelPublisher: ModelPublisher[F]
-  )(
-    implicit F: MonadError[F, Throwable],
-    executionContext: ExecutionContext
   ): ModelVersionService[F] = new ModelVersionService[F] with Logging {
 
     def deleteVersions(mvs: Seq[ModelVersion]): F[Seq[ModelVersion]] = {
@@ -43,7 +41,7 @@ object ModelVersionService {
       for {
         allVersions <- modelVersionRepository.all()
         f <- allVersions.map(_.id).toList.traverse { x =>
-          applicationRepo.findVersionsUsage(x).map(x -> _)
+          applicationRepo.findVersionUsage(x).map(x -> _)
         }
         usageMap = f.toMap
       } yield {
@@ -71,9 +69,8 @@ object ModelVersionService {
     override def get(name: String, version: Long): F[ModelVersion] = {
       for {
         _ <- F.fromOption(ModelValidator.name(name), DomainError.invalidRequest("Name contains invalid characters."))
-
         mv <- OptionT(modelVersionRepository.get(name, version))
-            .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $name:$version")))
+          .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $name:$version")))
       } yield mv
     }
   }

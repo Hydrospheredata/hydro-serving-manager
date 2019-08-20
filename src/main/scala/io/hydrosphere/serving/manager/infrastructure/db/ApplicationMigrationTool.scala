@@ -1,15 +1,17 @@
 package io.hydrosphere.serving.manager.infrastructure.db
 
-import cats.MonadError
 import cats.data.OptionT
+import cats.effect.Bracket
 import cats.implicits._
+import doobie.implicits._
+import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.application.graph.{ServableGraphAdapter, VersionGraphAdapter}
 import io.hydrosphere.serving.manager.domain.application.requests.{ExecutionGraphRequest, ModelVariantRequest, PipelineStageRequest}
 import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationKafkaStream, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.{AppDBSchemaErrors, IncompatibleExecutionGraphError, UsingModelVersionIsMissing}
-import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBServableRepository}
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.{AppDBSchemaErrors, ApplicationRow, IncompatibleExecutionGraphError, UsingModelVersionIsMissing}
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import org.apache.logging.log4j.scala.Logging
 import spray.json._
@@ -23,8 +25,8 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
     appsRepo: ApplicationRepository[F],
     cloudDriver: CloudDriver[F],
     appDeployer: ApplicationDeployer[F],
-    servableRepository: ServableRepository[F]
-  )(implicit F: MonadError[F, Throwable]): ApplicationMigrationTool[F] = new ApplicationMigrationTool[F] {
+    servableRepository: ServableRepository[F],
+  )(implicit F: Bracket[F, Throwable], tx: Transactor[F]): ApplicationMigrationTool[F] = new ApplicationMigrationTool[F] {
     override def getAndRevive() = {
       for {
         maybeApps <- appsRepo.all().attempt
@@ -49,26 +51,27 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
     }
 
     def restoreVersions(rawApp: ApplicationRow, graph: Either[VersionGraphAdapter, ServableGraphAdapter]) = {
-      graph match {
+      val fixedApp = graph match {
         case Left(value) =>
           val usedVersions = value.stages.flatMap(_.modelVariants.map(_.modelVersion.id)).toList
-          val newApp = rawApp.copy(usedModelVersions = usedVersions)
-          for {
-            _ <- appsRepo.updateRow(newApp)
-          } yield newApp
+          rawApp.copy(used_model_versions = usedVersions).pure[F]
+
         case Right(value) =>
           val servableNames = value.stages.flatMap(_.modelVariants.map(_.item)).toList
           for {
             servables <- servableRepository.get(servableNames)
             versions = servables.map(_.modelVersion.id)
-            newApp = rawApp.copy(usedModelVersions = versions)
-            _ <- appsRepo.updateRow(newApp)
+            newApp = rawApp.copy(used_model_versions = versions)
           } yield newApp
       }
+      for {
+        newApp <- fixedApp
+        _ <- DBApplicationRepository.updateQ(newApp).run.transact(tx)
+      } yield newApp
     }
 
     def restoreServables(rawApp: ApplicationRow) = {
-      val oldGraph = rawApp.executionGraph.parseJson.convertTo[VersionGraphAdapter]
+      val oldGraph = rawApp.execution_graph.parseJson.convertTo[VersionGraphAdapter]
       for {
         _ <- oldGraph.stages.traverse { stage =>
           stage.modelVariants.traverse { variant =>
@@ -94,9 +97,9 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
             )
           }
         )
-        streaming = rawApp.kafkaStreams.map(p => p.parseJson.convertTo[ApplicationKafkaStream])
-        _ = logger.debug(s"Restoring ${rawApp.applicationName}")
-        newApp <- appDeployer.deploy(rawApp.applicationName, graph, streaming)
+        streaming = rawApp.kafka_streams.map(p => p.parseJson.convertTo[ApplicationKafkaStream])
+        _ = logger.debug(s"Restoring ${rawApp.application_name}")
+        newApp <- appDeployer.deploy(rawApp.application_name, graph, streaming)
       } yield rawApp
     }
   }

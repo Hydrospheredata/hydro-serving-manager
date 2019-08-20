@@ -2,7 +2,9 @@ package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import cats.effect.Bracket
 import cats.implicits._
+import doobie._
 import doobie.implicits._
+import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
@@ -11,7 +13,7 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelReposi
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 
 object DBServableRepository {
-  final val tableName = "hydro_serving.servable"
+  val tableName = "hydro_serving.servable"
 
   case class ServableRow(
     service_name: String,
@@ -87,10 +89,10 @@ object DBServableRepository {
          | WHERE service_name = $name
       """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
 
-  def getQ(names: Seq[String]) =
+  def getManyQ(names: Seq[String]) =
     sql"""
          |${allQ.sql}
-         | WHERE service_name IN ($names)
+         | WHERE service_name IN ${names.toList}
       """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
 
   def make[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable]) = new ServableRepository[F] {
@@ -117,7 +119,7 @@ object DBServableRepository {
 
     override def get(names: Seq[String]): F[List[GenericServable]] = {
       for {
-        rows <- getQ(names).to[List].transact(tx)
+        rows <- getManyQ(names).to[List].transact(tx)
       } yield rows.map(toServableT)
     }
   }

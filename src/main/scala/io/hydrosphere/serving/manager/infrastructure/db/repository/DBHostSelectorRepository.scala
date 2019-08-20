@@ -1,8 +1,14 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
+import cats._, cats.data._, cats.implicits._
+import doobie._, doobie.implicits._
+
+import org.postgresql.util.PGobject
 import cats.effect.{Bracket, Sync}
 import cats.implicits._
+import doobie._
 import doobie.implicits._
+import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository}
 

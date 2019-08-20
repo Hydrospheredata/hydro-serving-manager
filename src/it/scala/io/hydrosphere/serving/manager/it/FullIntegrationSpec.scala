@@ -12,7 +12,7 @@ import cats.syntax.traverse._
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.grpc.Server
 import io.hydrosphere.serving.manager._
-import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
+import io.hydrosphere.serving.manager.api.grpc.GrpcServer
 import io.hydrosphere.serving.manager.api.http.HttpApiServer
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, ApplicationSubscriber, ModelPublisher, ModelSubscriber, ServablePublisher, ServableSubscriber}

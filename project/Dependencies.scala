@@ -81,7 +81,6 @@ object Dependencies {
       "org.tpolecat" %% "doobie-core" % "0.7.0",
       "org.tpolecat" %% "doobie-hikari"    % "0.7.0",
       "org.tpolecat" %% "doobie-postgres"  % "0.7.0",
-      "org.tpolecat" %% "doobie-h2"  % "0.7.0",
       "org.tpolecat" %% "doobie-scalatest" % "0.7.0" % "test",
       "io.hydrosphere" %% "typed-sql" % "0.1.0",
       "org.postgresql" % "postgresql" % postgresqlVersion,
@@ -92,6 +91,7 @@ object Dependencies {
       "com.github.pureconfig" %% "pureconfig" % "0.9.1",
       "co.fs2" %% "fs2-core" % "1.0.5",
       "co.fs2" %% "fs2-io" % "1.0.5",
-      "com.github.krasserm" %% "streamz-converter" % "0.10-M2" // uses FS2 1.0.0
+      "com.github.krasserm" %% "streamz-converter" % "0.10-M2", // uses FS2 1.0.0,
+       "com.github.mpilquist" %% "simulacrum" % "0.19.0"
     )
 }

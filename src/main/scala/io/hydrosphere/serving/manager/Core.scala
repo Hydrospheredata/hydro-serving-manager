@@ -1,80 +1,98 @@
 package io.hydrosphere.serving.manager
 
-import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
-import akka.util.Timeout
 import cats.effect._
 import cats.implicits._
-import com.spotify.docker.client.DefaultDockerClient
-import com.zaxxer.hikari.HikariDataSource
-import doobie.hikari.HikariTransactor
-import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.api.grpc.GrpcApiServer
-import io.hydrosphere.serving.manager.api.http.HttpApiServer
-import io.hydrosphere.serving.manager.config.{DockerClientConfig, HikariConfiguration, ManagerConfiguration}
-import io.hydrosphere.serving.manager.discovery.DiscoveryTopic
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
+import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, ModelPublisher, ServablePublisher}
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
+import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationRepository, ApplicationService}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import io.hydrosphere.serving.manager.infrastructure.db.ApplicationMigrationTool
+import io.hydrosphere.serving.manager.domain.host_selector.{HostSelectorRepository, HostSelectorService}
+import io.hydrosphere.serving.manager.domain.image.ImageRepository
+import io.hydrosphere.serving.manager.domain.model.{ModelRepository, ModelService}
+import io.hydrosphere.serving.manager.domain.model_build.{BuildLogRepository, BuildLoggingService, ModelVersionBuilder}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionService}
+import io.hydrosphere.serving.manager.domain.servable.{ServableMonitor, ServableProbe, ServableRepository, ServableService}
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
-import io.hydrosphere.serving.manager.util.random.RNG
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
+import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
+import io.hydrosphere.serving.manager.infrastructure.storage.{ModelUnpacker, StorageOps}
+import io.hydrosphere.serving.manager.util.UUIDGenerator
+import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
-object Core extends Logging {
 
-  def app[F[_]](
-    config: ManagerConfiguration,
-    dockerClient: DefaultDockerClient,
-    dockerConfig: DockerClientConfig,
-    predictionCtor: PredictionClient.Factory[F]
-  )(
-    implicit F: ConcurrentEffect[F],
-    cs: ContextShift[F],
-    ec: ExecutionContext,
-    as: ActorSystem,
-    mat: ActorMaterializer,
-    timeout: Timeout,
-    timer: Timer[F],
-    rng: RNG[F]
-  ) = {
-    val cloudDriver = CloudDriver.fromConfig[F](config.cloudDriver, config.dockerRepository)
-    val repositories = new Repositories[F](config)
+final case class Core[F[_]](
+  modelService: ModelService[F],
+  appService: ApplicationService[F],
+  versionService: ModelVersionService[F],
+  hostSelectorService: HostSelectorService[F],
+  servableService: ServableService[F]
+)
 
-    for {
-      appDH <- DiscoveryTopic.make[F, GenericApplication, String]()
-      (appPub, appSub) = appDH
-      servDH <- DiscoveryTopic.make[F, GenericServable, String]()
-      (servPub, servSub) = servDH
-      mdh <- DiscoveryTopic.make[F, ModelVersion, Long]()
-      (modelPub, modelSub) = mdh
-      repos = new Repositories[IO](config)
-      services = new Services[F](
-        appPub,
-        servPub,
-        modelPub,
-        repositories,
-        config,
-        dockerClient,
-        dockerConfig,
-        cloudDriver,
-        predictionCtor
-      )
+object Core {
+    def make[F[_]]()(
+      implicit
+      F: ConcurrentEffect[F],
+      ec: ExecutionContext,
+      timer: Timer[F],
+      rng: RNG[F],
+      storageOps: StorageOps[F],
+      cloudDriver: CloudDriver[F],
+      predictionCtor: PredictionClient.Factory[F],
+      imageRepository: ImageRepository[F],
+      modelPub: ModelPublisher[F],
+      appPublisher: ApplicationPublisher[F],
+      servablePublisher: ServablePublisher[F],
+      imageBuilder: DockerImageBuilder[F],
+      modelRepo: ModelRepository[F],
+      modelVersionRepo: ModelVersionRepository[F],
+      hostSelectorRepo: HostSelectorRepository[F],
+      servableRepo: ServableRepository[F],
+      appRepo: ApplicationRepository[F],
+      buildLogsRepo: BuildLogRepository[F],
+    ): F[Core[F]] = {
 
-      n = ApplicationMigrationTool.default(
-        repositories.applicationRepository,
-        services.cloudDriverService,
-        services.appDeployer,
-        repositories.servableRepository
-      )
-      _ <- n.getAndRevive()
-    } yield {
-      val httpApi = new HttpApiServer(repositories, services, config, appSub, modelSub, servSub)
-      val grpcApi = GrpcApiServer(repositories, services, config, appSub, servSub)
-      (httpApi, grpcApi, services, repos)
+        implicit val nameGen: NameGenerator[F] = NameGenerator.haiku[F]()
+
+        implicit val uuidGen: UUIDGenerator[F] = UUIDGenerator.default[F]()
+
+        implicit val modelUnpacker: ModelUnpacker[F] = ModelUnpacker.default[F]()
+
+        implicit val modelFetcher: ModelFetcher[F] = ModelFetcher.default[F]()
+
+        implicit val hostSelectorService: HostSelectorService[F] = HostSelectorService[F](hostSelectorRepo)
+
+        implicit val versionService: ModelVersionService[F] = ModelVersionService[F]()
+
+        implicit val servableProbe: ServableProbe[F] = ServableProbe.default[F]
+
+        for {
+            buildLoggingService <- BuildLoggingService.make[F]()
+            servableMonitor <- ServableMonitor.default[F](2.seconds, 1.minute)
+        } yield {
+            implicit val bl = buildLoggingService
+            implicit val sm = servableMonitor.mon
+            implicit val versionBuilder: ModelVersionBuilder[F] = ModelVersionBuilder()
+            implicit val servableService: ServableService[F] = ServableService[F]()
+
+            implicit val graphComposer: VersionGraphComposer = VersionGraphComposer.default
+
+            implicit val appDeployer: ApplicationDeployer[F] = ApplicationDeployer.default()
+
+            implicit val appService: ApplicationService[F] = ApplicationService[F]()
+
+            implicit val modelService: ModelService[F] = ModelService[F]()
+
+            Core(
+                modelService,
+                appService,
+                versionService,
+                hostSelectorService,
+                servableService
+            )
+        }
     }
-  }
 }
+
