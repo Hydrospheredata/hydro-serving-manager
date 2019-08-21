@@ -7,27 +7,12 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import cats.data.EitherT
 import cats.effect.IO
-import cats.instances.list._
-import cats.syntax.traverse._
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import doobie.util.transactor.Transactor
-import io.grpc.Server
 import io.hydrosphere.serving.manager._
-import io.hydrosphere.serving.manager.api.grpc.GrpcServer
-import io.hydrosphere.serving.manager.api.http.{HttpApiServer, HttpServer}
-import io.hydrosphere.serving.manager.config.{DockerClientConfig, HikariConfiguration, ManagerConfiguration}
-import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, ApplicationSubscriber, ModelPublisher, ModelSubscriber, ServablePublisher, ServableSubscriber}
+import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.domain.DomainError
-import io.hydrosphere.serving.manager.domain.application.Application
-import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
-import io.hydrosphere.serving.manager.domain.application.ApplicationService.Internals
-import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.domain.servable.Servable
-import io.hydrosphere.serving.manager.infrastructure.db.Database
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.util.TarGzUtils
-import io.hydrosphere.serving.manager.util.grpc.Converters
 import io.hydrosphere.serving.manager.util.random.RNG
 import org.scalatest._
 
@@ -51,33 +36,19 @@ trait FullIntegrationSpec extends DatabaseAccessIT
     tag = "latest"
   )
 
-  private[this] var rawConfig = ConfigFactory.load()
-  rawConfig = rawConfig.withValue(
-    "database",
-    rawConfig.getConfig("database").withValue(
-      "jdbcUrl",
-      ConfigValueFactory.fromAnyRef(s"jdbc:postgresql://localhost:5432/docker")
-    ).root()
-  )
-
   private[this] val originalConfiguration = ManagerConfiguration.load[IO]
-
   def configuration = originalConfiguration.unsafeRunSync()
 
-  var app: App[IO] = _
-  var transactor: Transactor[IO] = _
+  val allocatedApp =App.make[IO](configuration, dockerClient, DockerClientConfig.empty).allocated.unsafeRunSync()
+  val app: App[IO] = allocatedApp._1
+  val appFree: IO[Unit] = allocatedApp._2
   val grpcCtor: GrpcChannel.Factory[IO] = GrpcChannel.plaintextFactory[IO]
   val predictionCtor: PredictionClient.Factory[IO] = PredictionClient.clientCtor[IO](grpcCtor)
-
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    app = App.make(configuration, dockerClient, DockerClientConfig.empty).unsafeRunSync()
-    transactor = app.tra
-  }
 
   override def afterAll(): Unit = {
     app.grpcServer.shutdown().unsafeRunSync()
     system.terminate()
+    appFree.unsafeRunSync()
     super.afterAll()
   }
 

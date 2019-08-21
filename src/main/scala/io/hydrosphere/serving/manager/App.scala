@@ -11,6 +11,12 @@ import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.api.ManagerServiceGrpc
 import io.hydrosphere.serving.manager.api.grpc.{GrpcServer, GrpcServingDiscovery, ManagerGrpcService}
 import io.hydrosphere.serving.manager.api.http.HttpServer
+import io.hydrosphere.serving.manager.api.http.controller.SwaggerDocController
+import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationController
+import io.hydrosphere.serving.manager.api.http.controller.events.SSEController
+import io.hydrosphere.serving.manager.api.http.controller.host_selector.HostSelectorController
+import io.hydrosphere.serving.manager.api.http.controller.model.ModelController
+import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
@@ -74,20 +80,37 @@ object App {
         implicit val buildLogRepo = DBBuildLogRepository.make()
         implicit val imageRepo = ImageRepository.fromConfig(dockerClient, InfoProgressHandler, config.dockerRepository)
         implicit val imageBuilder = new DockerImageBuilder(dockerClient, dockerClientConfig)
+
         Resource.liftF(Core.make[F]())
       }
       grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
       discoveryService = new GrpcServingDiscovery[F](core.appSub, core.servableSub, core.appService, core.servableService)
       grpc = GrpcServer.default(config, grpcService, discoveryService)
 
+      modelController = new ModelController[F](
+        core.modelService,
+        core.repos.modelRepo,
+        core.versionService,
+        core.buildLoggingService
+      )
+      appController = new ApplicationController[F](core.appService)
+      hsController = new HostSelectorController[F](core.hostSelectorService)
+      servableController = new ServableController[F](core.servableService, cloudDriver)
+      sseController = new SSEController[F](core.appSub, core.modelSub, core.servableSub)
+
+      apiClasses = modelController.getClass ::
+        appController.getClass :: hsController.getClass ::
+        servableController.getClass:: sseController.getClass :: Nil
+      swaggerController = new SwaggerDocController(apiClasses.toSet, "2")
+
       http = HttpServer.akkaBased(
         config = config.application,
-        swaggerRoutes = ???,
-        modelRoutes = ???,
-        applicationRoutes = ???,
-        hostSelectorRoutes = ???,
-        servableRoutes = ???,
-        sseRoutes = ???
+        swaggerRoutes = swaggerController.routes,
+        modelRoutes = modelController.routes,
+        applicationRoutes = appController.routes,
+        hostSelectorRoutes = hsController.routes,
+        servableRoutes = servableController.routes,
+        sseRoutes = sseController.routes
       )
     } yield App(config, core, grpc, http, tx)
   }

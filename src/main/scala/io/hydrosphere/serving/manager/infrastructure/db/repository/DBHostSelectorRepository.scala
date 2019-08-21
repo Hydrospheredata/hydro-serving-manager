@@ -56,9 +56,9 @@ object DBHostSelectorRepository {
 
       override def delete(id: Long): F[Int] = deleteQ(id).run.transact(tx)
 
-      override def all(): F[Seq[HostSelector]] = {
+      override def all(): F[List[HostSelector]] = {
         for {
-          rows <- allQ.to[Seq].transact(tx)
+          rows <- allQ.to[List].transact(tx)
         } yield rows.map(toHostSelector)
       }
     }

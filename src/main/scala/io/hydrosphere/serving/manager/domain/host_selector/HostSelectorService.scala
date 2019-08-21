@@ -7,6 +7,8 @@ import cats.syntax.functor._
 import io.hydrosphere.serving.manager.domain.DomainError
 
 trait HostSelectorService[F[_]] {
+  def all(): F[List[HostSelector]]
+
   def create(name: String, nodeSelector: Map[String, String]): F[Either[DomainError, HostSelector]]
 
   def delete(name: String): F[Either[DomainError, HostSelector]]
@@ -44,5 +46,7 @@ object HostSelectorService {
       } yield hs
       f.value
     }
+
+    override def all(): F[List[HostSelector]] = hsRepo.all()
   }
 }

@@ -43,14 +43,11 @@ class GrpcSpec extends GenericUnitTest {
       when(versionService.get(1000)).thenReturn(IO.raiseError(new IllegalArgumentException("1000")))
       val s = new ServableService[IO] {
         override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
-
         override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
-
         override def stop(name: String): IO[GenericServable] = ???
-
         override def deploy(modelVersion: DMV): IO[DeferredResult[IO, GenericServable]] = ???
-
         override def all(): IO[List[GenericServable]] = ???
+        override def get(name: String): IO[GenericServable] = ???
       }
       val grpcApi = new ManagerGrpcService(versionService, s)
 
@@ -100,22 +97,17 @@ class GrpcSpec extends GenericUnitTest {
       var completionFlag = false
       val observer = new StreamObserver[ModelVersion] {
         override def onNext(value: ModelVersion): Unit = buffer += value
-
         override def onError(t: Throwable): Unit = ???
-
         override def onCompleted(): Unit = completionFlag = true
       }
 
       val s = new ServableService[IO] {
         override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
-
         override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
-
         override def stop(name: String): IO[GenericServable] = ???
-
         override def deploy(modelVersion: DMV): IO[DeferredResult[IO, GenericServable]] = ???
-
         override def all(): IO[List[GenericServable]] = ???
+        override def get(name: String): IO[GenericServable] = ???
       }
       val grpcApi = new ManagerGrpcService(versionService, s)
       grpcApi.getAllVersions(Empty(), observer)
@@ -132,21 +124,16 @@ class GrpcSpec extends GenericUnitTest {
       val errors = ListBuffer.empty[Throwable]
       val observer = new StreamObserver[ModelVersion] {
         override def onNext(value: ModelVersion): Unit = ???
-
         override def onError(t: Throwable): Unit = errors += t
-
         override def onCompleted(): Unit = ???
       }
       val s = new ServableService[IO] {
         override def findAndDeploy(name: String, version: Long): IO[DeferredResult[IO, GenericServable]] = ???
-
         override def findAndDeploy(modelId: Long): IO[DeferredResult[IO, GenericServable]] = ???
-
         override def stop(name: String): IO[GenericServable] = ???
-
         override def deploy(modelVersion: DMV): IO[DeferredResult[IO, GenericServable]] = ???
-
         override def all(): IO[List[GenericServable]] = ???
+        override def get(name: String): IO[GenericServable] = ???
       }
       val grpcApi = new ManagerGrpcService(versionRepo, s)
       grpcApi.getAllVersions(Empty(), observer)

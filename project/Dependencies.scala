@@ -68,7 +68,7 @@ object Dependencies {
     "org.tensorflow" % "proto" % "1.10.0"
   )
 
-  lazy val hydroServingManagerDependencies = logDependencies ++
+  lazy val all = logDependencies ++
     akkaDependencies ++
     testDependencies ++
     akkaHttpDependencies ++
@@ -81,10 +81,9 @@ object Dependencies {
       "org.tpolecat" %% "doobie-core" % "0.7.0",
       "org.tpolecat" %% "doobie-hikari"    % "0.7.0",
       "org.tpolecat" %% "doobie-postgres"  % "0.7.0",
-      "org.tpolecat" %% "doobie-scalatest" % "0.7.0" % "test",
+      "org.tpolecat" %% "doobie-scalatest" % "0.7.0" % "test, it",
       "io.hydrosphere" %% "typed-sql" % "0.1.0",
       "org.postgresql" % "postgresql" % postgresqlVersion,
-      "com.zaxxer" % "HikariCP" % "2.6.3",
       "org.flywaydb" % "flyway-core" % "4.2.0",
       "com.spotify" % "docker-client" % "8.16.0" exclude("ch.qos.logback", "logback-classic"),
       "com.google.guava" % "guava" % "22.0",

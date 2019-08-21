@@ -13,10 +13,10 @@ import scala.concurrent.ExecutionContext
 
 object Database {
   def makeHikariDataSource[F[_]](hikariConfig: HikariConfiguration)(implicit F: Sync[F]): Resource[F, HikariDataSource] = {
-    for {
-      config <- Resource.liftF(F.delay(HikariConfiguration.toConfig(hikariConfig)))
-      dataSource <- Resource.make[F, HikariDataSource](F.delay(new HikariDataSource(config)))(x => F.delay(x.close()))
-    } yield dataSource
+    val hkds = F.delay {
+      new HikariDataSource(HikariConfiguration.toConfig(hikariConfig))
+    }
+    Resource.make[F, HikariDataSource](hkds)(x => F.delay(x.close()))
   }
 
   def makeTransactor[F[_]](

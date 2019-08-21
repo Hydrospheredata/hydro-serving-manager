@@ -25,13 +25,14 @@ import scala.util.Try
 
 @Path("/api/v2/model")
 @Api(produces = "application/json", tags = Array("Model and Model Versions"))
-class ModelController[F[_]]()(
-  implicit F: ConcurrentEffect[F],
-  cs: ContextShift[F],
+class ModelController[F[_]](
   modelManagementService: ModelService[F],
   modelRepo: ModelRepository[F],
   modelVersionManagementService: ModelVersionService[F],
   buildLoggingService: BuildLoggingService[F],
+)(
+  implicit F: ConcurrentEffect[F],
+  cs: ContextShift[F],
   system: ActorSystem,
   materializer: ActorMaterializer,
 ) extends AkkaHttpControllerDsl {

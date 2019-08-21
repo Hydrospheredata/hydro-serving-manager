@@ -20,7 +20,6 @@ import spray.json._
 import java.time.Instant
 
 object DBModelVersionRepository {
-  val tableName = "hydro_serving.model_version"
   final case class ModelVersionRow(
     model_version_id: Long,
     model_id: Long,
@@ -71,11 +70,30 @@ object DBModelVersionRepository {
     metadata = mvr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
   )
 
+  def fromModelVersion(mv: ModelVersion) = ModelVersionRow(
+    model_version_id = mv.id,
+    model_id = mv.model.id,
+    host_selector = mv.hostSelector.map(_.id),
+    created_timestamp = mv.created,
+    finished_timestamp = mv.finished,
+    model_version = mv.modelVersion,
+    model_contract = mv.modelContract.toJson.compactPrint,
+    image_name = mv.image.name,
+    image_tag = mv.image.tag,
+    image_sha256 = mv.image.sha256,
+    runtime_name = mv.runtime.name,
+    runtime_version = mv.runtime.tag,
+    status = mv.status.toString,
+    profile_types = None,
+    install_command = mv.installCommand,
+    metadata = if(mv.metadata.nonEmpty) {mv.metadata.toJson.compactPrint.some} else {None}
+  )
+
   def toModelVersionT = (toModelVersion _).tupled
 
   def allQ: doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
     sql"""
-         |SELECT * FROM $tableName 
+         |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |  LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
@@ -83,7 +101,7 @@ object DBModelVersionRepository {
 
   def getQ(id: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
     sql"""
-         |SELECT * FROM $tableName
+         |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE model_version_id = $id
@@ -92,16 +110,16 @@ object DBModelVersionRepository {
 
   def getQ(name: String, version: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
     sql"""
-         |SELECT * FROM $tableName 
+         |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |  WHERE name = $name AND model_version = $version
+         |  WHERE hydro_serving.model.name = $name AND model_version = $version
          |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
   }
 
   def listVersionsQ(modelId: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
     sql"""
-         |SELECT * FROM $tableName 
+         |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE model_id = $modelId
@@ -110,7 +128,7 @@ object DBModelVersionRepository {
 
   def findVersionsQ(versionIdx: Seq[Long]): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
     sql"""
-         |SELECT * FROM $tableName 
+         |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE model_version_id IN ${versionIdx.toList}
@@ -119,7 +137,7 @@ object DBModelVersionRepository {
 
   def lastModelVersionQ(modelId: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
     sql"""
-         |SELECT * FROM $tableName 
+         |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE model_id = $modelId
@@ -128,9 +146,9 @@ object DBModelVersionRepository {
          |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
   }
 
-  def insertQ(mv: ModelVersion): doobie.Update0 = {
+  def insertQ(mv: ModelVersionRow): doobie.Update0 = {
     sql"""
-         |INSERT INTO $tableName (
+         |INSERT INTO hydro_serving.model_version (
          | model_id,
          | host_selector,
          | created_timestamp,
@@ -146,46 +164,46 @@ object DBModelVersionRepository {
          | install_command,
          | metadata
          | ) VALUES (
-         | ${mv.model.id},
-         | ${mv.hostSelector.map(_.id)},
-         | ${mv.created},
-         | ${mv.finished},
-         | ${mv.modelVersion},
-         | ${mv.modelContract.toJson.compactPrint},
-         | ${mv.image.name},
-         | ${mv.image.tag},
-         | ${mv.image.sha256},
-         | ${mv.runtime.name},
-         | ${mv.runtime.tag},
-         | ${mv.status.toString},
-         | ${mv.installCommand},
-         | ${mv.metadata.toJson.compactPrint}
+         | ${mv.model_id},
+         | ${mv.host_selector},
+         | ${mv.created_timestamp},
+         | ${mv.finished_timestamp},
+         | ${mv.model_version},
+         | ${mv.model_contract},
+         | ${mv.image_name},
+         | ${mv.image_tag},
+         | ${mv.image_sha256},
+         | ${mv.runtime_name},
+         | ${mv.runtime_version},
+         | ${mv.status},
+         | ${mv.install_command},
+         | ${mv.metadata}
          |)""".stripMargin.update
   }
 
-  def updateQ(mv: ModelVersion): doobie.Update0 = {
+  def updateQ(mv: ModelVersionRow): doobie.Update0 = {
     sql"""
-         |UPDATE $tableName SET
-         | model_id = ${mv.model.id},
-         | host_selector = ${mv.hostSelector.map(_.id)},
-         | created_timestamp = ${mv.created},
-         | finished_timestamp = ${mv.finished},
-         | model_version = ${mv.modelVersion},
-         | model_contract = ${mv.modelContract.toJson.compactPrint},
-         | image_name = ${mv.image.name},
-         | image_tag = ${mv.image.tag},
-         | image_sha256 = ${mv.image.sha256},
-         | runtime_name = ${mv.runtime.name},
-         | runtime_version = ${mv.runtime.tag},
-         | status = ${mv.status.toString},
-         | install_command = ${mv.installCommand},
-         | metadata = ${mv.metadata.toJson.compactPrint}
-         | WHERE model_version_id = ${mv.id}""".stripMargin.update
+         |UPDATE hydro_serving.model_version SET
+         | model_id = ${mv.model_id},
+         | host_selector = ${mv.host_selector},
+         | created_timestamp = ${mv.created_timestamp},
+         | finished_timestamp = ${mv.finished_timestamp},
+         | model_version = ${mv.model_version},
+         | model_contract = ${mv.model_contract},
+         | image_name = ${mv.image_name},
+         | image_tag = ${mv.image_tag},
+         | image_sha256 = ${mv.image_sha256},
+         | runtime_name = ${mv.runtime_name},
+         | runtime_version = ${mv.runtime_version},
+         | status = ${mv.status},
+         | install_command = ${mv.install_command},
+         | metadata = ${mv.metadata}
+         | WHERE model_version_id = ${mv.model_version_id}""".stripMargin.update
   }
 
   def deleteQ(id: Long): doobie.Update0 = {
     sql"""
-         |DELETE FROM $tableName 
+         |DELETE FROM hydro_serving.model_version
          |  WHERE model_version_id = $id
       """.stripMargin.update
   }
@@ -199,12 +217,12 @@ object DBModelVersionRepository {
 
     override def create(entity: ModelVersion): F[ModelVersion] = {
       for {
-        id <- insertQ(entity).withUniqueGeneratedKeys[Long]("model_version_id").transact(tx)
+        id <- insertQ(fromModelVersion(entity)).withUniqueGeneratedKeys[Long]("model_version_id").transact(tx)
       } yield entity.copy(id = id)
     }
 
     override def update(entity: ModelVersion): F[Int] = {
-      updateQ(entity).run.transact(tx)
+      updateQ(fromModelVersion( entity)).run.transact(tx)
     }
 
     override def get(id: Long): F[Option[ModelVersion]] = {

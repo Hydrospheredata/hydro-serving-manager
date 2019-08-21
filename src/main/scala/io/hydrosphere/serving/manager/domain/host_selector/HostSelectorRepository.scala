@@ -7,7 +7,7 @@ trait HostSelectorRepository[F[_]] {
 
   def get(name: String): F[Option[HostSelector]]
 
-  def all(): F[Seq[HostSelector]]
+  def all(): F[List[HostSelector]]
 
   def delete(id: Long): F[Int]
 }

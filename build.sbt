@@ -61,4 +61,4 @@ dockerfile in docker := {
 }
 resolvers += "krasserm at bintray" at "http://dl.bintray.com/krasserm/maven"
   
-libraryDependencies ++= Dependencies.hydroServingManagerDependencies
+libraryDependencies ++= Dependencies.all

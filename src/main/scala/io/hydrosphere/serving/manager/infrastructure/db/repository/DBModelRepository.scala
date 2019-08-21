@@ -17,25 +17,20 @@ object DBModelRepository {
 
   def toModel(mr: ModelRow) = Model(mr.model_id, mr.name)
 
-  val modelTableName = "hydro_serving.model"
+  def fromModel(m:Model) = ModelRow(m.id, m.name)
 
-  def allQ: doobie.Query0[ModelRow] = sql"SELECT * FROM $modelTableName".query[ModelRow]
-
-  def getByNameQ(name: String): doobie.Query0[ModelRow] = sql"${allQ.sql} WHERE name = $name".query[ModelRow]
-
-  def getByIdQ(id: Long): doobie.Query0[ModelRow] = sql"${allQ.sql} WHERE id = $id".query[ModelRow]
-
-  def createQ(m: Model): doobie.Update0 = sql"INSERT INTO $modelTableName (name) VALUES (${m.name})".update
-
-  def updateQ(m: Model): doobie.Update0 = sql"UPDATE $modelTableName SET name = ${m.name} WHERE id = ${m.id}".update
-
-  def deleteQ(id: Long): doobie.Update0 = sql"DELETE FROM $modelTableName WHERE id = id".update
+  def allQ: doobie.Query0[ModelRow] = sql"SELECT * FROM hydro_serving.model".query[ModelRow]
+  def getByNameQ(name: String): doobie.Query0[ModelRow] = sql"SELECT * FROM hydro_serving.model WHERE name = $name".query[ModelRow]
+  def getByIdQ(id: Long): doobie.Query0[ModelRow] = sql"SELECT * FROM hydro_serving.model WHERE model_id = $id".query[ModelRow]
+  def createQ(m: ModelRow): doobie.Update0 = sql"INSERT INTO hydro_serving.model (name) VALUES (${m.name})".update
+  def updateQ(m: ModelRow): doobie.Update0 = sql"UPDATE hydro_serving.model SET name = ${m.name} WHERE model_id = ${m.model_id}".update
+  def deleteQ(id: Long): doobie.Update0 = sql"DELETE FROM hydro_serving.model WHERE model_id = $id".update
 
   def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): ModelRepository[F] = {
     new ModelRepository[F] {
       override def create(entity: Model): F[Model] = {
         for {
-          id <- createQ(entity).withUniqueGeneratedKeys[Long]("model_id").transact(tx)
+          id <- createQ(fromModel(entity)).withUniqueGeneratedKeys[Long]("model_id").transact(tx)
         } yield Model(id, entity.name)
       }
 
@@ -57,7 +52,7 @@ object DBModelRepository {
         } yield row.map(toModel)
       }
 
-      override def update(value: Model): F[Int] = updateQ(value).run.transact(tx)
+      override def update(value: Model): F[Int] = updateQ(fromModel(value)).run.transact(tx)
 
       override def delete(id: Long): F[Int] = deleteQ(id).run.transact(tx)
     }

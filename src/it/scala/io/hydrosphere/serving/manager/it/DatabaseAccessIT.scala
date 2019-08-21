@@ -1,13 +1,8 @@
 package io.hydrosphere.serving.manager.it
 
-import cats.effect.IO
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
-import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.config.HikariConfiguration
-import io.hydrosphere.serving.manager.infrastructure.db.Database
 
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext
 
 trait DatabaseAccessIT extends IsolatedDockerAccessIT {
 
@@ -33,9 +28,10 @@ trait DatabaseAccessIT extends IsolatedDockerAccessIT {
   def container = dockerClient.createContainer(config)
   logger.info("Created db container")
 
+  dockerClient.startContainer(container.id())
+  logger.info("Starting db container")
   override protected def beforeAll(): Unit = {
+
     super.beforeAll()
-    dockerClient.startContainer(container.id())
-    logger.info("Starting db container")
   }
 }

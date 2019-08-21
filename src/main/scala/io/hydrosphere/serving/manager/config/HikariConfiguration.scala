@@ -11,14 +11,14 @@ case class HikariConfiguration(
 )
 
 object HikariConfiguration {
-    def toConfig(hikariConfiguration: HikariConfiguration): HikariConfig = {
+    def toConfig(config: HikariConfiguration): HikariConfig = {
         val hikariConfig = new HikariConfig()
-        hikariConfig.setJdbcUrl(hikariConfiguration.jdbcUrl)
-        hikariConfig.setUsername(hikariConfiguration.username)
-        hikariConfig.setPassword(hikariConfiguration.password)
-        hikariConfig.setDriverClassName(hikariConfiguration.driverClassname)
-        hikariConfig.setMaximumPoolSize(hikariConfiguration.maximumPoolSize)
-        hikariConfig.setInitializationFailTimeout(20000)
+        hikariConfig.setJdbcUrl(config.jdbcUrl)
+        hikariConfig.setUsername(config.username)
+        hikariConfig.setPassword(config.password)
+        hikariConfig.setDriverClassName(config.driverClassname)
+        hikariConfig.setMaximumPoolSize(config.maximumPoolSize)
+        hikariConfig.setInitializationFailTimeout(-1)
         hikariConfig
     }
 }

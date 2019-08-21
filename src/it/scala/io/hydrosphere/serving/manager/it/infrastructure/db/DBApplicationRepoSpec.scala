@@ -15,7 +15,7 @@ import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 
-class ApplicationRepoSpec extends FullIntegrationSpec {
+class DBApplicationRepoSpec extends FullIntegrationSpec {
   private val uploadFile = packModel("/models/dummy_model")
   private val signature = ModelSignature(
     signatureName = "not-default-spark",
@@ -50,26 +50,26 @@ class ApplicationRepoSpec extends FullIntegrationSpec {
         kafkaStreaming = List.empty,
         versionGraph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(mv1, 100)), ModelSignature.defaultInstance))
       )
-      val result = app .applicationRepository.create(application).unsafeRunSync()
+      val result = app.core.repos.appRepo.create(application).unsafeRunSync()
       println(result)
       assert(result.id !== 0)
     }
     it("should retrieve an application by id") {
-      val result = repositories.applicationRepository.get(1).unsafeRunSync().get
+      val result = app.core.repos.appRepo.get(1).unsafeRunSync().get
       println(result)
       assert(result.name === "repo-spec-app")
     }
     it("should retrieve an application by name") {
-      val result = repositories.applicationRepository.get("repo-spec-app").unsafeRunSync().get
+      val result = app.core.repos.appRepo.get("repo-spec-app").unsafeRunSync().get
       println(result)
       assert(result.id === 1)
     }
     it("should find app usages") {
-      val oldApp = repositories.applicationRepository.get("repo-spec-app").unsafeRunSync().get
-      val result = repositories.applicationRepository.findServableUsage(servable.fullName).unsafeRunSync()
+      val oldApp = app.core.repos.appRepo.get("repo-spec-app").unsafeRunSync().get
+      val result = app.core.repos.appRepo.findServableUsage(servable.fullName).unsafeRunSync()
       assert(result.head.name == oldApp.name)
 
-      val failResult = repositories.applicationRepository.findServableUsage("hackermans").unsafeRunSync()
+      val failResult = app.core.repos.appRepo.findServableUsage("hackermans").unsafeRunSync()
       assert(failResult.isEmpty, failResult)
     }
   }
@@ -77,10 +77,10 @@ class ApplicationRepoSpec extends FullIntegrationSpec {
     super.beforeAll()
 
     val f = for {
-      d1 <- services.modelService.uploadModel(uploadFile, upload1)
+      d1 <- app.core.modelService.uploadModel(uploadFile, upload1)
       completed1 <- d1.completed.get
-      s = Servable(completed1, "test-suffix", Servable.Serving("ok", "localhost", 9090))
-      _ <- repositories.servableRepository.upsert(s)
+      s = Servable(completed1, "test-suffix", Servable.Serving("ok", "localhost", 9090), Nil)
+      _ <- app.core.repos.servableRepo.upsert(s)
     } yield {
       println(s"UPLOADED: $completed1")
       mv1 = completed1

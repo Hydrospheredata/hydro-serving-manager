@@ -18,6 +18,8 @@ import org.apache.logging.log4j.scala.Logging
 import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
+  def get(name: String): F[GenericServable]
+
   def all(): F[List[GenericServable]]
 
   def findAndDeploy(name: String, version: Long): F[DeferredResult[F, GenericServable]]
@@ -122,5 +124,10 @@ object ServableService extends Logging {
     }
 
     override def all(): F[List[GenericServable]] = servableRepository.all()
+
+    override def get(name: String): F[GenericServable] = {
+      OptionT(servableRepository.get(name))
+        .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find Servable with name=${name}")))
+    }
   }
 }

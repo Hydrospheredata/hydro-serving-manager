@@ -1,8 +1,9 @@
 package io.hydrosphere.serving.manager.it.infrastructure.db
 
-import io.hydrosphere.serving.manager.GenericUnitTest
+import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 
-class DBApplicationRepositorySpec extends GenericUnitTest {
+
+class DBApplicationRepositorySpec extends FullIntegrationSpec {
   describe("Queries") {
     pending
   }

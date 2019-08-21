@@ -35,6 +35,7 @@ case class Repositories[F[_]](
 
 final case class Core[F[_]](
   repos: Repositories[F],
+  buildLoggingService: BuildLoggingService[F],
   hostSelectorService: HostSelectorService[F],
   modelService: ModelService[F],
   versionService: ModelVersionService[F],
@@ -98,6 +99,7 @@ object Core {
           val repos = Repositories(appRepo, hostSelectorRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo)
           Core(
             repos = repos,
+            buildLoggingService = buildLoggingService,
             hostSelectorService = hostSelectorService,
             modelService = modelService,
             versionService = versionService,
