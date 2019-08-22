@@ -85,6 +85,15 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       }
       q.unsafeToFuture()
     }
+    it("should get many versions") {
+      val q = for {
+        result <- OptionT(app.core.repos.versionRepo.get("model-name", 1))
+          .getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
+      } yield {
+        assert(result.id == 1)
+      }
+      q.unsafeToFuture()
+    }
     it("should delete a version") {
       val q = for {
         added <- app.core.repos.versionRepo.create(version.copy(modelVersion = 2))

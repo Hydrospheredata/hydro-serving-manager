@@ -51,6 +51,13 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
     it("should read names correctly") {
       assert(Servable.extractSuffix("claims_model", 1, "claims-model-1-far-moon") == "far-moon")
     }
+    it("should get many servables") {
+      val res = app.core.repos.servableRepo.get("model-name-1-test-servable" :: "kek" :: Nil).unsafeRunSync()
+      println(res)
+      assert(res.size == 1)
+      assert(res.head.modelVersion === mv1)
+      assert(res.head.nameSuffix === "test-servable")
+    }
   }
 
   override protected def beforeAll(): Unit = {

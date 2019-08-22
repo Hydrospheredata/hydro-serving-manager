@@ -19,6 +19,8 @@ import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtoc
 import spray.json._
 import java.time.Instant
 
+import cats.data.NonEmptyList
+
 object DBModelVersionRepository {
   final case class ModelVersionRow(
     model_version_id: Long,
@@ -128,13 +130,15 @@ object DBModelVersionRepository {
          |""".stripMargin.query[JoinedModelVersionRow]
   }
 
-  def findVersionsQ(versionIdx: Seq[Long]): doobie.Query0[JoinedModelVersionRow] = {
-    sql"""
-         |SELECT * FROM hydro_serving.model_version
-         |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |  WHERE hydro_serving.model_version.model_version_id IN ${versionIdx.toList}
-         |""".stripMargin.query[JoinedModelVersionRow]
+  def findVersionsQ(versionIdx: NonEmptyList[Long]): doobie.Query0[JoinedModelVersionRow] = {
+    val q =
+      fr"""
+          |SELECT * FROM hydro_serving.model_version
+          | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
+          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
+          |  WHERE """.stripMargin
+    val fullQ = q ++ Fragments.in(fr"hydro_serving.model_version.model_version_id", versionIdx)
+    fullQ.query[JoinedModelVersionRow]
   }
 
   def lastModelVersionQ(modelId: Long): doobie.Query0[JoinedModelVersionRow] = {

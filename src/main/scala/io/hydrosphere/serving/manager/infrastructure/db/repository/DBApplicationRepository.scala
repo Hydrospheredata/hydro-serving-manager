@@ -30,10 +30,10 @@ object DBApplicationRepository {
     status: String,
     application_contract: String,
     execution_graph: String,
+    used_servables: List[String],
     kafka_streams: List[String],
     status_message: Option[String],
     used_model_versions: List[Long],
-    used_servables: List[String],
   )
 
   def toApplication(ar: ApplicationRow, versions: Map[Long, ModelVersion], servables: Map[String, GenericServable]): Either[AppDBSchemaError, GenericApplication] = {
@@ -306,7 +306,13 @@ object DBApplicationRepository {
 
   def fetchAppsInfo(apps: List[ApplicationRow]) = {
    for {
-     versions <- DBModelVersionRepository.findVersionsQ(apps.flatMap(_.used_model_versions)).to[List]
+     versions <- {
+       val allVersions = apps.flatMap(_.used_model_versions)
+       NonEmptyList.fromList(allVersions) match {
+         case Some(x) => DBModelVersionRepository.findVersionsQ(x).to[List]
+         case None => Nil.pure[ConnectionIO]
+       }
+     }
      versionMap = versions.map(x => x._1.model_version_id -> DBModelVersionRepository.toModelVersionT(x)).toMap
      servables <- {
        val allServables = apps.flatMap(_.used_servables)
