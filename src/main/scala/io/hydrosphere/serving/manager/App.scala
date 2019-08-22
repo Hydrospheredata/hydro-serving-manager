@@ -31,11 +31,11 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicatio
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
-import io.hydrosphere.serving.manager.util.docker.InfoProgressHandler
 import io.hydrosphere.serving.manager.util.random.RNG
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
+import io.hydrosphere.serving.manager.util.docker.DockerProgress
 
 
 
@@ -68,6 +68,7 @@ object App {
       tx <- Resource.liftF(Database.makeTransactor[F](hk, ExecutionContext.global, ExecutionContext.global))
       flyway <- Resource.liftF(Database.makeFlyway(tx))
       _ <- Resource.liftF(flyway.migrate())
+      dockerLogger = DockerProgress.makeLogger(println)
       core <- {
         implicit val rng = rngF
         implicit val cd = cloudDriver
@@ -78,7 +79,7 @@ object App {
         implicit val servableRepo = DBServableRepository.make()
         implicit val appRepo = DBApplicationRepository.make()
         implicit val buildLogRepo = DBBuildLogRepository.make()
-        implicit val imageRepo = ImageRepository.fromConfig(dockerClient, InfoProgressHandler, config.dockerRepository)
+        implicit val imageRepo = ImageRepository.fromConfig(dockerClient, dockerLogger, config.dockerRepository)
         implicit val imageBuilder = new DockerImageBuilder(dockerClient, dockerClientConfig)
 
         Resource.liftF(Core.make[F]())

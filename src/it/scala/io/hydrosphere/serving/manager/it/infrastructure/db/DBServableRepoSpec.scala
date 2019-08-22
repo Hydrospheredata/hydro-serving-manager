@@ -2,6 +2,7 @@ package io.hydrosphere.serving.manager.it.infrastructure.db
 
 import java.time.Instant
 
+import cats.data.NonEmptyList
 import doobie.scalatest.IOChecker
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
@@ -26,7 +27,7 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
     it("should have correct queries") {
       val row = ServableRow("name", 123, "status_text", Some("host"), Some(123), "status")
       check(DBServableRepository.allQ)
-      check(DBServableRepository.getManyQ("123" :: "test" :: Nil))
+      check(DBServableRepository.getManyQ(NonEmptyList.of("123", "test")))
       check(DBServableRepository.deleteQ("delete-me"))
       check(DBServableRepository.getQ("get-me"))
       check(DBServableRepository.upsertQ(row))
@@ -38,10 +39,10 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
       val servable = Servable(mv1, "test-servable", Servable.Serving("Ok", "localhost", 9090), Nil)
       val result = app.core.repos.servableRepo.upsert(servable).unsafeRunSync()
       println(result)
-      assert(result.fullName === "m1-1-test-servable")
+      assert(result.fullName === "model-name-1-test-servable")
     }
     it("should get Servable by name") {
-      val res = app.core.repos.servableRepo.get("m1-1-test-servable").unsafeRunSync()
+      val res = app.core.repos.servableRepo.get("model-name-1-test-servable").unsafeRunSync()
       println(res)
       assert(res.isDefined, res)
       assert(res.get.modelVersion === mv1)
@@ -56,7 +57,7 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
     super.beforeAll()
 
     val f = for {
-      m <- app.core.repos.modelRepo.create(Model(1, "test"))
+      m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
       mv = ModelVersion(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
       mv <- app.core.repos.versionRepo.create(mv)
     } yield {

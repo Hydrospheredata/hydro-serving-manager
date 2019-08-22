@@ -11,10 +11,10 @@ import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableReposit
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
+import cats.data.NonEmptyList
+import cats.data.OptionT
 
 object DBServableRepository {
-  val tableName = "hydro_serving.servable"
-
   case class ServableRow(
     service_name: String,
     model_version_id: Long,
@@ -41,7 +41,7 @@ object DBServableRepository {
     )
   }
 
-  def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow], apps: List[String]) = {
+  def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow], apps: Option[List[String]]) = {
     val modelVersion = DBModelVersionRepository.toModelVersion(mvr, mr, hsr)
     val suffix = Servable.extractSuffix(mr.name, mvr.model_version, sr.service_name)
     val status = (sr.status, sr.host, sr.port) match {
@@ -50,7 +50,7 @@ object DBServableRepository {
       case ("NotAvailable", host, port) => Servable.NotAvailable(sr.status_text, host, port)
       case (_, host, port) => Servable.Starting(sr.status_text, host, port)
     }
-    Servable(modelVersion, suffix, status, apps)
+    Servable(modelVersion, suffix, status, apps.getOrElse(Nil))
   }
 
   def toServableT = (toServable _).tupled
@@ -61,11 +61,11 @@ object DBServableRepository {
          | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
          | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |""".stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
+         |""".stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])]
 
   def upsertQ(sr: ServableRow) =
     sql"""
-         |INSERT INTO $tableName(service_name, model_version_id, status_text, host, port, status)
+         |INSERT INTO hydro_serving.servable(service_name, model_version_id, status_text, host, port, status)
          | VALUES(${sr.service_name}, ${sr.model_version_id}, ${sr.status_text}, ${sr.host}, ${sr.port}, ${sr.status})
          | ON CONFLICT (service_name)
          |  DO UPDATE
@@ -79,21 +79,28 @@ object DBServableRepository {
 
   def deleteQ(name: String) =
     sql"""
-         |DELETE FROM $tableName
+         |DELETE FROM hydro_serving.servable
          | WHERE service_name = $name
       """.stripMargin.update
 
   def getQ(name: String) =
     sql"""
-         |${allQ.sql}
-         | WHERE service_name = $name
-      """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
+      |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
+      | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
+      | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
+      | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
+      |   WHERE service_name = $name
+      """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])]
 
-  def getManyQ(names: Seq[String]) =
-    sql"""
-         |${allQ.sql}
-         | WHERE service_name IN ${names.toList}
-      """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], List[String])]
+  def getManyQ(names: NonEmptyList[String]) = {
+    val frag = fr"""
+      |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
+      | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
+      | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
+      | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
+      |  WHERE """.stripMargin ++ Fragments.in(fr"service_name", names)
+      frag.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])]
+  }
 
   def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]) = new ServableRepository[F] {
     override def all(): F[List[GenericServable]] = {
@@ -118,9 +125,11 @@ object DBServableRepository {
     }
 
     override def get(names: Seq[String]): F[List[GenericServable]] = {
-      for {
-        rows <- getManyQ(names).to[List].transact(tx)
+      val okCase = for {
+        nonEmptyNames <- OptionT.fromOption[F](NonEmptyList.fromList(names.toList))
+        rows <- OptionT.liftF(getManyQ(nonEmptyNames).to[List].transact(tx))
       } yield rows.map(toServableT)
+      okCase.getOrElse(Nil)
     }
   }
 }

@@ -6,7 +6,6 @@ import cats.free.Free
 import cats.implicits._
 import doobie.implicits._
 import doobie._
-import doobie.free.connection
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
@@ -21,6 +20,7 @@ import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtoc
 import spray.json._
 
 import scala.util.{Failure, Success, Try}
+import cats.data.NonEmptyList
 
 object DBApplicationRepository {
 
@@ -234,13 +234,11 @@ object DBApplicationRepository {
     override def get(id: Long): F[Option[GenericApplication]] = {
       val transaction = for {
         app <- OptionT(getByIdQ(id).option)
-        versions <- OptionT.liftF(DBModelVersionRepository.findVersionsQ(app.used_model_versions).to[List])
-        servables <- OptionT.liftF(DBServableRepository.getManyQ(app.used_servables).to[List])
+        appInfo <- OptionT.liftF(fetchAppInfo(app))
+        (versions, servables) = appInfo
       } yield (app, versions, servables)
       val result = transaction.transact(tx).flatMap { case (app, versions, servables) =>
-        val versionMap = versions.map(x => x._1.model_version_id -> DBModelVersionRepository.toModelVersionT(x)).toMap
-        val servableMap = servables.map(x => x._1.service_name -> DBServableRepository.toServableT(x)).toMap
-        OptionT.liftF(F.fromEither(toApplication(app, versionMap, servableMap)))
+        OptionT.liftF(F.fromEither(toApplication(app, versions, servables)))
       }
       result.value
     }
@@ -248,13 +246,11 @@ object DBApplicationRepository {
     override def get(name: String): F[Option[GenericApplication]] = {
       val transaction = for {
         app <- OptionT(getByNameQ(name).option)
-        versions <- OptionT.liftF(DBModelVersionRepository.findVersionsQ(app.used_model_versions).to[List])
-        servables <- OptionT.liftF(DBServableRepository.getManyQ(app.used_servables).to[List])
+        appInfo <- OptionT.liftF(fetchAppInfo(app))
+        (versions, servables) = appInfo
       } yield (app, versions, servables)
       val result = transaction.transact(tx).flatMap { case (app, versions, servables) =>
-        val versionMap = versions.map(x => x._1.model_version_id -> DBModelVersionRepository.toModelVersionT(x)).toMap
-        val servableMap = servables.map(x => x._1.service_name -> DBServableRepository.toServableT(x)).toMap
-        OptionT.liftF(F.fromEither(toApplication(app, versionMap, servableMap)))
+        OptionT.liftF(F.fromEither(toApplication(app, versions, servables)))
       }
       result.value
     }
@@ -309,11 +305,19 @@ object DBApplicationRepository {
     }
   }
 
-  def fetchAppsInfo(apps: List[ApplicationRow]): Free[connection.ConnectionOp, (Map[Long, ModelVersion], Map[String, Servable[Servable.Status]])] = {
+  def fetchAppInfo(app: ApplicationRow) = fetchAppsInfo(app :: Nil)
+
+  def fetchAppsInfo(apps: List[ApplicationRow]) = {
    for {
      versions <- DBModelVersionRepository.findVersionsQ(apps.flatMap(_.used_model_versions)).to[List]
      versionMap = versions.map(x => x._1.model_version_id -> DBModelVersionRepository.toModelVersionT(x)).toMap
-     servables <- DBServableRepository.getManyQ(apps.flatMap(app => app.used_servables)).to[List]
+     servables <- {
+       val allServables = apps.flatMap(_.used_servables)
+       NonEmptyList.fromList(allServables) match {
+         case Some(x) => DBServableRepository.getManyQ(x).to[List]
+         case None => Nil.pure[ConnectionIO]
+       }
+     }
      servableMap = servables.map(x => x._1.service_name -> DBServableRepository.toServableT(x)).toMap
    } yield versionMap -> servableMap
   }

@@ -39,6 +39,8 @@ object DBModelVersionRepository {
     metadata: Option[String]
   )
 
+  type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
+
   def toModelVersion(mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow]): ModelVersion = ModelVersion(
     id = mvr.model_version_id,
     image = DockerImage(
@@ -91,51 +93,51 @@ object DBModelVersionRepository {
 
   def toModelVersionT = (toModelVersion _).tupled
 
-  def allQ: doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
+  def allQ: doobie.Query0[JoinedModelVersionRow] = {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |  LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
+         |""".stripMargin.query[JoinedModelVersionRow]
   }
 
-  def getQ(id: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
+  def getQ(id: Long): doobie.Query0[JoinedModelVersionRow] = {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE model_version_id = $id
-         |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
+         |""".stripMargin.query[JoinedModelVersionRow]
   }
 
-  def getQ(name: String, version: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
+  def getQ(name: String, version: Long): doobie.Query0[JoinedModelVersionRow] = {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE hydro_serving.model.name = $name AND model_version = $version
-         |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
+         |""".stripMargin.query[JoinedModelVersionRow]
   }
 
-  def listVersionsQ(modelId: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
+  def listVersionsQ(modelId: Long): doobie.Query0[JoinedModelVersionRow] = {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE model_id = $modelId
-         |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
+         |""".stripMargin.query[JoinedModelVersionRow]
   }
 
-  def findVersionsQ(versionIdx: Seq[Long]): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
+  def findVersionsQ(versionIdx: Seq[Long]): doobie.Query0[JoinedModelVersionRow] = {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE model_version_id IN ${versionIdx.toList}
-         |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
+         |""".stripMargin.query[JoinedModelVersionRow]
   }
 
-  def lastModelVersionQ(modelId: Long): doobie.Query0[(ModelVersionRow, ModelRow, Option[HostSelectorRow])] = {
+  def lastModelVersionQ(modelId: Long): doobie.Query0[JoinedModelVersionRow] = {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
@@ -143,7 +145,7 @@ object DBModelVersionRepository {
          |  WHERE model_id = $modelId
          |  ORDER BY model_version DESC
          |  LIMIT 1
-         |""".stripMargin.query[(ModelVersionRow, ModelRow, Option[HostSelectorRow])]
+         |""".stripMargin.query[JoinedModelVersionRow]
   }
 
   def insertQ(mv: ModelVersionRow): doobie.Update0 = {
