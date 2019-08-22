@@ -106,7 +106,7 @@ object DBModelVersionRepository {
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |  WHERE model_version_id = $id
+         |  WHERE hydro_serving.model_version.model_version_id = $id
          |""".stripMargin.query[JoinedModelVersionRow]
   }
 
@@ -124,7 +124,7 @@ object DBModelVersionRepository {
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |  WHERE model_id = $modelId
+         |  WHERE hydro_serving.model_version.model_id = $modelId
          |""".stripMargin.query[JoinedModelVersionRow]
   }
 
@@ -133,7 +133,7 @@ object DBModelVersionRepository {
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |  WHERE model_version_id IN ${versionIdx.toList}
+         |  WHERE hydro_serving.model_version.model_version_id IN ${versionIdx.toList}
          |""".stripMargin.query[JoinedModelVersionRow]
   }
 
@@ -142,8 +142,8 @@ object DBModelVersionRepository {
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |  WHERE model_id = $modelId
-         |  ORDER BY model_version DESC
+         |  WHERE hydro_serving.model_version.model_id = $modelId
+         |  ORDER BY hydro_serving.model_version.model_version DESC
          |  LIMIT 1
          |""".stripMargin.query[JoinedModelVersionRow]
   }

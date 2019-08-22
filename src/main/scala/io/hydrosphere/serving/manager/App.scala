@@ -38,7 +38,6 @@ import scala.concurrent.ExecutionContext
 import io.hydrosphere.serving.manager.util.docker.DockerProgress
 
 
-
 case class App[F[_]](
   config: ManagerConfiguration,
   core: Core[F],

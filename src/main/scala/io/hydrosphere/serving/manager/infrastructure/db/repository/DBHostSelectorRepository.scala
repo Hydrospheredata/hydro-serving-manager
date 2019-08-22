@@ -22,17 +22,15 @@ object DBHostSelectorRepository {
 
   def toHostSelector(hs: HostSelectorRow) = HostSelector(hs.host_selector_id, hs.name, hs.node_selector)
 
-  def selTableName = "hydro_serving.host_selector"
+  def allQ: doobie.Query0[HostSelectorRow] = sql"SELECT * FROM hydro_serving.host_selector".query[HostSelectorRow]
 
-  def allQ: doobie.Query0[HostSelectorRow] = sql"SELECT * FROM $selTableName".query[HostSelectorRow]
+  def insertQ(entity: HostSelector): doobie.Update0 = sql"INSERT INTO hydro_serving.host_selector (name, node_selector) VALUES (${entity.name}, ${entity.nodeSelector})".update
 
-  def insertQ(entity: HostSelector): doobie.Update0 = sql"INSERT INTO $selTableName (name, node_selector) VALUES (${entity.name}, ${entity.nodeSelector})".update
+  def getByIdQ(id: Long): doobie.Query0[HostSelectorRow] = sql"SELECT * FROM hydro_serving.host_selector WHERE id = $id".query[HostSelectorRow]
 
-  def getByIdQ(id: Long): doobie.Query0[HostSelectorRow] = sql"SELECT * FROM $selTableName WHERE id = $id".query[HostSelectorRow]
+  def getByNameQ(name: String): doobie.Query0[HostSelectorRow] = sql"SELECT * FROM hydro_serving.host_selector WHERE name = $name".query[HostSelectorRow]
 
-  def getByNameQ(name: String): doobie.Query0[HostSelectorRow] = sql"SELECT * FROM $selTableName WHERE name = $name".query[HostSelectorRow]
-
-  def deleteQ(id: Long): doobie.Update0 = sql"DELETE FROM $selTableName WHERE id = $id".update
+  def deleteQ(id: Long): doobie.Update0 = sql"DELETE FROM hydro_serving.host_selector WHERE id = $id".update
 
   def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): HostSelectorRepository[F] = {
     new HostSelectorRepository[F] {

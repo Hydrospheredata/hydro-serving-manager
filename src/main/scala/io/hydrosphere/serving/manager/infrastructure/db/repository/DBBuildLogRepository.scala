@@ -9,11 +9,6 @@ import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
 
 object DBBuildLogRepository {
-  val tableName = "hydro_serving.build_log"
-
-  val version = 1
-  val testQ = sql"SELECT * FROM $tableName hydro_serving.build_log WHERE version_id = $version"
-
   final case class BuildLogRow(
     version_id: Long,
     logs: List[String]
@@ -21,13 +16,13 @@ object DBBuildLogRepository {
 
   def getQ(modelVersionId: Long): doobie.Query0[BuildLogRow] =
     sql"""
-         |SELECT * FROM $tableName
+         |SELECT * FROM hydro_serving.build_log
          |  WHERE version_id = $modelVersionId
       """.stripMargin.query[BuildLogRow]
 
   def insertQ(br: BuildLogRow): doobie.Update0 =
     sql"""
-         |INSERT INTO $tableName(version_id, logs)
+         |INSERT INTO hydro_serving.build_log(version_id, logs)
          |  VALUES(${br.version_id}, ${br.logs})
       """.stripMargin.update
 

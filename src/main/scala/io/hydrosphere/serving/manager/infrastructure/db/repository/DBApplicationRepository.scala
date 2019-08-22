@@ -23,9 +23,6 @@ import scala.util.{Failure, Success, Try}
 import cats.data.NonEmptyList
 
 object DBApplicationRepository {
-
-  val tableName = "hydro_serving.application"
-
   final case class ApplicationRow(
     id: Long,
     application_name: String,
@@ -151,37 +148,37 @@ object DBApplicationRepository {
 
   def allQ =
     sql"""
-         |SELECT * FROM $tableName
+         |SELECT * FROM hydro_serving.application
         """.stripMargin.query[ApplicationRow]
 
   def getByNameQ(name: String) =
     sql"""
-          |SELECT * FROM $tableName
+          |SELECT * FROM hydro_serving.application
           | WHERE application_name = $name
       """.stripMargin.query[ApplicationRow]
 
   def getByIdQ(id: Long) =
     sql"""
-         |SELECT * FROM $tableName
+         |SELECT * FROM hydro_serving.application
          | WHERE id = $id
       """.stripMargin.query[ApplicationRow]
 
   def modelVersionUsageQ(versionId: Long) =
     sql"""
-          |SELECT * FROM $tableName
+          |SELECT * FROM hydro_serving.application
           | WHERE ${versionId} = ANY(used_model_versions)
       """.stripMargin.query[ApplicationRow]
 
 
   def servableUsageQ(servableName: String) =
     sql"""
-         |SELECT * FROM $tableName
+         |SELECT * FROM hydro_serving.application
          | WHERE ${servableName} = ANY(used_servables)
       """.stripMargin.query[ApplicationRow]
 
   def createQ(app:ApplicationRow) =
     sql"""
-          |INSERT INTO $tableName(
+          |INSERT INTO hydro_serving.application(
           | application_name,
           | used_servables,
           | used_model_versions,
@@ -204,7 +201,7 @@ object DBApplicationRepository {
 
   def updateQ(app: ApplicationRow) =
     sql"""
-          |UPDATE TABLE $tableName SET
+          |UPDATE TABLE hydro_serving.application SET
           | application_name = ${app.application_name},
           | used_servables = ${app.used_servables},
           | used_model_versions = ${app.used_model_versions},
@@ -218,7 +215,7 @@ object DBApplicationRepository {
 
   def deleteQ(id: Long) =
     sql"""
-          |DELETE FROM $tableName
+          |DELETE FROM hydro_serving.application
           | WHERE id = $id
       """.stripMargin.update
 

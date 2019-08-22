@@ -109,7 +109,7 @@ trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with 
   }
 
   implicit val instantFormat = new JsonFormat[Instant] {
-    def write(obj: Instant): JsValue = JsString(DateTimeFormatter.ISO_DATE_TIME.format(obj))
+    def write(obj: Instant): JsValue = JsString(obj.toString)
     def read(json: JsValue): Instant = json match {
       case JsString(value) =>
         Try(Instant.parse(value))
