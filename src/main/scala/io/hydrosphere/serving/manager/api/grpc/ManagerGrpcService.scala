@@ -52,8 +52,8 @@ class ManagerGrpcService[F[_]](
     val flow = for {
       res <- request.modelVersion match {
         case ModelVersion.Empty =>  F.raiseError[DeferredResult[F, GenericServable]](DomainError.invalidRequest("model version is not specified"))
-        case ModelVersion.VersionId(value) => servableService.findAndDeploy(value)
-        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version)
+        case ModelVersion.VersionId(value) => servableService.findAndDeploy(value, Map.empty)
+        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version, Map.empty) // TODO update GRPC contract
       }
       _ <- F.delay(responseObserver.onNext(Converters.fromServable(res.started)))
       completed <- res.completed.get

@@ -44,7 +44,8 @@ class DBServableRepository[F[_]](
         statusText = statusText,
         host = host,
         port = port,
-        status = status
+        status = status,
+        metadata = if (entity.metadata.nonEmpty) Some(entity.metadata.toJson.compactPrint) else None
       )
       val q = Tables.Servable.insertOrUpdate(row)
       db.run(q)

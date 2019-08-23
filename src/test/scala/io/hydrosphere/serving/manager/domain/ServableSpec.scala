@@ -392,7 +392,7 @@ class ServableSpec extends GenericUnitTest {
         override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
       }
       val service = ServableService[IO](cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh)
-      val result = service.deploy(mv).unsafeRunSync().completed.get.unsafeRunSync()
+      val result = service.deploy(mv, Map.empty).unsafeRunSync().completed.get.unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty
       monitorState should not be empty

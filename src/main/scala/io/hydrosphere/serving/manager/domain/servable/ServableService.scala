@@ -18,13 +18,13 @@ import org.apache.logging.log4j.scala.Logging
 import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
-  def findAndDeploy(name: String, version: Long): F[DeferredResult[F, GenericServable]]
+  def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 
-  def findAndDeploy(modelId: Long): F[DeferredResult[F, GenericServable]]
+  def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 
   def stop(name: String): F[GenericServable]
 
-  def deploy(modelVersion: ModelVersion): F[DeferredResult[F, GenericServable]]
+  def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 }
 
 object ServableService extends Logging {
@@ -42,11 +42,11 @@ object ServableService extends Logging {
     idGenerator: UUIDGenerator[F]
   ): ServableService[F] = new ServableService[F] {
 
-    override def deploy(modelVersion: ModelVersion): F[DeferredResult[F, GenericServable]] = {
+    override def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
         randomSuffix <- generateUniqueSuffix(modelVersion)
         d <- Deferred[F, GenericServable]
-        initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None))
+        initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), metadata)
         _ <- servableRepository.upsert(initServable)
         _ <- awaitServable(initServable)
           .flatMap(d.complete)
@@ -87,19 +87,19 @@ object ServableService extends Logging {
       } yield servable
     }
 
-    override def findAndDeploy(name: String, version: Long): F[DeferredResult[F, GenericServable]] = {
+    override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
         version <- OptionT(versionRepository.get(name, version))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model $name:$version doesn't exist")))
-        servable <- deploy(version)
+        servable <- deploy(version, metadata)
       } yield servable
     }
 
-    override def findAndDeploy(modelId: Long): F[DeferredResult[F, GenericServable]] = {
+    override def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
         version <- OptionT(versionRepository.get(modelId))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model id=$modelId doesn't exist")))
-        servable <- deploy(version)
+        servable <- deploy(version, metadata)
       } yield servable
     }
 

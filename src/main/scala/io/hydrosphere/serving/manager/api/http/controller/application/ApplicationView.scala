@@ -13,7 +13,8 @@ case class ApplicationView(
   signature: ModelSignature,
   executionGraph: VersionGraphAdapter,
   kafkaStreaming: List[ApplicationKafkaStream],
-  message: Option[String]
+  message: Option[String],
+  metadata: Map[String, String]
 )
 
 object ApplicationView {
@@ -46,7 +47,8 @@ object ApplicationView {
       signature = app.signature,
       executionGraph = graph,
       kafkaStreaming = app.kafkaStreaming,
-      message = message
+      message = message,
+      metadata = app.metadata
     )
   }
 }
