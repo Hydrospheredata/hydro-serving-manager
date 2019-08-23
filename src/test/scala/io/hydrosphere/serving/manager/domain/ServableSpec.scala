@@ -35,11 +35,11 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class ServableSpec extends GenericUnitTest {
+  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val rng: RNG[IO] = RNG.default[IO].unsafeRunSync()
   implicit val nameGen: NameGenerator[IO] = NameGenerator.haiku[IO]()
   implicit val uuidGen = UUIDGenerator.default[IO]()
   implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   val mv = ModelVersion(
     id = 10,
     image = DockerImage("name", "tag"),
