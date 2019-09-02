@@ -19,6 +19,7 @@ import io.hydrosphere.serving.manager.util.DeferredResult
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
+import io.hydrosphere.serving.manager.domain.servable.Servable
 
 class GrpcSpec extends GenericUnitTest {
   describe("Manager GRPC API") {
@@ -43,13 +44,12 @@ class GrpcSpec extends GenericUnitTest {
       )))
       when(versionRepo.get(1000)).thenReturn(IO(None))
       val s = new ServableService[IO] {
-        override def findAndDeploy(name: String, version: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-
-        override def findAndDeploy(modelId: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-
-        override def stop(name: String): IO[GenericServable] = ???
-
-        override def deploy(modelVersion: DMV, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def all(): IO[List[Servable.GenericServable]] = ???
+        def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+        def findAndDeploy(name: String, version: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(modelId: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def stop(name: String): IO[GenericServable] = ???
+        def deploy(modelVersion: DMV, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
       }
       val grpcApi = new ManagerGrpcService(versionRepo, s)
 
@@ -108,13 +108,12 @@ class GrpcSpec extends GenericUnitTest {
       }
 
       val s = new ServableService[IO] {
-        override def findAndDeploy(name: String, version: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-
-        override def findAndDeploy(modelId: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-
-        override def stop(name: String): IO[GenericServable] = ???
-
-        override def deploy(modelVersion: DMV, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def all(): IO[List[Servable.GenericServable]] = ???
+        def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+        def findAndDeploy(name: String, version: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(modelId: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def stop(name: String): IO[GenericServable] = ???
+        def deploy(modelVersion: DMV, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
       }
       val grpcApi = new ManagerGrpcService(versionRepo, s)
       grpcApi.getAllVersions(Empty(), observer)
@@ -137,13 +136,12 @@ class GrpcSpec extends GenericUnitTest {
         override def onCompleted(): Unit = ???
       }
       val s = new ServableService[IO] {
-        override def findAndDeploy(name: String, version: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-
-        override def findAndDeploy(modelId: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-
-        override def stop(name: String): IO[GenericServable] = ???
-
-        override def deploy(modelVersion: DMV, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def all(): IO[List[Servable.GenericServable]] = ???
+        def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+        def findAndDeploy(name: String, version: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(modelId: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def stop(name: String): IO[GenericServable] = ???
+        def deploy(modelVersion: DMV, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
       }
       val grpcApi = new ManagerGrpcService(versionRepo, s)
       grpcApi.getAllVersions(Empty(), observer)

@@ -84,7 +84,7 @@ object ApplicationService extends Logging {
             namespace = appRequest.namespace,
             executionGraph = appRequest.executionGraph,
             kafkaStreaming = appRequest.kafkaStreaming,
-            metadata = Map.empty
+            metadata = None
           )
         )
       } yield newApplication

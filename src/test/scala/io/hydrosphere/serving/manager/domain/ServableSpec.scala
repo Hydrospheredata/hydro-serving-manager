@@ -516,7 +516,6 @@ class ServableSpec extends GenericUnitTest {
       repoState shouldBe empty
     }
 
-
     it("should reject deletion of used Servable") {
       val mv = ModelVersion(
         id = 10,
@@ -630,6 +629,60 @@ class ServableSpec extends GenericUnitTest {
       val service = ServableService[IO](cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh)
       val result = service.stop("test-model-1-delete-me").attempt.unsafeRunSync()
       assert(result.isLeft, result)
+    }
+
+    it("should be able to filter servables") {
+      val mv = ModelVersion(
+        id = 1,
+        image = DockerImage("name", "tag"),
+        created = LocalDateTime.now(),
+        finished = None,
+        modelVersion = 1,
+        modelContract = ModelContract.defaultInstance,
+        runtime = DockerImage("runtime", "tag"),
+        model = Model(1, "model"),
+        hostSelector = None,
+        status = ModelVersionStatus.Assembling,
+        profileTypes = Map.empty,
+        installCommand = None,
+        metadata = Map.empty
+      )
+
+      val s1 = Servable(
+        modelVersion = mv,
+        nameSuffix = "kek",
+        status = Servable.Serving("Ok", "host", 9090),
+        metadata = Map("author" -> "me", "date" -> "now")
+      )
+      val s2 = Servable(
+        modelVersion = mv,
+        nameSuffix = "lol",
+        status = Servable.Serving("Ok", "host", 9090),
+        metadata = Map("author" -> "you", "date" -> "now")
+      )
+      val s3 = Servable(
+        modelVersion = mv,
+        nameSuffix = "foo",
+        status = Servable.Serving("Ok", "host", 9090),
+        metadata = Map("author" -> "me", "date" -> "yesterday")
+      )
+      val servableRepo = new ServableRepository[IO] {
+        def all(): IO[List[Servable.GenericServable]] = IO(List(s1,s2,s3))
+        def upsert(servable: Servable.GenericServable): IO[Servable.GenericServable] = ???
+        def delete(name: String): IO[Int] = ???
+        def get(name: String): IO[Option[Servable.GenericServable]] = ???
+        def get(names: Seq[String]): IO[List[Servable.GenericServable]] = ???
+      }
+
+      val service = ServableService[IO](null, servableRepo, null, null, null, null)
+      val r1 = service.getFiltered(Some("model-1-kek"), None, Map.empty).unsafeRunSync()
+      assert(r1 == List(s1))
+      val r2 = service.getFiltered(None, Some(1), Map.empty).unsafeRunSync()
+      assert(r2 == List(s1, s2, s3))
+      val r3 = service.getFiltered(None, None, Map("author" -> "me", "date" -> "now")).unsafeRunSync() 
+      assert(r3 == List(s1))
+      val r4 = service.getFiltered(Some("model-1-foo"), Some(1), Map("author" -> "me", "date" -> "yesterday")).unsafeRunSync()
+      assert(r4 == List(s3))
     }
   }
 }

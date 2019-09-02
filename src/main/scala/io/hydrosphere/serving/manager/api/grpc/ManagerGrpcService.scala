@@ -19,6 +19,7 @@ import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.manager.util.grpc.Converters
 
 import scala.concurrent.Future
+import io.hydrosphere.serving.manager.api.GetServablesRequest
 
 class ManagerGrpcService[F[_]](
   versionRepo: ModelVersionRepository[F],
@@ -52,8 +53,8 @@ class ManagerGrpcService[F[_]](
     val flow = for {
       res <- request.modelVersion match {
         case ModelVersion.Empty =>  F.raiseError[DeferredResult[F, GenericServable]](DomainError.invalidRequest("model version is not specified"))
-        case ModelVersion.VersionId(value) => servableService.findAndDeploy(value, Map.empty)
-        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version, Map.empty) // TODO update GRPC contract
+        case ModelVersion.VersionId(value) => servableService.findAndDeploy(value, request.metadata)
+        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version, request.metadata) 
       }
       _ <- F.delay(responseObserver.onNext(Converters.fromServable(res.started)))
       completed <- res.completed.get
@@ -71,5 +72,24 @@ class ManagerGrpcService[F[_]](
       res <- servableService.stop(request.servableName)
     } yield Converters.fromServable(res)
     flow.toIO.unsafeToFuture()
+  }
+
+  override def getServables(request: GetServablesRequest, responseObserver: StreamObserver[Servable]): Unit = {
+    val flow = for {
+        servables <- request.filter match {
+        case Some(filter) => servableService.getFiltered(name=filter.name, versionId=filter.versionId, metadata=filter.metadata) // return filtered
+        case None => servableService.all()
+       }
+       _ <- F.delay{ 
+         servables.foreach{ s =>
+          responseObserver.onNext(Converters.fromServable(s))
+        }
+      }
+      _ <- F.delay(responseObserver.onCompleted())
+    } yield ()
+
+    flow
+    .onError { case x => F.delay(responseObserver.onError(x)) }
+    .toIO.unsafeRunAsyncAndForget()
   }
 }

@@ -18,6 +18,10 @@ import org.apache.logging.log4j.scala.Logging
 import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
+  def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String, String]): F[List[GenericServable]]
+
+  def all(): F[List[GenericServable]]
+
   def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 
   def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
@@ -28,6 +32,18 @@ trait ServableService[F[_]] {
 }
 
 object ServableService extends Logging {
+  def filterByName(name: String) = { (x: List[GenericServable]) =>
+    x.filter(_.fullName == name)
+  }
+
+  def filterByVersionId(versionId: Long) = { (x: List[GenericServable]) =>
+    x.filter(_.modelVersion.id == versionId)
+  }
+
+  def filterByMetadata(metadata: Map[String, String]) = { (x: List[GenericServable]) =>
+    x.filter(s => s.metadata.toSet.subsetOf(metadata.toSet))
+  }
+
   def apply[F[_]](
     cloudDriver: CloudDriver[F],
     servableRepository: ServableRepository[F],
@@ -41,6 +57,21 @@ object ServableService extends Logging {
     nameGenerator: NameGenerator[F],
     idGenerator: UUIDGenerator[F]
   ): ServableService[F] = new ServableService[F] {
+    override def all(): F[List[Servable.GenericServable]] = {
+      servableRepository.all()
+    }
+
+    override def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): F[List[Servable.GenericServable]] = {
+      val maybeMetadata = if (metadata.nonEmpty) metadata.some else None
+      val filtersMaybe = name.map(filterByName) :: versionId.map(filterByVersionId) :: maybeMetadata.map(filterByMetadata) :: Nil
+      val filters = filtersMaybe.flatten
+      val finalFilter = filters.foldLeft(identity[List[GenericServable]](_)) {
+        case (a, b) => b.andThen(a)
+      }
+      for {
+        servables <- servableRepository.all()
+      } yield finalFilter(servables)
+    }
 
     override def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {

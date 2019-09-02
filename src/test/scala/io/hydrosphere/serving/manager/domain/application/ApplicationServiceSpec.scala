@@ -74,7 +74,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         when(versionRepo.get(Seq(1L))).thenReturn(IO(Seq(modelVersion)))
         val servableService = new ServableService[IO] {
-          override def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = {
+          def all(): IO[List[Servable.GenericServable]] = ???
+          def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+          def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = {
             IO.pure {
               val s = Servable(modelVersion, "hi", Servable.Serving("Ok", "host", 9090))
               val d = Deferred[IO, GenericServable].unsafeRunSync()
@@ -82,12 +84,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
               DeferredResult(s, d)
             }
           }
-
-          override def stop(name: String): IO[GenericServable] = ???
-
-          override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-
-          override def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def stop(name: String): IO[GenericServable] = ???
+          def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         }
         val graphComposer = VersionGraphComposer.default
         val discoveryHub = new ApplicationPublisher[IO] {
@@ -139,13 +138,14 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         val servableService = new ServableService[IO] {
-          override def deploy(mv: ModelVersion, metadata: Map[String, String]): IO[Nothing] = {
+          def all(): IO[List[Servable.GenericServable]] = ???
+          def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+          def deploy(mv: ModelVersion, metadata: Map[String, String]): IO[Nothing] = {
             IO.raiseError(new RuntimeException("Test error"))
           }
-          override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-          override def stop(name: String): IO[GenericServable] = ???
-
-          override def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def stop(name: String): IO[GenericServable] = ???
+          def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         }
 
         val graphComposer = VersionGraphComposer.default
@@ -201,7 +201,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         when(versionRepo.get(Seq(1L))).thenReturn(IO(Seq(modelVersion)))
         val servableService = new ServableService[IO] {
-          override def deploy(mv: ModelVersion, metadata: Map[String, String]) = {
+          def all(): IO[List[Servable.GenericServable]] = ???
+          def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+          def deploy(mv: ModelVersion, metadata: Map[String, String]) = {
             val s = Servable(
               modelVersion = mv,
               nameSuffix = "test",
@@ -209,12 +211,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
             DeferredResult.completed(s)
           }
-
-          override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]) = ???
-
-          override def stop(name: String): IO[GenericServable] = ???
-
-          override def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def findAndDeploy(name: String, version: Long, metadata: Map[String, String]) = ???
+          def stop(name: String): IO[GenericServable] = ???
+          def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         }
 
         val appChanged = ListBuffer.empty[GenericApplication]
@@ -288,15 +287,14 @@ class ApplicationServiceSpec extends GenericUnitTest {
         when(versionRepo.get(Matchers.any[Seq[Long]]())).thenReturn(IO(Seq(modelVersion)))
 
         val servableService = new ServableService[IO] {
-          override def deploy(mv: ModelVersion, metadata: Map[String, String]) = {
+          def all(): IO[List[Servable.GenericServable]] = ???
+          def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+          def deploy(mv: ModelVersion, metadata: Map[String, String]) = {
             DeferredResult.completed(Servable(mv, "test", Servable.Serving("Ok", "host", 9090)))
           }
-
-          override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]) = ???
-
-          override def stop(name: String): IO[GenericServable] = ???
-
-          override def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def findAndDeploy(name: String, version: Long, metadata: Map[String, String]) = ???
+          def stop(name: String): IO[GenericServable] = ???
+          def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         }
 
         val apps = ListBuffer.empty[GenericApplication]
@@ -329,7 +327,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           eventPublisher,
           appDep
         )
-        val updateReq = UpdateApplicationRequest(1, "test", None, graph, Option.empty)
+        val updateReq = UpdateApplicationRequest(1, "test", None, graph, Option.empty, Option.empty)
         applicationService.update(updateReq).map { res =>
           assert(res.started.name === "test")
           assert(res.started.status.isInstanceOf[Application.Assembling])
