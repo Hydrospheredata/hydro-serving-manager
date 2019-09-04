@@ -10,6 +10,8 @@ import io.hydrosphere.serving.manager.util.AsyncUtil
 import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.ExecutionContext
+import spray.json._
+import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 
 class DBServableRepository[F[_]](
   implicit F: Async[F],
@@ -42,7 +44,8 @@ class DBServableRepository[F[_]](
         statusText = statusText,
         host = host,
         port = port,
-        status = status
+        status = status,
+        metadata = if (entity.metadata.nonEmpty) Some(entity.metadata.toJson.compactPrint) else None
       )
       val q = Tables.Servable.insertOrUpdate(row)
       db.run(q)
@@ -102,10 +105,7 @@ class DBServableRepository[F[_]](
 
 object DBServableRepository {
 
-
-
   def mapFrom(service: Tables.ServableRow, version: (Tables.ModelVersionRow, Tables.ModelRow, Option[Tables.HostSelectorRow])): GenericServable = {
-
     val mv = DBModelVersionRepository.mapFromDb(version)
     val suffix = Servable.extractSuffix(version._2.name, version._1.modelVersion, service.serviceName)
 
@@ -115,6 +115,8 @@ object DBServableRepository {
       case ("NotAvailable", host, port) => Servable.NotAvailable(service.statusText, host, port)
       case (_, host, port) => Servable.Starting(service.statusText, host, port)
     }
-    Servable(mv, suffix, status)
+
+    val metadata = service.metadata.map(x => x.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
+    Servable(mv, suffix, status, metadata)
   }
 }

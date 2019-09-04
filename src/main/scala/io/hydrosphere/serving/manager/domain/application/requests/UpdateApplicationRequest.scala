@@ -7,12 +7,13 @@ case class UpdateApplicationRequest(
   name: String,
   namespace: Option[String],
   executionGraph: ExecutionGraphRequest,
-  kafkaStreaming: Option[List[ApplicationKafkaStream]]
+  kafkaStreaming: Option[List[ApplicationKafkaStream]],
+  metadata: Option[Map[String, String]]
 )
 
 object UpdateApplicationRequest {
 
   import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 
-  implicit val format = jsonFormat5(UpdateApplicationRequest.apply)
+  implicit val format = jsonFormat6(UpdateApplicationRequest.apply)
 }

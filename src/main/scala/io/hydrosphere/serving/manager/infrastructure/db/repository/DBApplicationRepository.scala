@@ -48,7 +48,8 @@ class DBApplicationRepository[F[_]](
           usedServables = status.usedServables,
           kafkaStreams = entity.kafkaStreaming.map(p => p.toJson.toString()),
           statusMessage = status.message,
-          usedModelVersions = status.usedVersions
+          usedModelVersions = status.usedVersions,
+          metadata = if (entity.metadata.nonEmpty) Some(entity.metadata.toJson.compactPrint) else None
         )
         db.run(Tables.Application returning Tables.Application += elem)
       }
@@ -115,7 +116,8 @@ class DBApplicationRepository[F[_]](
       application.namespace,
       application.applicationContract,
       application.status,
-      application.statusMessage
+      application.statusMessage,
+      application.metadata
     )
     val status = flatten(value)
     db.run(query.update((
@@ -127,7 +129,8 @@ class DBApplicationRepository[F[_]](
       value.namespace,
       value.signature.toProtoString,
       status.status,
-      status.message
+      status.message,
+      if (value.metadata.nonEmpty) Some(value.metadata.toJson.compactPrint) else None
     )))
   }
 
@@ -320,7 +323,8 @@ object DBApplicationRepository extends CompleteJsonProtocol {
         signature = ModelSignature.fromAscii(dbApp.applicationContract),
         kafkaStreaming = dbApp.kafkaStreams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
         namespace = dbApp.namespace,
-        status = s
+        status = s,
+        metadata = dbApp.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
       )
     }
   }

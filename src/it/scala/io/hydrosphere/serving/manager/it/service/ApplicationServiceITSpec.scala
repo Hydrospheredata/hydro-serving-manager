@@ -61,7 +61,8 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
               ))
             ))
           ),
-          Option.empty
+          Option.empty,
+          Map.empty
         )
         for {
           appResult <- services.appService.create(create)
@@ -104,7 +105,8 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
               )
             )
           ),
-          kafkaStreaming = None
+          kafkaStreaming = None,
+          metadata = Map.empty
         )
         for {
           app <- services.appService.create(appRequest)
@@ -147,7 +149,8 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
             consumerId = None,
             errorTopic = None
           )
-        ))
+        )),
+        metadata = Map.empty
       )
       ioAssert {
         for {
@@ -187,7 +190,8 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
               )
             )
           ),
-          kafkaStreaming = None
+          kafkaStreaming = None,
+          metadata = Map.empty
         )
         for {
           app <- services.appService.create(appRequest)
