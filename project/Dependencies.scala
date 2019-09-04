@@ -79,8 +79,8 @@ object Dependencies {
     Seq(
       "org.typelevel" %% "cats-effect" % catsV,
       "org.tpolecat" %% "doobie-core" % "0.7.0",
-      "org.tpolecat" %% "doobie-hikari"    % "0.7.0",
       "org.tpolecat" %% "doobie-postgres"  % "0.7.0",
+      "com.zaxxer" % "HikariCP" % "2.6.3",  // doobie-hikari depends on hikari 3.3.1 which has weird pool retries.
       "org.tpolecat" %% "doobie-scalatest" % "0.7.0" % "test, it",
       "io.hydrosphere" %% "typed-sql" % "0.1.0",
       "org.postgresql" % "postgresql" % postgresqlVersion,
@@ -91,6 +91,6 @@ object Dependencies {
       "co.fs2" %% "fs2-core" % "1.0.5",
       "co.fs2" %% "fs2-io" % "1.0.5",
       "com.github.krasserm" %% "streamz-converter" % "0.10-M2", // uses FS2 1.0.0,
-       "com.github.mpilquist" %% "simulacrum" % "0.19.0"
+      "com.github.mpilquist" %% "simulacrum" % "0.19.0"
     )
 }

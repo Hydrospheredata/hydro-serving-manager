@@ -18,7 +18,7 @@ object HikariConfiguration {
         hikariConfig.setPassword(config.password)
         hikariConfig.setDriverClassName(config.driverClassname)
         hikariConfig.setMaximumPoolSize(config.maximumPoolSize)
-        hikariConfig.setInitializationFailTimeout(-1)
+        hikariConfig.setInitializationFailTimeout(20000L)
         hikariConfig
     }
 }
