@@ -16,6 +16,7 @@ import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.ApplicationRow
 
 class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor
@@ -36,10 +37,25 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
   var servable: Servable.OkServable = _
 
   describe("Queries") {
+    val appRow = ApplicationRow(
+      id = 1,
+      application_name = "test",
+      namespace = Some("namespace"),
+      status = "Ready",
+      application_contract = ModelContract.defaultInstance.toString(),
+      execution_graph = "",
+      used_servables = List("asd", "q123"),
+      kafka_streams = List("azxcxz"),
+      status_message = Some("Ok"),
+      used_model_versions = List(1,2,3)
+    )
+
     it("should have correct queries") {
       check(DBApplicationRepository.allQ)
       check(DBApplicationRepository.getByIdQ(1))
       check(DBApplicationRepository.getByNameQ("test"))
+      check(DBApplicationRepository.updateQ(appRow))
+      check(DBApplicationRepository.createQ(appRow))
       succeed
     }
   }

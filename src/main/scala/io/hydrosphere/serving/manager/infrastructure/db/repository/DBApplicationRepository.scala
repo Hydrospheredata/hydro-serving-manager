@@ -201,7 +201,7 @@ object DBApplicationRepository {
 
   def updateQ(app: ApplicationRow) =
     sql"""
-          |UPDATE TABLE hydro_serving.application SET
+          |UPDATE hydro_serving.application SET
           | application_name = ${app.application_name},
           | used_servables = ${app.used_servables},
           | used_model_versions = ${app.used_model_versions},
