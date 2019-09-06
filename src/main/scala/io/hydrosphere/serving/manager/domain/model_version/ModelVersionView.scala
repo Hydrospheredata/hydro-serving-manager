@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime}
 
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
@@ -11,8 +11,8 @@ import io.hydrosphere.serving.manager.domain.model.Model
 case class ModelVersionView(
   id: Long,
   image: DockerImage,
-  created: LocalDateTime,
-  finished: Option[LocalDateTime],
+  created: Instant,
+  finished: Option[Instant],
   modelVersion: Long,
   modelContract: ModelContract,
   runtime: DockerImage,

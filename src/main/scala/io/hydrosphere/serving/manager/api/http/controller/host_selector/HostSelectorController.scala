@@ -13,9 +13,8 @@ import scala.concurrent.duration._
 
 @Path("/api/v2/hostSelector")
 @Api(produces = "application/json", tags = Array("Host Selectors"))
-class HostSelectorController[F[_]: Effect]()(
-  implicit hostSelectorService: HostSelectorService[F],
-  hostSelectorRepo: HostSelectorRepository[F]
+class HostSelectorController[F[_]: Effect](
+  hostSelectorService: HostSelectorService[F],
 ) extends AkkaHttpControllerDsl {
   implicit val timeout = Timeout(5.seconds)
 
@@ -27,7 +26,7 @@ class HostSelectorController[F[_]: Effect]()(
   ))
   def listHostSelectors = pathPrefix("hostSelector") {
     get {
-      completeF(hostSelectorRepo.all())
+      completeF(hostSelectorService.all())
     }
   }
 

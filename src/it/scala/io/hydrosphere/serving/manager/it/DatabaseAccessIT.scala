@@ -5,6 +5,7 @@ import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBind
 import scala.collection.JavaConverters._
 
 trait DatabaseAccessIT extends IsolatedDockerAccessIT {
+
   def config = ContainerConfig.builder()
     .image("postgres:9.6-alpine")
     .hostConfig(
@@ -27,9 +28,10 @@ trait DatabaseAccessIT extends IsolatedDockerAccessIT {
   def container = dockerClient.createContainer(config)
   logger.info("Created db container")
 
+  dockerClient.startContainer(container.id())
+  logger.info("Starting db container")
   override protected def beforeAll(): Unit = {
+
     super.beforeAll()
-    dockerClient.startContainer(container.id())
-    logger.info("Starting db container")
   }
 }

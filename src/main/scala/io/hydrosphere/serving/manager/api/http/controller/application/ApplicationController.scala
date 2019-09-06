@@ -11,10 +11,9 @@ import javax.ws.rs.Path
 
 @Path("/api/v2/application")
 @Api(produces = "application/json", tags = Array("Application"))
-class ApplicationController[F[_]: Effect]()(
-  implicit appService: ApplicationService[F],
-  appRepository: ApplicationRepository[F]
-) extends AkkaHttpControllerDsl {
+class ApplicationController[F[_]: Effect](
+  appService: ApplicationService[F],
+)extends AkkaHttpControllerDsl {
 
   @Path("/")
   @ApiOperation(value = "applications", notes = "applications", nickname = "applications", httpMethod = "GET")
@@ -26,7 +25,7 @@ class ApplicationController[F[_]: Effect]()(
     get {
       completeF{
         for {
-          apps <- appRepository.all()
+          apps <- appService.all()
         } yield apps.map(ApplicationView.fromApplication)
       }
     }

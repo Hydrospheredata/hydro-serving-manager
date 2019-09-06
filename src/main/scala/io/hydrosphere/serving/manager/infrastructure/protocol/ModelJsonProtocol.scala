@@ -57,7 +57,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val modelFormat         = jsonFormat2(Model)
   implicit val environmentFormat   = jsonFormat3(HostSelector)
   implicit val versionStatusFormat = enumFormat(ModelVersionStatus)
-  implicit val modelVersionFormat  = jsonFormat13(ModelVersion.apply)
+  implicit val modelVersionFormat  = jsonFormat12(ModelVersion.apply)
   implicit val cloudServableFormat = jsonFormat3(CloudInstance.apply)
 
   implicit def variantFormat[T: JsonFormat] = jsonFormat2(Variant.apply[T])
@@ -102,12 +102,12 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   }
 
   implicit def servableFormat[T <: Servable.Status](implicit j: JsonFormat[T]) =
-    jsonFormat4(Servable.apply[T])
+    jsonFormat5(Servable.apply[T])
 
   implicit val servableStageFormat = jsonFormat2(ServableStage.apply)
   implicit val servableAdapter     = jsonFormat1(ServableGraphAdapter.apply)
 
-  implicit val ExecutionGraphAdapterFormat = new RootJsonFormat[ExecutionGraphAdapter] {
+  implicit val executionGraphAdapterFormat = new RootJsonFormat[ExecutionGraphAdapter] {
     override def read(json: JsValue): ExecutionGraphAdapter = {
       json match {
         case x: JsObject =>
@@ -117,7 +117,6 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
         case x => throw DeserializationException("Invalid JSON for ExecutionGraph")
       }
     }
-
 
     override def write(obj: ExecutionGraphAdapter): JsValue = {
       obj match {
@@ -130,22 +129,6 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val applicationStageFormat          = jsonFormat2(PipelineStage.apply)
   implicit val applicationKafkaStreamingFormat = jsonFormat4(ApplicationKafkaStream)
   implicit val execNode = jsonFormat2(ExecutionNode.apply)
-  implicit val appOk = jsonFormat1(Application.Ready)
-  implicit val appAssembling = jsonFormat1(Application.Assembling)
-  implicit val appFail = jsonFormat2(Application.Failed)
-
-  implicit val appSFormat = new RootJsonFormat[Application.Status] {
-    override def read(json: JsValue): Application.Status = throw DeserializationException(s"Can't deserialize Application json: $json")
-
-    override def write(obj: Application.Status): JsValue = obj match {
-      case x: Application.Assembling => x.toJson
-      case x: Application.Failed => x.toJson
-      case x: Application.Ready => x.toJson
-    }
-  }
-
-  implicit def applicationFormat[T <: Application.Status](implicit jf: JsonFormat[T]) =
-    jsonFormat7(Application.apply[T])
 }
 
 object ModelJsonProtocol extends ModelJsonProtocol

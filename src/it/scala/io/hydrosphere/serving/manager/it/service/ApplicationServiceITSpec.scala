@@ -65,10 +65,10 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           Map.empty
         )
         for {
-          appResult <- services.appService.create(create)
+          appResult <- app.core.appService.create(create)
           started = appResult.started
           finished <- appResult.completed.get
-          servables <- repositories.servableRepository.all()
+          servables <- app.core.repos.servableRepo.all()
         } yield {
           assert(started.name === "simple-app")
           assert(finished.status.isInstanceOf[Application.Ready], finished.status)
@@ -109,7 +109,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           metadata = Map.empty
         )
         for {
-          app <- services.appService.create(appRequest)
+          app <- app.core.appService.create(appRequest)
           finished <- app.completed.get
         } yield {
           println(app)
@@ -154,17 +154,17 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
       )
       ioAssert {
         for {
-          app <- services.appService.create(appRequest)
-          _ <- app.completed.get
-          appNew <- services.appService.update(UpdateApplicationRequest(
-            app.started.id,
-            app.started.name,
-            app.started.namespace,
+          application <- app.core.appService.create(appRequest)
+          _ <- application.completed.get
+          appNew <- app.core.appService.update(UpdateApplicationRequest(
+            application.started.id,
+            application.started.name,
+            application.started.namespace,
             appRequest.executionGraph,
             Option.empty
           ))
           finishedNew <- appNew.completed.get
-          gotNewApp <- OptionT(repositories.applicationRepository.get(appNew.started.id))
+          gotNewApp <- OptionT(app.core.repos.appRepo.get(appNew.started.id))
             .getOrElse(throw new IllegalArgumentException("no applicaiton"))
         } yield {
           assert(finishedNew === gotNewApp)
@@ -194,7 +194,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           metadata = Map.empty
         )
         for {
-          app <- services.appService.create(appRequest)
+          application <- app.core.appService.create(appRequest)
           newGraph = ExecutionGraphRequest(
             stages = NonEmptyList.of(
               PipelineStageRequest(
@@ -207,15 +207,15 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
               )
             )
           )
-          appNew <- services.appService.update(UpdateApplicationRequest(
-            app.started.id,
-            app.started.name,
-            app.started.namespace,
+          appNew <- app.core.appService.update(UpdateApplicationRequest(
+            application.started.id,
+            application.started.name,
+            application.started.namespace,
             newGraph,
             Option.empty
           ))
 
-          gotNewApp <- OptionT(repositories.applicationRepository.get(appNew.started.id))
+          gotNewApp <- OptionT(app.core.repos.appRepo.get(appNew.started.id))
             .getOrElse(throw DomainError.notFound("app not found"))
         } yield {
           assert(appNew.started === gotNewApp, gotNewApp)
@@ -230,11 +230,11 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
     dockerClient.pull("hydrosphere/serving-runtime-dummy:latest")
 
     val f = for {
-      d1 <- services.modelService.uploadModel(uploadFile, upload1)
+      d1 <- app.core.modelService.uploadModel(uploadFile, upload1)
       completed1 <- d1.completed.get
-      d2 <- services.modelService.uploadModel(uploadFile, upload2)
+      d2 <- app.core.modelService.uploadModel(uploadFile, upload2)
       completed2 <- d2.completed.get
-      d3 <- services.modelService.uploadModel(uploadFile, upload3)
+      d3 <- app.core.modelService.uploadModel(uploadFile, upload3)
       completed3 <- d3.completed.get
     } yield {
       println(s"UPLOADED: $completed1")

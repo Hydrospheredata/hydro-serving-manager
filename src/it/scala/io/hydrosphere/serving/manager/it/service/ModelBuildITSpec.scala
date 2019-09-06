@@ -27,8 +27,8 @@ class ModelBuildITSpec extends FullIntegrationSpec {
     it("should create an image with correct name and content") {
       ioAssert {
         for {
-          models <- repositories.modelVersionRepository.all()
-          mv <- services.modelService.uploadModel(uploadFile, uploadMetadata)
+          models <- app.core.repos.versionRepo.all()
+          mv <- app.core.modelService.uploadModel(uploadFile, uploadMetadata)
           builtMv <- mv.completed.get
         } yield {
           println(models)

@@ -19,6 +19,8 @@ import spray.json.JsObject
 import scala.concurrent.ExecutionContext
 
 trait ApplicationService[F[_]] {
+  def all(): F[List[GenericApplication]]
+
   def generateInputs(name: String): F[JsObject]
 
   def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]]
@@ -32,13 +34,15 @@ trait ApplicationService[F[_]] {
 
 object ApplicationService extends Logging {
 
-  def apply[F[_]](
+  def apply[F[_]]()(
+    implicit
+    F: Concurrent[F],
     applicationRepository: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     servableService: ServableService[F],
     discoveryHub: ApplicationPublisher[F],
     applicationDeployer: ApplicationDeployer[F]
-  )(implicit F: Concurrent[F], ex: ExecutionContext): ApplicationService[F] = new ApplicationService[F] {
+  ): ApplicationService[F] = new ApplicationService[F] {
 
     def generateInputs(name: String): F[JsObject] = {
       for {
@@ -94,10 +98,7 @@ object ApplicationService extends Logging {
       OptionT(applicationRepository.get(name))
         .getOrElseF(F.raiseError(NotFound(s"Application with name $name is not found")))
     }
+
+    override def all(): F[List[GenericApplication]] = applicationRepository.all()
   }
-
-  object Internals extends Logging {
-
-  }
-
 }

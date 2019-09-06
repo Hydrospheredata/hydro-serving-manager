@@ -1,11 +1,12 @@
 package io.hydrosphere.serving.manager.domain
 
 import java.nio.file.{Path, Paths}
-import java.time.LocalDateTime
+import java.time.Instant
 
-import cats.syntax.option._
+import cats.MonadError
 import cats.effect.IO
 import cats.effect.concurrent.Deferred
+import cats.syntax.option._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
@@ -50,15 +51,14 @@ class ModelServiceSpec extends GenericUnitTest {
             name = modelName,
             tag = "1"
           ),
-          created = LocalDateTime.now(),
-          finished = Some(LocalDateTime.now()),
+          created = Instant.now(),
+          finished = Some(Instant.now()),
           modelVersion = 1,
           modelContract = contract,
           runtime = modelRuntime,
           model = model,
           hostSelector = None,
           status = ModelVersionStatus.Released,
-          profileTypes = Map.empty,
           installCommand = None,
           metadata = Map.empty
         )
@@ -99,7 +99,8 @@ class ModelServiceSpec extends GenericUnitTest {
           override def fetch(path: Path) = IO(None)
         }
 
-        val modelManagementService = ModelService[IO](
+        val modelManagementService = ModelService[IO]()(
+          MonadError[IO, Throwable],
           modelRepository = modelRepo,
           modelVersionService = modelVersionService,
           modelVersionRepository = modelVersionRepository,
@@ -141,15 +142,14 @@ class ModelServiceSpec extends GenericUnitTest {
             name = modelName,
             tag = "1"
           ),
-          created = LocalDateTime.now(),
-          finished = Some(LocalDateTime.now()),
+          created = Instant.now(),
+          finished = Some(Instant.now()),
           modelVersion = 1,
           modelContract = contract,
           runtime = modelRuntime,
           model = model,
           hostSelector = None,
           status = ModelVersionStatus.Released,
-          profileTypes = Map.empty,
           installCommand = None,
           metadata = Map.empty
         )
@@ -191,7 +191,8 @@ class ModelServiceSpec extends GenericUnitTest {
           override def fetch(path: Path) = IO(None)
         }
 
-        val modelManagementService = ModelService[IO](
+        val modelManagementService = ModelService[IO]()(
+          MonadError[IO, Throwable],
           modelRepository = modelRepo,
           modelVersionService = null,
           modelVersionRepository = null,

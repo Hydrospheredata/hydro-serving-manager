@@ -3,7 +3,7 @@ package io.hydrosphere.serving.manager.domain.model_version
 import java.io.File
 import java.nio.file.{Path, Paths}
 
-import cats.effect.IO
+import cats.effect.{Concurrent, IO}
 import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
@@ -12,7 +12,7 @@ import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder, I
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, DockerLogger, ModelVersionBuilder}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
-import io.hydrosphere.serving.manager.util.docker.InfoProgressHandler
+import io.hydrosphere.serving.manager.util.docker.DockerProgress
 import org.mockito.Matchers
 
 import scala.concurrent.duration._
@@ -27,14 +27,13 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
 
         val versionRepo = new ModelVersionRepository[IO] {
           override def create(entity: ModelVersion): IO[ModelVersion] = IO.pure(entity)
-          override def update(id: Long, entity: ModelVersion): IO[Int] = IO.pure(1)
           override def get(id: Long): IO[Option[ModelVersion]] = ???
           override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
-          override def get(idx: Seq[Long]): IO[Seq[ModelVersion]] = ???
           override def delete(id: Long): IO[Int] = ???
-          override def all(): IO[Seq[ModelVersion]] = ???
-          override def listForModel(modelId: Long): IO[Seq[ModelVersion]] = ???
-          override def lastModelVersionByModel(modelId: Long, max: Int): IO[Seq[ModelVersion]] = ???
+          override def update(entity: ModelVersion): IO[Int] = IO(1)
+          override def all(): IO[List[ModelVersion]] = ???
+          override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
+          override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]] = ???
         }
 
         val modelVersionMetadata = ModelVersionMetadata(
@@ -66,6 +65,8 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def deleteVersions(mvs: Seq[ModelVersion]) = ???
           override def list = ???
           override def delete(versionId: Long) = ???
+          override def all(): IO[List[ModelVersion]] = ???
+          override def get(id: Long): IO[ModelVersion] = ???
         }
 
         val mfs = ModelFileStructure(
@@ -92,11 +93,12 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def publish(t: DiscoveryEvent[ModelVersion, Long]): IO[Unit] = IO.unit
         }
         val bl = new BuildLoggingService[IO] {
-          override def makeLogger(modelVersion: ModelVersion): IO[ProgressHandler] = IO(InfoProgressHandler)
+          override def makeLogger(modelVersion: ModelVersion): IO[ProgressHandler] = IO(DockerProgress.makeLogger(println))
           override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
           override def getLogs(modelVersionId: Long, sinceLine: Int): IO[Option[fs2.Stream[IO, String]]] = IO(None)
         }
-        val builder = ModelVersionBuilder[IO](
+        val builder = ModelVersionBuilder[IO]()(
+          Concurrent[IO],
           imageBuilder = imageBuilder,
           modelVersionRepository = versionRepo,
           imageRepository = imageRepo,

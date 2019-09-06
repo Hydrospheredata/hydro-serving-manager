@@ -9,9 +9,12 @@ import org.mockito.Mockito
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertion, AsyncFunSpecLike, Matchers}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 trait GenericUnitTest extends AsyncFunSpecLike with Matchers with MockitoSugar {
+  implicit val ec = ExecutionContext.global
+  implicit val cs = IO.contextShift(ec)
+
   def when[T](methodCall: T) = Mockito.when(methodCall)
 
   protected def ioAssert(body : => IO[Assertion]): Future[Assertion] = {

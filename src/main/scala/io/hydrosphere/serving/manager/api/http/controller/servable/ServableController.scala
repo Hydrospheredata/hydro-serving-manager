@@ -17,10 +17,8 @@ import scala.concurrent.duration._
 
 @Path("/api/v2/servable")
 @Api(produces = "application/json", tags = Array("Servable"))
-class ServableController[F[_]]()(
-  implicit F: Effect[F],
+class ServableController[F[_]: Effect](
   servableService: ServableService[F],
-  servableRepository: ServableRepository[F],
   cloudDriver: CloudDriver[F]
 ) extends AkkaHttpControllerDsl {
 
@@ -33,7 +31,7 @@ class ServableController[F[_]]()(
   def listServables = path("servable") {
     get {
       completeF {
-        servableRepository.all().map{ list =>
+        servableService.all().map{ list =>
           list.map(ServableView.fromServable)
         }
       }
@@ -52,9 +50,8 @@ class ServableController[F[_]]()(
   def getServable = path("servable" / Segment) { name =>
     get {
       completeF {
-        OptionT(servableRepository.get(name))
+        servableService.get(name)
           .map(ServableView.fromServable)
-          .getOrElseF(F.raiseError[ServableView](DomainError.notFound(s"Can't find servable $name")))
       }
     }
   }

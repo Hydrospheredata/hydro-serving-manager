@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager.api.grpc
 
-import cats.data.EitherT
 import cats.effect.Effect
 import cats.effect.implicits._
 import cats.implicits._
@@ -10,7 +9,7 @@ import io.hydrosphere.serving.manager.api.DeployServableRequest.ModelVersion
 import io.hydrosphere.serving.manager.api.ManagerServiceGrpc.ManagerService
 import io.hydrosphere.serving.manager.api.{DeployServableRequest, GetVersionRequest, RemoveServableRequest}
 import io.hydrosphere.serving.manager.domain.DomainError
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersion => DMV}
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersionService
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableService
 import io.hydrosphere.serving.manager.grpc
@@ -22,12 +21,12 @@ import scala.concurrent.Future
 import io.hydrosphere.serving.manager.api.GetServablesRequest
 
 class ManagerGrpcService[F[_]](
-  versionRepo: ModelVersionRepository[F],
+  versionService: ModelVersionService[F],
   servableService: ServableService[F]
 )(implicit F: Effect[F]) extends ManagerService {
 
   override def getAllVersions(request: Empty, responseObserver: StreamObserver[grpc.entities.ModelVersion]): Unit = {
-    val fAction = versionRepo.all().map { versions =>
+    val fAction = versionService.all().map { versions =>
       versions.foreach { v =>
         responseObserver.onNext(Converters.fromModelVersion(v))
       }
@@ -44,9 +43,9 @@ class ManagerGrpcService[F[_]](
 
   override def getVersion(request: GetVersionRequest): Future[grpc.entities.ModelVersion] = {
     val f = for {
-      version <- EitherT.fromOptionF[F, Throwable, DMV](versionRepo.get(request.id), new IllegalArgumentException(s"ModelVersion with id ${request.id} is not found"))
+      version <- versionService.get(request.id)
     } yield Converters.fromModelVersion(version)
-    f.value.rethrow.toIO.unsafeToFuture()
+    f.toIO.unsafeToFuture()
   }
 
   override def deployServable(request: DeployServableRequest, responseObserver: StreamObserver[Servable]): Unit = {

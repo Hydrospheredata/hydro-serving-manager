@@ -45,7 +45,7 @@ object ServableMonitor extends Logging {
           for {
             deferred <- Deferred[F, GenericServable]
             _ <- queue.offer1(servable, deferred)
-            _ <- F.delay(logger.debug(s"Offered to the monitoring queue: ${servable}"))
+            _ <- F.delay(logger.debug(s"Offered to the monitoring queue: ${servable.fullName}"))
           } yield deferred
         }
       }
@@ -89,7 +89,7 @@ object ServableMonitor extends Logging {
             Servable.NotAvailable(s"Probe failed. ${x.getMessage}", None, None)
         }
       updatedServable = servable.copy(status = status)
-      _ <- F.delay(logger.debug(s"Probed: $updatedServable"))
+      _ <- F.delay(logger.debug(s"Probed: ${updatedServable.fullName}"))
       _ <- status match {
         case _: Servable.Serving =>
           servableRepository.upsert(updatedServable) >>

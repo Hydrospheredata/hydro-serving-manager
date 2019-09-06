@@ -18,9 +18,11 @@ import org.apache.logging.log4j.scala.Logging
 import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
-  def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String, String]): F[List[GenericServable]]
+  def get(name: String): F[GenericServable]
 
   def all(): F[List[GenericServable]]
+
+  def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String, String]): F[List[GenericServable]]
 
   def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 
@@ -44,18 +46,17 @@ object ServableService extends Logging {
     x.filter(s => s.metadata.toSet.subsetOf(metadata.toSet))
   }
 
-  def apply[F[_]](
+  def apply[F[_]]()(
+    implicit F: Concurrent[F],
+    timer: Timer[F],
+    nameGenerator: NameGenerator[F],
+    idGenerator: UUIDGenerator[F],
     cloudDriver: CloudDriver[F],
     servableRepository: ServableRepository[F],
     appRepo: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     monitor: ServableMonitor[F],
     servableDH: ServablePublisher[F]
-  )(
-    implicit F: Concurrent[F],
-    timer: Timer[F],
-    nameGenerator: NameGenerator[F],
-    idGenerator: UUIDGenerator[F]
   ): ServableService[F] = new ServableService[F] {
     override def all(): F[List[Servable.GenericServable]] = {
       servableRepository.all()
@@ -77,7 +78,7 @@ object ServableService extends Logging {
       for {
         randomSuffix <- generateUniqueSuffix(modelVersion)
         d <- Deferred[F, GenericServable]
-        initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), metadata)
+        initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata)
         _ <- servableRepository.upsert(initServable)
         _ <- awaitServable(initServable)
           .flatMap(d.complete)
@@ -147,7 +148,13 @@ object ServableService extends Logging {
           }
         } yield res
       }
+
       _gen(0)
+    }
+
+    override def get(name: String): F[GenericServable] = {
+      OptionT(servableRepository.get(name))
+        .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find Servable with name=${name}")))
     }
   }
 }

@@ -12,23 +12,21 @@ case class Application[+T <: Application.Status](
   status: T,
   signature: ModelSignature,
   kafkaStreaming: List[ApplicationKafkaStream],
+  versionGraph: NonEmptyList[PipelineStage],
   metadata: Map[String, String] = Map.empty
 )
 
 object Application {
+  sealed trait Status extends Product with Serializable
 
-  type GenericApplication = Application[Status]
+  case object Assembling extends Status
 
-  sealed trait Status
-
-  case class Assembling(versionGraph: NonEmptyList[PipelineStage]) extends Status
-
-  case class Failed(versionGraph: NonEmptyList[PipelineStage], reason: Option[String]) extends Status
+  case class Failed(reason: Option[String]) extends Status
 
   case class Ready(stages: NonEmptyList[ExecutionNode]) extends Status
 
-  type AssemblingApp = Application[Assembling]
+  type GenericApplication = Application[Status]
+  type AssemblingApp = Application[Assembling.type]
   type FailedApp = Application[Failed]
   type ReadyApp = Application[Ready]
-
 }

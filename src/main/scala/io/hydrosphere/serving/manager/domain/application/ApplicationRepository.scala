@@ -1,8 +1,7 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import io.hydrosphere.serving.manager.db.Tables
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.ApplicationRow
 
 trait ApplicationRepository[F[_]] {
   def create(entity: GenericApplication): F[GenericApplication]
@@ -13,15 +12,13 @@ trait ApplicationRepository[F[_]] {
 
   def update(value: GenericApplication): F[Int]
 
-  def updateRow(row: Tables.ApplicationRow): F[Int]
+  def updateRow(row: ApplicationRow): F[Int]  // NB: not good, need to provide low-level API for Application tool
 
   def delete(id: Long): F[Int]
 
   def all(): F[List[GenericApplication]]
 
-  def applicationsWithCommonServices(servables: Set[GenericServable], applicationId: Long): F[List[GenericApplication]]
-
-  def findVersionsUsage(versionIdx: Long): F[List[GenericApplication]]
+  def findVersionUsage(versionIdx: Long): F[List[GenericApplication]]
 
   def findServableUsage(servableName: String): F[List[GenericApplication]]
 }

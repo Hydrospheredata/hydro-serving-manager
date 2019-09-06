@@ -9,8 +9,6 @@ trait ModelRepository[F[_]] {
 
   def get(name: String): F[Option[Model]]
 
-  def getMany(ids: Set[Long]): F[Seq[Model]]
-
   def update(value: Model): F[Int]
 
   def delete(id: Long): F[Int]
