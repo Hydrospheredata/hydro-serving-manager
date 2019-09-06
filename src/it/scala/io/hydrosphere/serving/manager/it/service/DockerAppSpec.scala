@@ -54,7 +54,8 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
               ))
             ))
           ),
-          None
+          None,
+          Map.empty
         )
         for {
           appResult <- app.core.appService.create(create)

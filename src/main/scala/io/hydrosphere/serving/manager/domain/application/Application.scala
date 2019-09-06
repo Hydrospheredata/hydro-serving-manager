@@ -12,7 +12,8 @@ case class Application[+T <: Application.Status](
   status: T,
   signature: ModelSignature,
   kafkaStreaming: List[ApplicationKafkaStream],
-  versionGraph: NonEmptyList[PipelineStage]
+  versionGraph: NonEmptyList[PipelineStage],
+  metadata: Map[String, String] = Map.empty
 )
 
 object Application {

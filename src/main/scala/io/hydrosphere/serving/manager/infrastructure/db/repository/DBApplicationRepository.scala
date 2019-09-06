@@ -17,8 +17,8 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+import io.hydrosphere.serving.manager.util.CollectionOps._
 import spray.json._
-
 import scala.util.{Failure, Success, Try}
 import cats.data.NonEmptyList
 
@@ -34,6 +34,7 @@ object DBApplicationRepository {
     kafka_streams: List[String],
     status_message: Option[String],
     used_model_versions: List[Long],
+    metadata: Option[String]
   )
 
   def toApplication(ar: ApplicationRow, versions: Map[Long, ModelVersion], servables: Map[String, GenericServable]): Either[AppDBSchemaError, GenericApplication] = {
@@ -102,7 +103,8 @@ object DBApplicationRepository {
       kafkaStreaming = ar.kafka_streams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
       namespace = ar.namespace,
       status = statusAndGraph._1,
-      versionGraph = statusAndGraph._2
+      versionGraph = statusAndGraph._2,
+      metadata = ar.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
     )
   }
 
@@ -130,7 +132,8 @@ object DBApplicationRepository {
       used_servables = servables,
       used_model_versions = versions,
       kafka_streams = app.kafkaStreaming.map(_.toJson.compactPrint),
-      status_message = msg
+      status_message = msg,
+      metadata = app.metadata.maybeEmpty.map(_.toJson.compactPrint)
     )
   }
 

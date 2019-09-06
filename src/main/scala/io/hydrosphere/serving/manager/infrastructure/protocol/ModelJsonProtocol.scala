@@ -102,12 +102,12 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   }
 
   implicit def servableFormat[T <: Servable.Status](implicit j: JsonFormat[T]) =
-    jsonFormat4(Servable.apply[T])
+    jsonFormat5(Servable.apply[T])
 
   implicit val servableStageFormat = jsonFormat2(ServableStage.apply)
   implicit val servableAdapter     = jsonFormat1(ServableGraphAdapter.apply)
 
-  implicit val ExecutionGraphAdapterFormat = new RootJsonFormat[ExecutionGraphAdapter] {
+  implicit val executionGraphAdapterFormat = new RootJsonFormat[ExecutionGraphAdapter] {
     override def read(json: JsValue): ExecutionGraphAdapter = {
       json match {
         case x: JsObject =>

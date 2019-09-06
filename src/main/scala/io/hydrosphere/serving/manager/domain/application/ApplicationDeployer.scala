@@ -129,7 +129,7 @@ object ApplicationDeployer extends Logging {
               variants <- stage.modelVariants.traverse { i =>
                 for {
                   _ <- F.delay(logger.debug(s"Deploying ${i.item.fullName}"))
-                  result <- servableService.deploy(i.item)
+                  result <- servableService.deploy(i.item, Map.empty)  // NOTE maybe infer some app-specific labels?
                   servable <- result.completed.get
                   okServable <- servable.status match {
                     case _: Servable.Serving =>

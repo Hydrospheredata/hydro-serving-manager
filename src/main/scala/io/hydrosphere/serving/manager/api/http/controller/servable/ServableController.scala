@@ -93,7 +93,7 @@ class ServableController[F[_]: Effect](
     post {
       entity(as[DeployModelRequest]) { r =>
         completeF {
-          servableService.findAndDeploy(r.modelName, r.version)
+          servableService.findAndDeploy(r.modelName, r.version, r.metadata.getOrElse(Map.empty))
             .map(x => ServableView.fromServable(x.started))
         }
       }

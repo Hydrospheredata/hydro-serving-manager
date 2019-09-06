@@ -11,8 +11,12 @@ import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableReposit
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
+import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+import io.hydrosphere.serving.manager.util.CollectionOps._
 import cats.data.NonEmptyList
 import cats.data.OptionT
+import spray.json._
+
 
 object DBServableRepository {
   case class ServableRow(
@@ -21,7 +25,8 @@ object DBServableRepository {
     status_text: String,
     host: Option[String],
     port: Option[Int],
-    status: String
+    status: String,
+    metadata: Option[String]
   )
 
   def fromServable(s: GenericServable): ServableRow = {
@@ -37,7 +42,8 @@ object DBServableRepository {
       status_text = statusText,
       host = host,
       port = port,
-      status = status
+      status = status,
+      metadata = s.metadata.maybeEmpty.map(_.toJson.compactPrint)
     )
   }
 
@@ -50,7 +56,13 @@ object DBServableRepository {
       case ("NotAvailable", host, port) => Servable.NotAvailable(sr.status_text, host, port)
       case (_, host, port) => Servable.Starting(sr.status_text, host, port)
     }
-    Servable(modelVersion, suffix, status, apps.getOrElse(Nil))
+    Servable(
+      modelVersion = modelVersion,
+      nameSuffix = suffix,
+      status = status,
+      usedApps = apps.getOrElse(Nil),
+      metadata = sr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
+      )
   }
 
   def toServableT = (toServable _).tupled

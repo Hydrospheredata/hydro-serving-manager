@@ -7,7 +7,8 @@ case class Servable[+T <: Servable.Status](
   modelVersion: ModelVersion,
   nameSuffix: String,
   status: T,
-  usedApps: List[String]
+  usedApps: List[String],
+  metadata: Map[String, String] = Map.empty
 ) {
   def fullName: String = Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, nameSuffix)
 }

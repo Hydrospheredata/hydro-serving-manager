@@ -32,8 +32,8 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
   describe("ApplicationMigrationTool") {
     it("should detect and recover invalid apps") {
       val graph = "{\"stages\":[{\"modelVariants\":[{\"modelVersion\":{\"model\":{\"id\":1,\"name\":\"claims\"},\"image\":{\"name\":\"claims_tgdq\",\"tag\":\"1\",\"sha256\":\"74fe2d2\"},\"finished\":\"2019-05-28T12:34:02.688\",\"modelContract\":{\"modelName\":\"model\",\"predict\":{\"signatureName\":\"claim\",\"inputs\":[{\"profile\":\"TEXT\",\"dtype\":\"DT_STRING\",\"name\":\"foo\",\"shape\":{\"dim\":[],\"unknownRank\":false}},{\"profile\":\"NUMERICAL\",\"dtype\":\"DT_DOUBLE\",\"name\":\"client_profile\",\"shape\":{\"dim\":[{\"size\":112,\"name\":\"\"}],\"unknownRank\":false}}],\"outputs\":[{\"profile\":\"NONE\",\"dtype\":\"DT_INT64\",\"name\":\"amount\",\"shape\":{\"dim\":[],\"unknownRank\":false}}]}},\"id\":2,\"status\":\"Released\",\"profileTypes\":{},\"metadata\":{\"git.branch.head.date\":\"Tue Apr 16 10:44:31 2019\",\"git.branch.head.sha\":\"172da8da2fad6d48c49cf8afffc05010079620e8\",\"git.branch\":\"master\",\"git.branch.head.author.name\":\"Konstantin Makarychev\",\"git.is-dirty\":\"True\",\"git.branch.head.author.email\":\"mrsimpson@inbox.ru\",\"experiment\":\"demo\"},\"modelVersion\":1,\"runtime\":{\"name\":\"hydrosphere/serving-runtime-python-3.6\",\"tag\":\"dev\"},\"created\":\"2019-05-28T12:33:56.556\"},\"weight\":100}],\"signature\":{\"signatureName\":\"claim\",\"inputs\":[{\"profile\":\"TEXT\",\"dtype\":\"DT_STRING\",\"name\":\"foo\",\"shape\":{\"dim\":[],\"unknownRank\":false}},{\"profile\":\"NUMERICAL\",\"dtype\":\"DT_DOUBLE\",\"name\":\"client_profile\",\"shape\":{\"dim\":[{\"size\":112,\"name\":\"\"}],\"unknownRank\":false}}],\"outputs\":[{\"profile\":\"NONE\",\"dtype\":\"DT_INT64\",\"name\":\"amount\",\"shape\":{\"dim\":[],\"unknownRank\":false}}]}}]}"
-      val data1 = ApplicationRow(1, "test", None, "Ready", "", graph, Nil, Nil, None, Nil)
-      val data2 = ApplicationRow(1, "test", None, "Ready", "", graph, Nil, Nil, None, Nil)
+      val data1 = ApplicationRow(1, "test", None, "Ready", "", graph, Nil, Nil, None, Nil, None)
+      val data2 = ApplicationRow(1, "test", None, "Ready", "", graph, Nil, Nil, None, Nil, None)
       val removedApps = ListBuffer.empty[Long]
       val appsRepo = new ApplicationRepository[IO] {
         override def create(entity: GenericApplication): IO[GenericApplication] = ???
@@ -180,8 +180,8 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       val sMap = Map(
         "claims-model-2-dusty-wind" -> servable
       )
-      val data1 = ApplicationRow(1, "test", None, "Ready", "", graph, Nil, Nil, None, Nil)
-      val data2 = ApplicationRow(2, "test", None, "Ready", "", graph, Nil, Nil, None, Nil)
+      val data1 = ApplicationRow(1, "test", None, "Ready", "", graph, Nil, Nil, None, Nil, None)
+      val data2 = ApplicationRow(2, "test", None, "Ready", "", graph, Nil, Nil, None, Nil, None)
       val updatedRows = ListBuffer.empty[ApplicationRow]
       val appsRepo = new ApplicationRepository[IO] {
         override def create(entity: GenericApplication): IO[GenericApplication] = ???
