@@ -13,7 +13,7 @@ class RemoteImageRepository[F[_]: Sync](
   progressHandler: ProgressHandler)
   extends ImageRepository[F] {
 
-  override def push(dockerImage: DockerImage): F[Unit] = Sync[F].delay {
+  override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit] = Sync[F].delay {
     val auth: RegistryAuth = if (conf.username.isEmpty && conf.password.isEmpty) {
       RegistryAuth.fromDockerConfig(conf.host).build()
     } else {
@@ -26,7 +26,7 @@ class RemoteImageRepository[F[_]: Sync](
         None
       ))
     }
-    dockerClient.push(dockerImage.fullName, auth)
+    dockerClient.push(dockerImage.fullName, progressHandler, auth)
   }
 
   override def getImage(name: String, tag: String): DockerImage = {
