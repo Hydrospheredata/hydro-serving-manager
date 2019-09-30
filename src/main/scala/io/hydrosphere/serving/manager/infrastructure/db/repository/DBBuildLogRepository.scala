@@ -35,8 +35,13 @@ object DBBuildLogRepository {
 
       override def get(modelVersionId: Long): F[Option[fs2.Stream[F, String]]] = {
         for {
-          row <- getQ(modelVersionId).option.transact(tx)
-        } yield row.map(x => fs2.Stream.emits(x.logs).covary[F])
+          rows <- getQ(modelVersionId).to[List].transact(tx)
+        } yield {
+          rows match {
+            case Nil => None
+            case _ => Some(fs2.Stream.emits(rows.foldLeft(List.empty[String])(_ ++ _.logs)).covary[F])
+          }
+        }
       }
     }
 }
