@@ -68,10 +68,10 @@ object ModelVersionBuilder {
         imageSha <- imageBuilder.build(buildPath.root, mv.image, handler)
         newDockerImage = mv.image.copy(sha256 = Some(imageSha))
         finishedVersion = mv.copy(image = newDockerImage, finished = Instant.now().some, status = ModelVersionStatus.Released)
+        _ <- imageRepository.push(finishedVersion.image, handler)
         _ <- buildLoggingService.finishLogging(mv.id)
         _ <- modelVersionRepository.update(finishedVersion)
         _ <- modelDiscoveryHub.update(finishedVersion)
-        _ <- imageRepository.push(finishedVersion.image)
       } yield finishedVersion
 
       innerCompleted.handleErrorWith { err =>

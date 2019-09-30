@@ -20,7 +20,7 @@ class ECSImageRepository[F[_]: Sync](
     .withRegion(ecsDockerRepositoryConfiguration.region)
     .build()
 
-  override def push(dockerImage: DockerImage): F[Unit] = Sync[F].delay {
+  override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit] = Sync[F].delay {
     createRepositoryIfNeeded(dockerImage.name)
     dockerClient.push(
       dockerImage.fullName,

@@ -1,6 +1,7 @@
 package io.hydrosphere.serving.manager.infrastructure.image.repositories
 
 import cats.Applicative
+import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 
 class LocalImageRepository[F[_]: Applicative] extends ImageRepository[F] {
@@ -11,7 +12,7 @@ class LocalImageRepository[F[_]: Applicative] extends ImageRepository[F] {
     )
   }
 
-  override def push(dockerImage: DockerImage): F[Unit] = {
+  override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit] = {
     Applicative[F].pure(())
   }
 }

@@ -8,7 +8,7 @@ import io.hydrosphere.serving.manager.infrastructure.image.repositories.{ECSImag
 import scala.concurrent.ExecutionContext
 
 trait ImageRepository[F[_]] {
-  def push(dockerImage: DockerImage): F[Unit]
+  def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit]
 
   def getImage(name: String, tag: String): DockerImage
 }

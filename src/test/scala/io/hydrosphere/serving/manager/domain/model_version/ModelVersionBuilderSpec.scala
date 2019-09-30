@@ -55,7 +55,7 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         val imageRepo = new ImageRepository[IO] {
           override def getImage(name: String, tag: String): DockerImage = DockerImage(name, tag)
 
-          override def push(dockerImage: DockerImage): IO[Unit] = {
+          override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): IO[Unit] = {
               IO(p.success(dockerImage))
           }
         }
