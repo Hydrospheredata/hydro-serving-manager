@@ -7,7 +7,9 @@ case class HikariConfiguration(
   username: String,
   password: String,
   driverClassname: String = "org.postgresql.Driver",
-  maximumPoolSize: Int
+  maximumPoolSize: Int,
+  initializationFailTimeout: Long = 20000L,
+  leakDetectionThreshold: Long = 5000L
 )
 
 object HikariConfiguration {
@@ -18,7 +20,8 @@ object HikariConfiguration {
         hikariConfig.setPassword(config.password)
         hikariConfig.setDriverClassName(config.driverClassname)
         hikariConfig.setMaximumPoolSize(config.maximumPoolSize)
-        hikariConfig.setInitializationFailTimeout(20000L)
+        hikariConfig.setInitializationFailTimeout(config.initializationFailTimeout)
+        hikariConfig.setLeakDetectionThreshold(config.leakDetectionThreshold)
         hikariConfig
     }
 }

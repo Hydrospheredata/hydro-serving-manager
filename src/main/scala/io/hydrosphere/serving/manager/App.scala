@@ -7,6 +7,7 @@ import cats.implicits._
 import cats.effect.implicits._
 import cats.effect.{ConcurrentEffect, ContextShift, Effect, IO, Resource, Sync, Timer}
 import com.spotify.docker.client.DockerClient
+import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.api.ManagerServiceGrpc
 import io.hydrosphere.serving.manager.api.grpc.{GrpcServer, GrpcServingDiscovery, ManagerGrpcService}
@@ -64,7 +65,9 @@ object App {
       rngF <- Resource.liftF(RNG.default[F])
       cloudDriver = CloudDriver.fromConfig[F](config.cloudDriver, config.dockerRepository)
       hk <- Database.makeHikariDataSource[F](config.database)
-      tx <- Resource.liftF(Database.makeTransactor[F](hk, ExecutionContext.global, ExecutionContext.global))
+      connectEc <- ExecutionContexts.fixedThreadPool[F](32)
+      transactEc <- ExecutionContexts.cachedThreadPool[F]
+      tx <- Resource.liftF(Database.makeTransactor[F](hk, connectEc, transactEc))
       flyway <- Resource.liftF(Database.makeFlyway(tx))
       _ <- Resource.liftF(flyway.migrate())
       dockerLogger = DockerProgress.makeLogger(println)
