@@ -10,7 +10,6 @@ import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator}
 import io.hydrosphere.serving.manager.util.random.NameGenerator
 import org.apache.logging.log4j.scala.Logging
@@ -18,32 +17,33 @@ import org.apache.logging.log4j.scala.Logging
 import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
-  def get(name: String): F[GenericServable]
+  def get(name: String): F[Servable]
 
-  def all(): F[List[GenericServable]]
+  def all(): F[List[Servable]]
 
-  def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String, String]): F[List[GenericServable]]
+  def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String, String]): F[List[Servable]]
 
-  def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
+  def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, Servable]]
 
-  def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
+  def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, Servable]]
 
-  def stop(name: String): F[GenericServable]
+  def stop(name: String): F[Servable]
 
-  def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
+  def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, Servable]]
 }
 
 object ServableService extends Logging {
-  def filterByName(name: String) = { (x: List[GenericServable]) =>
-    x.filter(_.fullName == name)
+
+  def filterByName(name: String): Servable => Boolean = { x: Servable =>
+    x.fullName == name
   }
 
-  def filterByVersionId(versionId: Long) = { (x: List[GenericServable]) =>
-    x.filter(_.modelVersion.id == versionId)
+  def filterByVersionId(versionId: Long): Servable => Boolean = { x: Servable =>
+    x.modelVersion.id == versionId
   }
 
-  def filterByMetadata(metadata: Map[String, String]) = { (x: List[GenericServable]) =>
-    x.filter(s => s.metadata.toSet.subsetOf(metadata.toSet))
+  def filterByMetadata(metadata: Map[String, String]): Servable => Boolean = { x: Servable =>
+    x.metadata.toSet.subsetOf(metadata.toSet)
   }
 
   def apply[F[_]]()(
@@ -55,29 +55,26 @@ object ServableService extends Logging {
     servableRepository: ServableRepository[F],
     appRepo: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
-    monitor: ServableMonitor[F],
     servableDH: ServablePublisher[F]
   ): ServableService[F] = new ServableService[F] {
-    override def all(): F[List[Servable.GenericServable]] = {
-      servableRepository.all()
+
+    override def all(): F[List[Servable]] = {
+      servableRepository.all().compile.toList
     }
 
-    override def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): F[List[Servable.GenericServable]] = {
+    override def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): F[List[Servable]] = {
       val maybeMetadata = if (metadata.nonEmpty) metadata.some else None
       val filtersMaybe = name.map(filterByName) :: versionId.map(filterByVersionId) :: maybeMetadata.map(filterByMetadata) :: Nil
       val filters = filtersMaybe.flatten
-      val finalFilter = filters.foldLeft(identity[List[GenericServable]](_)) {
-        case (a, b) => b.andThen(a)
-      }
-      for {
-        servables <- servableRepository.all()
-      } yield finalFilter(servables)
+      servableRepository.all()
+        .filter(s => filters.map(f => f(s)).fold(false)((r1, r2) => r1 && r2))
+        .compile.toList
     }
 
-    override def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
+    override def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, Servable]] = {
       for {
         randomSuffix <- generateUniqueSuffix(modelVersion)
-        d <- Deferred[F, GenericServable]
+        d <- Deferred[F, Servable]
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata)
         _ <- servableRepository.upsert(initServable)
         _ <- awaitServable(initServable)
@@ -92,7 +89,8 @@ object ServableService extends Logging {
       } yield DeferredResult(initServable, d)
     }
 
-    def awaitServable(servable: GenericServable): F[GenericServable] = {
+    // TODO need to remove it
+    def awaitServable(servable: Servable): F[Servable] = {
       for {
         _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, servable.modelVersion.hostSelector)
         servableDef <- monitor.monitor(servable)
@@ -102,11 +100,11 @@ object ServableService extends Logging {
       } yield resultServable
     }
 
-    override def stop(name: String): F[GenericServable] = {
+    override def stop(name: String): F[Servable] = {
       for {
         servable <- OptionT(servableRepository.get(name))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't stop Servable $name because it doesn't exist")))
-        apps <- appRepo.findServableUsage(name)
+        apps <- appRepo.findServableUsage(name).compile.toList
         _ <- apps match {
           case Nil =>
             servableDH.remove(name) >>
@@ -119,7 +117,7 @@ object ServableService extends Logging {
       } yield servable
     }
 
-    override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
+    override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, Servable]] = {
       for {
         version <- OptionT(versionRepository.get(name, version))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model $name:$version doesn't exist")))
@@ -127,7 +125,7 @@ object ServableService extends Logging {
       } yield servable
     }
 
-    override def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
+    override def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, Servable]] = {
       for {
         version <- OptionT(versionRepository.get(modelId))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model id=$modelId doesn't exist")))
@@ -148,13 +146,12 @@ object ServableService extends Logging {
           }
         } yield res
       }
-
       _gen(0)
     }
 
-    override def get(name: String): F[GenericServable] = {
+    override def get(name: String): F[Servable] = {
       OptionT(servableRepository.get(name))
-        .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find Servable with name=${name}")))
+        .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find Servable with name=$name")))
     }
   }
 }

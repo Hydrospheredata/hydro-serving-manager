@@ -19,17 +19,17 @@ import spray.json.JsObject
 import scala.concurrent.ExecutionContext
 
 trait ApplicationService[F[_]] {
-  def all(): F[List[GenericApplication]]
+  def all(): F[List[Application]]
 
   def generateInputs(name: String): F[JsObject]
 
-  def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]]
+  def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, Application]]
 
-  def delete(name: String): F[GenericApplication]
+  def delete(name: String): F[Application]
 
-  def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, GenericApplication]]
+  def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, Application]]
 
-  def get(name: String): F[GenericApplication]
+  def get(name: String): F[Application]
 }
 
 object ApplicationService extends Logging {
@@ -53,11 +53,11 @@ object ApplicationService extends Logging {
     }
 
 
-    def create(req: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
+    def create(req: CreateApplicationRequest): F[DeferredResult[F, Application]] = {
       applicationDeployer.deploy(req.name, req.executionGraph, req.kafkaStreaming.getOrElse(List.empty))
     }
 
-    def delete(name: String): F[GenericApplication] = {
+    def delete(name: String): F[Application] = {
       for {
         app <- get(name)
         _ <- discoveryHub.remove(app.name)
@@ -75,7 +75,7 @@ object ApplicationService extends Logging {
       } yield app
     }
 
-    def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
+    def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, Application]] = {
       for {
         oldApplication <- OptionT(applicationRepository.get(appRequest.id))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find application id ${appRequest.id}")))
@@ -94,11 +94,11 @@ object ApplicationService extends Logging {
       } yield newApplication
     }
 
-    override def get(name: String): F[GenericApplication] = {
+    override def get(name: String): F[Application] = {
       OptionT(applicationRepository.get(name))
         .getOrElseF(F.raiseError(NotFound(s"Application with name $name is not found")))
     }
 
-    override def all(): F[List[GenericApplication]] = applicationRepository.all()
+    override def all(): fs2.Stream[F, Application] = applicationRepository.all()
   }
 }

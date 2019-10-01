@@ -5,12 +5,11 @@ import cats.effect.{Concurrent, Timer}
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.tensorflow.api.prediction_service.StatusResponse.ServiceStatus._
 
 trait ServableProbe[F[_]] {
-  def probe(servable: GenericServable): F[Servable.Status]
+  def probe(servable: Servable): F[Servable.Status]
 }
 
 object ServableProbe {
@@ -50,7 +49,7 @@ object ServableProbe {
         } yield x
       }
 
-      override def probe(servable: GenericServable): F[Servable.Status] = ping(servable.fullName)
+      override def probe(servable: Servable): F[Servable.Status] = ping(servable.fullName)
     }
   }
 }

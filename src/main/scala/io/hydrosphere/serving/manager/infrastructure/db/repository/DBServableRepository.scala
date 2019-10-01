@@ -6,7 +6,6 @@ import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
@@ -29,7 +28,7 @@ object DBServableRepository {
     metadata: Option[String]
   )
 
-  def fromServable(s: GenericServable): ServableRow = {
+  def fromServable(s: Servable): ServableRow = {
     val (status, statusText, host, port) = s.status match {
       case Servable.Serving(msg, h, p) => ("Serving", msg, h.some, p.some)
       case Servable.NotServing(msg, h, p) => ("NotServing", msg, h, p)

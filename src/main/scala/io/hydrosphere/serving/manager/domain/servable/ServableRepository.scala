@@ -1,13 +1,13 @@
 package io.hydrosphere.serving.manager.domain.servable
 
 trait ServableRepository[F[_]] {
-  def all(): F[List[Servable.GenericServable]]
+  def all(): fs2.Stream[F, Servable]
 
-  def upsert(servable: Servable.GenericServable): F[Servable.GenericServable]
+  def upsert(servable: Servable): F[Servable]
 
   def delete(name: String): F[Int]
 
-  def get(name: String): F[Option[Servable.GenericServable]]
+  def get(name: String): F[Option[Servable]]
 
-  def get(names: Seq[String]): F[List[Servable.GenericServable]]
+  def get(names: Seq[String]): fs2.Stream[F, Servable]
 }

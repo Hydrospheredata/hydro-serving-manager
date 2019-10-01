@@ -8,11 +8,9 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.discovery.ApplicationPublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
-import io.hydrosphere.serving.manager.domain.application.Application.{AssemblingApp, GenericApplication}
-import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Node, Variant, VersionGraphComposer}
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
 import org.apache.logging.log4j.scala.Logging
@@ -21,8 +19,8 @@ trait ApplicationDeployer[F[_]] {
   def deploy(
     name: String,
     executionGraph: ExecutionGraphRequest,
-    kafkaStreaming: List[ApplicationKafkaStream]
-  ): F[DeferredResult[F, GenericApplication]]
+    kafkaStreaming: List[Application.KafkaParams]
+  ): F[DeferredResult[F, Application]]
 }
 
 object ApplicationDeployer extends Logging {
@@ -39,8 +37,8 @@ object ApplicationDeployer extends Logging {
       override def deploy(
         name: String,
         executionGraph: ExecutionGraphRequest,
-        kafkaStreaming: List[ApplicationKafkaStream]
-      ): F[DeferredResult[F, GenericApplication]] = {
+        kafkaStreaming: List[Application.KafkaParams]
+      ): F[DeferredResult[F, Application]] = {
         for {
           composedApp <- composeApp(name, None, executionGraph, kafkaStreaming)
           repoApp <- applicationRepository.create(composedApp)
