@@ -5,17 +5,18 @@ import cats.implicits._
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationValidator
+import io.hydrosphere.serving.manager.domain.application.graph.ExecutionGraph.ExecutionNode
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.VersionPipeline
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
 trait VersionGraphComposer {
-  def compose(nodes: NonEmptyList[Node[ModelVersion]]): Either[DomainError, VersionPipeline]
+  def compose(nodes: NonEmptyList[ExecutionNode]): Either[DomainError, VersionPipeline]
 }
 
 object VersionGraphComposer {
 
   case class PipelineStage(
-    modelVariants: NonEmptyList[Variant[ModelVersion]],
+    modelVariants: NonEmptyList[ExecutionNode],
     signature: ModelSignature
   )
 

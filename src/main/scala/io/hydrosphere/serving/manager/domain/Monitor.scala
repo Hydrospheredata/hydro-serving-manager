@@ -51,7 +51,7 @@ object Monitor extends Logging {
         servable.status match {
           case Servable.Serving(msg, host, port) =>
             apps.map {app =>
-              app.versionGraph.nodes.find{ x =>
+              app.graph.nodes.find{ x =>
                 x match {
                   case ExecutionGraph.ModelNode(id, mv, es) =>
                     val x = es.find(_.fullName == servable.fullName)

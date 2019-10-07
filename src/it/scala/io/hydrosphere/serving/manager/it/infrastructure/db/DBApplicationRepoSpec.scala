@@ -83,7 +83,7 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
         ),
         signature = ModelSignature.defaultInstance,
         kafkaStreaming = List.empty,
-        versionGraph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(mv1, 100)), ModelSignature.defaultInstance))
+        graph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(mv1, 100)), ModelSignature.defaultInstance))
       )
       val result = app.core.repos.appRepo.create(application).unsafeRunSync()
       println(result)

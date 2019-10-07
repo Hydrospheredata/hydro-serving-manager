@@ -7,10 +7,8 @@ case class Application(
   id: Long,
   name: String,
   status: Application.Status,
-  status_message: Option[String],
-  signature: ModelSignature,
   kafkaStreaming: List[Application.KafkaParams],
-  versionGraph: ExecutionGraph,
+  graph: ExecutionGraph,
   metadata: Map[String, String] = Map.empty
 )
 
@@ -18,7 +16,7 @@ object Application {
 
   sealed trait Status extends Product with Serializable
 
-  case object Unhealthy extends Status
+  case class Unhealthy(reason: Option[String]) extends Status
 
   case object Healthy extends Status
 

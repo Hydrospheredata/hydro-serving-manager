@@ -21,9 +21,9 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
     implicit val running = jsonFormat2(CloudInstance.Status.Running.apply)
 
     object Keys {
-      val Running  = "running"
+      val Running = "running"
       val Starting = "starting"
-      val Stopped  = "stopped"
+      val Stopped = "stopped"
     }
 
     override def read(json: JsValue): clouddriver.CloudInstance.Status = {
@@ -31,10 +31,10 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       obj.fields.get("type") match {
         case Some(JsString(x)) =>
           x match {
-            case Keys.Running  => running.read(obj)
+            case Keys.Running => running.read(obj)
             case Keys.Starting => CloudInstance.Status.Starting
-            case Keys.Stopped  => CloudInstance.Status.Stopped
-            case x             => throw DeserializationException(s"Invalid type field: $x")
+            case Keys.Stopped => CloudInstance.Status.Stopped
+            case x => throw DeserializationException(s"Invalid type field: $x")
           }
         case x => throw DeserializationException(s"Invalid type field: $x")
       }
@@ -44,7 +44,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       obj match {
         case CloudInstance.Status.Starting => JsObject("type" -> JsString(Keys.Starting))
         case r: CloudInstance.Status.Running =>
-          val body   = running.write(r).asJsObject
+          val body = running.write(r).asJsObject
           val fields = body.fields + ("type" -> JsString(Keys.Running))
           JsObject(fields)
         case CloudInstance.Status.Stopped => JsObject("type" -> JsString(Keys.Stopped))
@@ -54,22 +54,22 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
 
   implicit val dockerImageFormat = jsonFormat3(DockerImage.apply)
 
-  implicit val modelFormat         = jsonFormat2(Model)
-  implicit val environmentFormat   = jsonFormat3(HostSelector)
+  implicit val modelFormat = jsonFormat2(Model)
+  implicit val environmentFormat = jsonFormat3(HostSelector)
   implicit val versionStatusFormat = enumFormat(ModelVersionStatus)
-  implicit val modelVersionFormat  = jsonFormat12(ModelVersion.apply)
+  implicit val modelVersionFormat = jsonFormat12(ModelVersion.apply)
   implicit val cloudServableFormat = jsonFormat3(CloudInstance.apply)
 
   implicit def variantFormat[T: JsonFormat] = jsonFormat2(Variant.apply[T])
 
-  implicit val modelVariant   = jsonFormat2(ModelVariant.apply)
-  implicit val versionStage   = jsonFormat2(VersionStage.apply)
+  implicit val modelVariant = jsonFormat2(ModelVariant.apply)
+  implicit val versionStage = jsonFormat2(VersionStage.apply)
   implicit val versionAdapter = jsonFormat1(VersionGraphAdapter.apply)
 
-  implicit val servingSF  = jsonFormat3(Servable.Serving)
+  implicit val servingSF = jsonFormat3(Servable.Serving)
   implicit val servingNSF = jsonFormat3(Servable.NotServing)
   implicit val servingNAF = jsonFormat3(Servable.NotAvailable)
-  implicit val servingUF  = jsonFormat3(Servable.Starting)
+  implicit val servingUF = jsonFormat3(Servable.Starting)
 
   implicit val servableStatusFormat = new RootJsonFormat[Servable.Status] {
     override def write(obj: Servable.Status): JsValue = {
@@ -90,22 +90,21 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       json match {
         case JsObject(fields) =>
           fields.get("status") match {
-            case Some(JsString("Serving"))      => json.convertTo[Servable.Serving]
-            case Some(JsString("NotServing"))   => json.convertTo[Servable.NotServing]
+            case Some(JsString("Serving")) => json.convertTo[Servable.Serving]
+            case Some(JsString("NotServing")) => json.convertTo[Servable.NotServing]
             case Some(JsString("NotAvailable")) => json.convertTo[Servable.NotAvailable]
-            case Some(JsString("Unknown"))      => json.convertTo[Servable.Starting]
-            case x                              => throw DeserializationException(s"Invalid Servable status type: $x")
+            case Some(JsString("Unknown")) => json.convertTo[Servable.Starting]
+            case x => throw DeserializationException(s"Invalid Servable status type: $x")
           }
         case x => throw DeserializationException(s"Invalid Servable status JSON: $x")
       }
     }
   }
 
-  implicit def servableFormat[T <: Servable.Status](implicit j: JsonFormat[T]) =
-    jsonFormat5(Servable.apply[T])
+  implicit val servableFormat = jsonFormat5(Servable.apply)
 
   implicit val servableStageFormat = jsonFormat2(ServableStage.apply)
-  implicit val servableAdapter     = jsonFormat1(ServableGraphAdapter.apply)
+  implicit val servableAdapter = jsonFormat1(ServableGraphAdapter.apply)
 
   implicit val executionGraphAdapterFormat = new RootJsonFormat[ExecutionGraphAdapter] {
     override def read(json: JsValue): ExecutionGraphAdapter = {
@@ -126,9 +125,8 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
     }
   }
 
-  implicit val applicationStageFormat          = jsonFormat2(PipelineStage.apply)
-  implicit val applicationKafkaStreamingFormat = jsonFormat4(ApplicationKafkaStream)
-  implicit val execNode = jsonFormat2(ExecutionNode.apply)
+  implicit val applicationStageFormat = jsonFormat2(PipelineStage.apply)
+  implicit val applicationKafkaStreamingFormat = jsonFormat4(Application.KafkaParams)
 }
 
 object ModelJsonProtocol extends ModelJsonProtocol

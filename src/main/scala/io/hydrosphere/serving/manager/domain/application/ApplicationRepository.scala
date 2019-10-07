@@ -15,9 +15,9 @@ trait ApplicationRepository[F[_]] {
 
   def delete(id: Long): F[Int]
 
-  def all(): fs2.Stream[F, Application]
+  def all(): F[List[Application]]
 
-  def findVersionUsage(versionIdx: Long): fs2.Stream[F, Application]
+  def findVersionUsage(versionIdx: Long): F[List[Application]]
 
-  def findServableUsage(servableName: String): fs2.Stream[F, Application]
+  def findServableUsage(servableName: String): F[List[Application]]
 }

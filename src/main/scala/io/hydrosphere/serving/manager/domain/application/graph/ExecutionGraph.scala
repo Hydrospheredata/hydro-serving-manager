@@ -20,4 +20,4 @@ object ExecutionGraph {
 
 }
 
-case class ExecutionGraph(id: String, nodes: List[ExecutionNode], links: List[DirectionalLink], signature: ModelSignature) extends ExecutionNode
+case class ExecutionGraph(nodes: List[ExecutionNode], links: List[DirectionalLink], signature: ModelSignature)

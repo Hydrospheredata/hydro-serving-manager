@@ -5,13 +5,13 @@ import cats.effect.Bracket
 import cats.implicits._
 import doobie.implicits._
 import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.domain.application.graph.{ServableGraphAdapter, VersionGraphAdapter}
-import io.hydrosphere.serving.manager.domain.application.requests.{ExecutionGraphRequest, ModelVariantRequest, PipelineStageRequest}
-import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationKafkaStream, ApplicationRepository}
+import io.hydrosphere.serving.manager.domain.application.graph._
+import io.hydrosphere.serving.manager.domain.application.requests._
+import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.{AppDBSchemaErrors, ApplicationRow, IncompatibleExecutionGraphError, UsingModelVersionIsMissing}
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository._
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import org.apache.logging.log4j.scala.Logging
 import spray.json._

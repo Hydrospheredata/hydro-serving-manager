@@ -96,7 +96,7 @@ object ApplicationDeployer extends Logging {
             signature = graph.pipelineSignature,
             kafkaStreaming = kafkaStreaming,
             status = Application.Assembling,
-            versionGraph = graph.stages
+            graph = graph.stages
           )
       }
 

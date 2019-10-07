@@ -60,7 +60,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             status = Application.Assembling,
             signature = signature.copy(signatureName = "test"),
             kafkaStreaming = List.empty,
-            versionGraph = NonEmptyList.of(PipelineStage(
+            graph = NonEmptyList.of(PipelineStage(
               NonEmptyList.of(Variant(modelVersion, 100)),
               modelVersion.modelContract.predict.get
             ))
@@ -125,7 +125,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             status = Application.Assembling,
             signature = signature.copy(signatureName = "test"),
             kafkaStreaming = List.empty,
-            versionGraph = NonEmptyList.of(
+            graph = NonEmptyList.of(
               PipelineStage(NonEmptyList.of(
                 Variant(modelVersion, 100)),
                 signature
@@ -189,7 +189,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             status = Application.Assembling,
             signature = signature.copy(signatureName = "test"),
             kafkaStreaming = List.empty,
-            versionGraph = NonEmptyList.of(PipelineStage(
+            graph = NonEmptyList.of(PipelineStage(
               NonEmptyList.of(Variant(modelVersion, 100)),
               modelVersion.modelContract.predict.get
             ))
@@ -264,7 +264,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           signature = signature.copy(signatureName = "test"),
           status = Application.Assembling,
           kafkaStreaming = List.empty,
-          versionGraph =  NonEmptyList.of(PipelineStage(
+          graph =  NonEmptyList.of(PipelineStage(
             NonEmptyList.of(Variant(modelVersion, 100)),
             modelVersion.modelContract.predict.get
           ))
