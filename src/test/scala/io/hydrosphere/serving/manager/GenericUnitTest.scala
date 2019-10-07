@@ -6,8 +6,8 @@ import cats.data.EitherT
 import cats.effect.IO
 import io.hydrosphere.serving.manager.domain.DomainError
 import org.mockito.Mockito
-import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertion, AsyncFunSpecLike, Matchers}
+import org.scalatestplus.mockito.MockitoSugar
 
 import scala.concurrent.{ExecutionContext, Future}
 

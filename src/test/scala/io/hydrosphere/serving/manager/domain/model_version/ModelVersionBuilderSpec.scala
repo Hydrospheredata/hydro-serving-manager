@@ -62,11 +62,11 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         val versionService = new ModelVersionService[IO] {
           override def getNextModelVersion(modelId: Long) = IO.pure(1)
           override def get(name: String, version: Long) = ???
-          override def deleteVersions(mvs: Seq[ModelVersion]) = ???
           override def list = ???
           override def delete(versionId: Long) = ???
           override def all(): IO[List[ModelVersion]] = ???
           override def get(id: Long): IO[ModelVersion] = ???
+          override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
         }
 
         val mfs = ModelFileStructure(

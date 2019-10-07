@@ -171,6 +171,7 @@ class ServableSpec extends GenericUnitTest {
         override def delete(name: String): IO[Int] = ???
         override def get(name: String): IO[Option[GenericServable]] = ???
         override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
       val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
       println("Created queue")
@@ -208,6 +209,7 @@ class ServableSpec extends GenericUnitTest {
         override def delete(name: String): IO[Int] = ???
         override def get(name: String): IO[Option[GenericServable]] = ???
         override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
       val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
       println("Created queue")
@@ -240,6 +242,7 @@ class ServableSpec extends GenericUnitTest {
         override def delete(name: String): IO[Int] = ???
         override def get(name: String): IO[Option[GenericServable]] = ???
         override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
       val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
       println("Created queue")
@@ -271,6 +274,7 @@ class ServableSpec extends GenericUnitTest {
         override def delete(name: String): IO[Int] = ???
         override def get(name: String): IO[Option[GenericServable]] = ???
         override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
       val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
       println("Created queue")
@@ -317,6 +321,7 @@ class ServableSpec extends GenericUnitTest {
           IO(repoState.find(_.fullName == name))
         }
         override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
       val versionRepo = new ModelVersionRepository[IO] {
         override def create(entity: ModelVersion): IO[ModelVersion] = ???
@@ -424,6 +429,7 @@ class ServableSpec extends GenericUnitTest {
           IO(repoState.find(_.fullName == name))
         }
         override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
       val versionRepo = new ModelVersionRepository[IO] {
         override def create(entity: ModelVersion): IO[ModelVersion] = ???
@@ -520,6 +526,7 @@ class ServableSpec extends GenericUnitTest {
           IO(repoState.find(_.fullName == name))
         }
         override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
       val versionRepo = new ModelVersionRepository[IO] {
         override def create(entity: ModelVersion): IO[ModelVersion] = ???
@@ -606,6 +613,7 @@ class ServableSpec extends GenericUnitTest {
         def delete(name: String): IO[Int] = ???
         def get(name: String): IO[Option[Servable.GenericServable]] = ???
         def get(names: Seq[String]): IO[List[Servable.GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
 
       val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, null, servableRepo, null, null, null, null)
@@ -676,6 +684,7 @@ class ServableSpec extends GenericUnitTest {
         def delete(name: String): IO[Int] = ???
         def get(name: String): IO[Option[Servable.GenericServable]] = IO(None)
         def get(names: Seq[String]): IO[List[Servable.GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
 
       val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cd, servableRepo, null, versionRepo, servableMonitor, servablePublisher)
