@@ -4,6 +4,7 @@ import java.nio.file.{Path, Paths}
 import java.time.Instant
 
 import cats.MonadError
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.concurrent.Deferred
 import cats.syntax.option._
@@ -13,11 +14,18 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
+import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
+import io.hydrosphere.serving.manager.domain.application.graph.Variant
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, ModelService, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{FetcherResult, ModelFetcher}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, ModelUnpacker}
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -26,6 +34,8 @@ import io.hydrosphere.serving.tensorflow.types.DataType
 import org.mockito.Matchers
 
 class ModelServiceSpec extends GenericUnitTest {
+  val dummyImage = DockerImage("a", "b")
+
   describe("Model service") {
     describe("uploads") {
       it("a new model") {
@@ -103,12 +113,12 @@ class ModelServiceSpec extends GenericUnitTest {
           MonadError[IO, Throwable],
           modelRepository = modelRepo,
           modelVersionService = modelVersionService,
-          modelVersionRepository = modelVersionRepository,
           storageService = storageMock,
           appRepo = null,
           hostSelectorRepository = selectorRepo,
           fetcher = fetcher,
-          modelVersionBuilder = versionBuilder
+          modelVersionBuilder = versionBuilder,
+          servableRepo = null
         )
 
         val maybeModel = modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
@@ -153,15 +163,6 @@ class ModelServiceSpec extends GenericUnitTest {
           installCommand = None,
           metadata = Map.empty
         )
-        val modelVersionMetadata = ModelVersionMetadata(
-          modelName = modelName,
-          contract = contract,
-          profileTypes = Map.empty,
-          runtime = modelRuntime,
-          hostSelector = None,
-          installCommand = None,
-          metadata = Map.empty
-        )
         val upload = ModelUploadMetadata(
           name = modelName,
           runtime = modelRuntime,
@@ -195,12 +196,12 @@ class ModelServiceSpec extends GenericUnitTest {
           MonadError[IO, Throwable],
           modelRepository = modelRepo,
           modelVersionService = null,
-          modelVersionRepository = null,
           storageService = storageMock,
           appRepo = null,
           hostSelectorRepository = null,
           fetcher = fetcher,
-          modelVersionBuilder = versionService
+          modelVersionBuilder = versionService,
+          servableRepo = null
         )
 
         val maybeModel = modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
@@ -258,6 +259,176 @@ class ModelServiceSpec extends GenericUnitTest {
         assert(res.installCommand === Some("echo hello"))
         assert(res.metadata === Map("author" -> "me", "overriden" -> "true", "f" -> "123"))
         assert(res.profileTypes === Map("a" -> DataProfileType.IMAGE))
+      }
+    }
+
+    describe("CRUD") {
+      it("should correctly delete a model and fail if there are live deps") {
+        val appFailedModel = Model(1, "app-failing")
+        val appFailedVersion = ModelVersion(
+          id = 1,
+          image = dummyImage,
+          created = Instant.now(),
+          finished = Some(Instant.now()),
+          modelVersion = 1,
+          modelContract = ModelContract.defaultInstance,
+          runtime = dummyImage,
+          model = appFailedModel,
+          hostSelector = None,
+          status = ModelVersionStatus.Released,
+          installCommand = None,
+          metadata = Map.empty
+        )
+        val app = Application(
+          id = 1,
+          name = "app",
+          namespace = None,
+          status = Application.Failed(None),
+          signature = ModelSignature.defaultInstance,
+          kafkaStreaming = Nil,
+          versionGraph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(appFailedVersion, 100)), ModelSignature.defaultInstance))
+        )
+
+        val servableFailedModel = Model(2, "servable-failing")
+        val servableFailedVersion = ModelVersion(
+          id = 2,
+          image = dummyImage,
+          created = Instant.now(),
+          finished = Some(Instant.now()),
+          modelVersion = 2,
+          modelContract = ModelContract.defaultInstance,
+          runtime = dummyImage,
+          model = servableFailedModel,
+          hostSelector = None,
+          status = ModelVersionStatus.Released,
+          installCommand = None,
+          metadata = Map.empty
+        )
+        val servable = Servable(
+          modelVersion = servableFailedVersion,
+          nameSuffix = "123",
+          status = Servable.NotServing("asd", None, None),
+          usedApps = Nil,
+          metadata = Map.empty
+        )
+        val okModel = Model(3, "ok")
+        val okVersion1 = ModelVersion(
+          id = 3,
+          image = dummyImage,
+          created = Instant.now(),
+          finished = Some(Instant.now()),
+          modelVersion = 1,
+          modelContract = ModelContract.defaultInstance,
+          runtime = dummyImage,
+          model = okModel,
+          hostSelector = None,
+          status = ModelVersionStatus.Released,
+          installCommand = None,
+          metadata = Map.empty
+        )
+        val okVersion2 = ModelVersion(
+          id = 4,
+          image = dummyImage,
+          created = Instant.now(),
+          finished = Some(Instant.now()),
+          modelVersion = 2,
+          modelContract = ModelContract.defaultInstance,
+          runtime = dummyImage,
+          model = okModel,
+          hostSelector = None,
+          status = ModelVersionStatus.Released,
+          installCommand = None,
+          metadata = Map.empty
+        )
+        val modelRepo = new ModelRepository[IO] {
+          override def create(entity: Model): IO[Model] = ???
+          override def get(id: Long): IO[Option[Model]] = {
+            id match {
+              case appFailedModel.id => IO.pure(Some(appFailedModel))
+              case servableFailedModel.id => IO.pure(Some(servableFailedModel))
+              case okModel.id => IO.pure(Some(okModel))
+              case _ => IO(None)
+            }
+          }
+          override def all(): IO[Seq[Model]] = ???
+          override def get(name: String): IO[Option[Model]] = ???
+          override def update(value: Model): IO[Int] = ???
+          override def delete(id: Long): IO[Int] = IO.pure(1)
+        }
+        val appRepo = new ApplicationRepository[IO] {
+          override def create(entity: GenericApplication): IO[GenericApplication] = ???
+          override def get(id: Long): IO[Option[GenericApplication]] = ???
+          override def get(name: String): IO[Option[GenericApplication]] = ???
+          override def update(value: GenericApplication): IO[Int] = ???
+          override def updateRow(row: DBApplicationRepository.ApplicationRow): IO[Int] = ???
+          override def delete(id: Long): IO[Int] = ???
+          override def all(): IO[List[GenericApplication]] = ???
+          override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = {
+            versionIdx match {
+              case appFailedModel.id => IO(app :: Nil)
+              case _ => IO.pure(Nil)
+            }
+          }
+          override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
+        }
+        val servableRepo = new ServableRepository[IO] {
+          override def all(): IO[List[GenericServable]] = ???
+          override def upsert(servable: GenericServable): IO[GenericServable] = ???
+          override def delete(name: String): IO[Int] = ???
+          override def get(name: String): IO[Option[GenericServable]] = ???
+          override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+          override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = {
+            versionId match {
+              case servableFailedVersion.id =>
+                println("Here")
+                IO.pure(servable :: Nil)
+              case _ =>
+                println(s"Ok ${versionId}")
+                IO.pure(Nil)
+            }
+          }
+        }
+        val modelVersionService = new ModelVersionService[IO] {
+          override def all(): IO[List[ModelVersion]] = ???
+          override def get(id: Long): IO[ModelVersion] = ???
+          override def get(name: String, version: Long): IO[ModelVersion] = ???
+          override def getNextModelVersion(modelId: Long): IO[Long] = ???
+          override def list: IO[List[ModelVersionView]] = ???
+          override def listForModel(modelId: Long): IO[List[ModelVersion]] = {
+            modelId match {
+              case appFailedModel.id => IO.pure(appFailedVersion :: Nil)
+              case servableFailedModel.id => IO.pure(servableFailedVersion :: Nil)
+              case okModel.id => IO.pure(okVersion1 :: okVersion2 :: Nil)
+              case _ => IO.raiseError(new RuntimeException(s"Shouldn't delete model $modelId"))
+            }
+          }
+          override def delete(versionId: Long): IO[Option[ModelVersion]] = {
+            versionId match {
+              case okVersion1.id => IO.pure(Some(okVersion1))
+              case okVersion2.id => IO.pure(Some(okVersion2))
+              case _ => IO.raiseError(new RuntimeException(s"Shouldn't delete version $versionId"))
+            }
+          }
+        }
+        val modelService = ModelService.apply[IO]()(
+          MonadError[IO, Throwable],
+          modelRepository = modelRepo,
+          appRepo = appRepo,
+          servableRepo = servableRepo,
+          modelVersionService = modelVersionService,
+          storageService = null,
+          hostSelectorRepository = null,
+          fetcher = null,
+          modelVersionBuilder = null
+        )
+        val result = modelService.deleteModel(okModel.id).unsafeRunSync()
+        assert(result.name == okModel.name)
+
+        val failedApp = modelService.deleteModel(appFailedModel.id).attempt.unsafeRunSync()
+        assert(failedApp.left.get.isInstanceOf[DomainError.InvalidRequest], failedApp)
+
+        val failedServable = modelService.deleteModel(servableFailedModel.id).attempt.unsafeRunSync()
+        assert(failedServable.left.get.isInstanceOf[DomainError.InvalidRequest], failedServable)
       }
     }
   }

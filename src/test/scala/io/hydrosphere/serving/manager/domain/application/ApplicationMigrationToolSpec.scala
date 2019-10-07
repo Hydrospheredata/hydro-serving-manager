@@ -100,14 +100,11 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       }
       val serviceRepo = new ServableRepository[IO] {
         override def all(): IO[List[GenericServable]] = ???
-
         override def upsert(servable: GenericServable): IO[GenericServable] = ???
-
         override def delete(name: String): IO[Int] = ???
-
         override def get(name: String): IO[Option[GenericServable]] = ???
-
         override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
       val mt = ApplicationMigrationTool.default[IO](appsRepo, cloudDriver, appDeployer, serviceRepo)
       mt.getAndRevive().unsafeRunSync()
@@ -247,14 +244,11 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       }
       val serviceRepo = new ServableRepository[IO] {
         override def all(): IO[List[GenericServable]] = ???
-
         override def upsert(servable: GenericServable): IO[GenericServable] = ???
-
         override def delete(name: String): IO[Int] = ???
-
         override def get(name: String): IO[Option[GenericServable]] = ???
-
         override def get(names: Seq[String]): IO[List[GenericServable]] = IO(sMap.values.toList)
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
       val mt = ApplicationMigrationTool.default[IO](appsRepo, cloudDriver, appDeployer, serviceRepo)
       mt.getAndRevive().unsafeRunSync()

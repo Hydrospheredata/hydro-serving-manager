@@ -10,4 +10,6 @@ trait ServableRepository[F[_]] {
   def get(name: String): F[Option[Servable.GenericServable]]
 
   def get(names: Seq[String]): F[List[Servable.GenericServable]]
+
+  def findForModelVersion(versionId: Long): F[List[Servable.GenericServable]]
 }

@@ -1,15 +1,13 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
+import cats.MonadError
 import cats.data.OptionT
 import cats.implicits._
-import cats.{MonadError, Traverse}
 import io.hydrosphere.serving.manager.discovery.ModelPublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.model.ModelValidator
 import org.apache.logging.log4j.scala.Logging
-
-import scala.concurrent.ExecutionContext
 
 trait ModelVersionService[F[_]] {
   def all(): F[List[ModelVersion]]
@@ -18,11 +16,11 @@ trait ModelVersionService[F[_]] {
 
   def get(name: String, version: Long): F[ModelVersion]
 
-  def deleteVersions(mvs: Seq[ModelVersion]): F[List[ModelVersion]]
-
   def getNextModelVersion(modelId: Long): F[Long]
 
   def list: F[List[ModelVersionView]]
+
+  def listForModel(modelId: Long): F[List[ModelVersion]]
 
   def delete(versionId: Long): F[Option[ModelVersion]]
 }
@@ -34,12 +32,6 @@ object ModelVersionService {
     applicationRepo: ApplicationRepository[F],
     modelPublisher: ModelPublisher[F]
   ): ModelVersionService[F] = new ModelVersionService[F] with Logging {
-
-    def deleteVersions(mvs: Seq[ModelVersion]): F[List[ModelVersion]] = {
-      mvs.toList.traverse { version =>
-        delete(version.id)
-      }.map(_.flatten)
-    }
 
     def list: F[List[ModelVersionView]] = {
       for {
@@ -85,6 +77,10 @@ object ModelVersionService {
         mv <- OptionT(modelVersionRepository.get(id))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $id")))
       } yield mv
+    }
+
+    override def listForModel(modelId: Long): F[List[ModelVersion]] = {
+      modelVersionRepository.listForModel(modelId)
     }
   }
 }

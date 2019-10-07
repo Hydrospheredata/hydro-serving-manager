@@ -13,6 +13,7 @@ import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository}
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService}
+import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.storage.ModelUnpacker
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -36,10 +37,10 @@ object ModelService {
     F: MonadError[F, Throwable],
     modelRepository: ModelRepository[F],
     modelVersionService: ModelVersionService[F],
-    modelVersionRepository: ModelVersionRepository[F],
     storageService: ModelUnpacker[F],
     appRepo: ApplicationRepository[F],
     hostSelectorRepository: HostSelectorRepository[F],
+    servableRepo: ServableRepository[F],
     fetcher: ModelFetcher[F],
     modelVersionBuilder: ModelVersionBuilder[F]
   ): ModelService[F] = new ModelService[F] with Logging {
@@ -47,9 +48,10 @@ object ModelService {
     def deleteModel(modelId: Long): F[Model] = {
       for {
         model <- get(modelId)
-        versions <- modelVersionRepository.listForModel(model.id)
+        versions <- modelVersionService.listForModel(model.id)
         _ <- checkIfNoApps(versions)
-        _ <- modelVersionService.deleteVersions(versions)
+        _ <- checkIfNoServables(versions)
+        _ <- versions.traverse(x => modelVersionService.delete(x.id))
         _ <- modelRepository.delete(model.id)
       } yield model
     }
@@ -113,6 +115,20 @@ object ModelService {
         usedApps <- versions.map(_.id).toList.traverse(appRepo.findVersionUsage)
         _ <- F.fromEither(_checkApps(usedApps))
       } yield ()
+    }
+
+    def checkIfNoServables(versions: List[ModelVersion]) = {
+      versions.traverse { version =>
+        for {
+          servables <- servableRepo.findForModelVersion(version.id)
+          _ <- servables match {
+            case Nil => F.unit
+            case x => DomainError
+              .invalidRequest(s"Can't delete the model. ${version.fullName} is used in ${x.map(_.fullName)}")
+              .raiseError[F, Unit]
+          }
+        } yield ()
+      }.void
     }
 
     override def get(modelId: Long): F[Model] = {

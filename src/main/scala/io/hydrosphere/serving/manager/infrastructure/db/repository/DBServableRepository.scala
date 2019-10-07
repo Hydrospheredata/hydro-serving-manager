@@ -19,6 +19,7 @@ import spray.json._
 
 
 object DBServableRepository {
+
   case class ServableRow(
     service_name: String,
     model_version_id: Long,
@@ -28,6 +29,8 @@ object DBServableRepository {
     status: String,
     metadata: Option[String]
   )
+
+  type JoinedServableRow = (ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])
 
   def fromServable(s: GenericServable): ServableRow = {
     val (status, statusText, host, port) = s.status match {
@@ -62,7 +65,7 @@ object DBServableRepository {
       status = status,
       usedApps = apps.getOrElse(Nil),
       metadata = sr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
-      )
+    )
   }
 
   def toServableT = (toServable _).tupled
@@ -73,7 +76,7 @@ object DBServableRepository {
          | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
          | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |""".stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])]
+         |""".stripMargin.query[JoinedServableRow]
 
   def upsertQ(sr: ServableRow) =
     sql"""
@@ -97,24 +100,41 @@ object DBServableRepository {
 
   def getQ(name: String) =
     sql"""
-      |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
-      | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
-      | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-      | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-      |   WHERE service_name = $name
-      """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])]
+         |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
+         | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
+         | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
+         | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
+         |   WHERE service_name = $name
+      """.stripMargin.query[JoinedServableRow]
 
   def getManyQ(names: NonEmptyList[String]) = {
-    val frag = fr"""
-      |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
-      | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
-      | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-      | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-      |  WHERE """.stripMargin ++ Fragments.in(fr"service_name", names)
-      frag.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])]
+    val frag =
+      fr"""
+          |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
+          | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
+          | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
+          | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
+          |  WHERE """.stripMargin ++ Fragments.in(fr"service_name", names)
+    frag.query[JoinedServableRow]
+  }
+
+  def findForModelVersionQ(versionId: Long) = {
+    sql"""
+         |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
+         | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
+         | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
+         | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
+         |   WHERE model_version_id = $versionId
+      """.stripMargin.query[JoinedServableRow]
   }
 
   def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]) = new ServableRepository[F] {
+    override def findForModelVersion(versionId: Long): F[List[GenericServable]] = {
+      for {
+        rows <- findForModelVersionQ(versionId).to[List].transact(tx)
+      } yield rows.map(toServableT)
+    }
+
     override def all(): F[List[GenericServable]] = {
       for {
         rows <- allQ.to[List].transact(tx)
