@@ -47,7 +47,8 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
       used_servables = List("asd", "q123"),
       kafka_streams = List("azxcxz"),
       status_message = Some("Ok"),
-      used_model_versions = List(1,2,3)
+      used_model_versions = List(1,2,3),
+      metadata = None
     )
 
     it("should have correct queries") {

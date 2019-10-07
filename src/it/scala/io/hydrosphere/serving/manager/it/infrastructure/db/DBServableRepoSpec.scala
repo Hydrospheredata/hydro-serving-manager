@@ -25,12 +25,13 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
 
   describe("Queries") {
     it("should have correct queries") {
-      val row = ServableRow("name", 123, "status_text", Some("host"), Some(123), "status")
+      val row = ServableRow("name", 123, "status_text", Some("host"), Some(123), "status", None)
       check(DBServableRepository.allQ)
       check(DBServableRepository.getManyQ(NonEmptyList.of("123", "test")))
       check(DBServableRepository.deleteQ("delete-me"))
       check(DBServableRepository.getQ("get-me"))
       check(DBServableRepository.upsertQ(row))
+      check(DBServableRepository.findForModelVersionQ(1))
       succeed
     }
   }

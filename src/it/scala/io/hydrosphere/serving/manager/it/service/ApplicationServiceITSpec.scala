@@ -61,8 +61,8 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
               ))
             ))
           ),
-          Option.empty,
-          Map.empty
+          None,
+          None
         )
         for {
           appResult <- app.core.appService.create(create)
@@ -106,7 +106,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
             )
           ),
           kafkaStreaming = None,
-          metadata = Map.empty
+          metadata = None
         )
         for {
           app <- app.core.appService.create(appRequest)
@@ -150,7 +150,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
             errorTopic = None
           )
         )),
-        metadata = Map.empty
+        metadata = None
       )
       ioAssert {
         for {
@@ -161,7 +161,8 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
             application.started.name,
             application.started.namespace,
             appRequest.executionGraph,
-            Option.empty
+            None,
+            None
           ))
           finishedNew <- appNew.completed.get
           gotNewApp <- OptionT(app.core.repos.appRepo.get(appNew.started.id))
@@ -191,7 +192,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
             )
           ),
           kafkaStreaming = None,
-          metadata = Map.empty
+          metadata = None
         )
         for {
           application <- app.core.appService.create(appRequest)
@@ -212,7 +213,8 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
             application.started.name,
             application.started.namespace,
             newGraph,
-            Option.empty
+            None,
+            None
           ))
 
           gotNewApp <- OptionT(app.core.repos.appRepo.get(appNew.started.id))

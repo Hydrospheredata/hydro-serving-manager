@@ -124,7 +124,7 @@ object DBServableRepository {
          | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
          | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |   WHERE model_version_id = $versionId
+         |   WHERE hydro_serving.servable.model_version_id = $versionId
       """.stripMargin.query[JoinedServableRow]
   }
 
