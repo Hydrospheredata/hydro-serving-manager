@@ -25,7 +25,7 @@ object Boot extends IOApp with Logging {
     for {
       configuration <- ManagerConfiguration.load[IO]
       _ <- IO(logger.info(s"Config loaded:\n${ReflectionUtils.prettyPrint(configuration)}"))
-      dockerClient <- IO(DefaultDockerClient.fromEnv().build())
+      dockerClient <- IO(DefaultDockerClient.fromEnv().readTimeoutMillis(60 * 60 * 1000).build())
       dockerClientConfig <- DockerClientConfig
         .load[IO](DockerClientConfig.defaultConfigPath)
         .recover { case _ => DockerClientConfig() }
