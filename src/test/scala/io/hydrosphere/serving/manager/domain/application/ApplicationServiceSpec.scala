@@ -12,7 +12,7 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, DiscoveryEvent}
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
-import io.hydrosphere.serving.manager.domain.application.graph.{Variant, VersionGraphComposer}
+import io.hydrosphere.serving.manager.domain.application.graph.Variant
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
@@ -38,7 +38,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
     created = Instant.now(),
     finished = None,
     modelVersion = 1,
-    modelContract = contract,
+    contract = contract,
     runtime = DockerImage("runtime", "v"),
     model = Model(1, "model"),
     hostSelector = None,
@@ -62,7 +62,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             kafkaStreaming = List.empty,
             graph = NonEmptyList.of(PipelineStage(
               NonEmptyList.of(Variant(modelVersion, 100)),
-              modelVersion.modelContract.predict.get
+              modelVersion.contract.predict.get
             ))
           )
         ))
@@ -191,7 +191,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             kafkaStreaming = List.empty,
             graph = NonEmptyList.of(PipelineStage(
               NonEmptyList.of(Variant(modelVersion, 100)),
-              modelVersion.modelContract.predict.get
+              modelVersion.contract.predict.get
             ))
           )
         ))
@@ -266,7 +266,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           kafkaStreaming = List.empty,
           graph =  NonEmptyList.of(PipelineStage(
             NonEmptyList.of(Variant(modelVersion, 100)),
-            modelVersion.modelContract.predict.get
+            modelVersion.contract.predict.get
           ))
         )
         var app = Option(ogApp)

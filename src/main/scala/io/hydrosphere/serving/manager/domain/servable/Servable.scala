@@ -14,7 +14,9 @@ case class Servable(
 
 object Servable {
 
-  sealed trait Status extends Product with Serializable
+  sealed trait Status extends Product with Serializable {
+    def msg: String
+  }
 
   final case class Serving(msg: String, host: String, port: Int) extends Status
 

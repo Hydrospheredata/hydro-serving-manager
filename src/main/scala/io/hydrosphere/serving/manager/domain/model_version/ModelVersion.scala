@@ -2,13 +2,11 @@ package io.hydrosphere.serving.manager.domain.model_version
 
 import java.time.Instant
 
-import io.hydrosphere.serving.contract.model_contract.ModelContract
+import io.hydrosphere.serving.manager.domain.Contract
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionStatus.ModelVersionStatus
-import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
-import java.time.LocalDateTime
 
 case class ModelVersion(
   id: Long,
@@ -16,7 +14,7 @@ case class ModelVersion(
   created: Instant,
   finished: Option[Instant],
   modelVersion: Long,
-  modelContract: ModelContract,
+  contract: Contract,
   runtime: DockerImage,
   model: Model,
   hostSelector: Option[HostSelector],

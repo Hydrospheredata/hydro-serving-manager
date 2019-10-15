@@ -168,7 +168,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         created = Instant.now(),
         finished = None,
         modelVersion = 4,
-        modelContract = ModelContract.defaultInstance,
+        contract = ModelContract.defaultInstance,
         runtime = DockerImage("", ""),
         model = Model(1, "aaaa"),
         hostSelector = None,

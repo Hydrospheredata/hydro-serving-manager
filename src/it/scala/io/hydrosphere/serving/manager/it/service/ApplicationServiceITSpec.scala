@@ -72,8 +72,8 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
         } yield {
           assert(started.name === "simple-app")
           assert(finished.status.isInstanceOf[Application.Ready], finished.status)
-          assert(started.signature.inputs === mv1.modelContract.predict.get.inputs)
-          assert(started.signature.outputs === mv1.modelContract.predict.get.outputs)
+          assert(started.signature.inputs === mv1.contract.predict.get.inputs)
+          assert(started.signature.outputs === mv1.contract.predict.get.outputs)
           val status = finished.status.asInstanceOf[Application.Ready]
           val models = status.stages.flatMap(_.variants)
           assert(models.head.weight === 100)

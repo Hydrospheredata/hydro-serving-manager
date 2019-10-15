@@ -9,6 +9,7 @@ import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
 
 object DBBuildLogRepository {
+
   final case class BuildLogRow(
     version_id: Long,
     logs: List[String]

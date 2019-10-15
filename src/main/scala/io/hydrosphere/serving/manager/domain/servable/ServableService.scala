@@ -2,19 +2,15 @@ package io.hydrosphere.serving.manager.domain.servable
 
 import cats.data.OptionT
 import cats.effect._
-import cats.effect.concurrent.Deferred
-import cats.effect.implicits._
 import cats.implicits._
 import io.hydrosphere.serving.manager.discovery.ServablePublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
-import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator}
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.NameGenerator
 import org.apache.logging.log4j.scala.Logging
-
-import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
   def get(name: String): F[Servable]
@@ -23,13 +19,15 @@ trait ServableService[F[_]] {
 
   def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String, String]): F[List[Servable]]
 
-  def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, Servable]]
+  def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[Servable]
 
-  def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, Servable]]
+  def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[Servable]
 
   def stop(name: String): F[Servable]
 
-  def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, Servable]]
+  def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[Servable]
+
+  def deploy(servable: Servable): F[Servable]
 }
 
 object ServableService extends Logging {
@@ -59,52 +57,39 @@ object ServableService extends Logging {
   ): ServableService[F] = new ServableService[F] {
 
     override def all(): F[List[Servable]] = {
-      servableRepository.all().compile.toList
+      servableRepository.all()
     }
 
     override def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): F[List[Servable]] = {
       val maybeMetadata = if (metadata.nonEmpty) metadata.some else None
       val filtersMaybe = name.map(filterByName) :: versionId.map(filterByVersionId) :: maybeMetadata.map(filterByMetadata) :: Nil
       val filters = filtersMaybe.flatten
-      servableRepository.all()
-        .filter(s => filters.map(f => f(s)).fold(false)((r1, r2) => r1 && r2))
-        .compile.toList
+      for {
+        all <- servableRepository.all()
+      } yield all.filter(s => filters.map(f => f(s)).fold(false)((r1, r2) => r1 && r2))
     }
 
-    override def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, Servable]] = {
+    override def deploy(servable: Servable): F[Servable] = {
+      for {
+        rServable <- servableRepository.upsert(servable)
+        _ <- cloudDriver.run(rServable.fullName, rServable.modelVersion.id, rServable.modelVersion.image, rServable.modelVersion.hostSelector)
+      } yield rServable
+    }
+
+
+    override def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[Servable] = {
       for {
         randomSuffix <- generateUniqueSuffix(modelVersion)
-        d <- Deferred[F, Servable]
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata)
-        _ <- servableRepository.upsert(initServable)
-        _ <- awaitServable(initServable)
-          .flatMap(d.complete)
-          .onError {
-            case NonFatal(ex) =>
-              cloudDriver.remove(initServable.fullName).attempt >>
-                d.complete(initServable.copy(status = Servable.NotServing(ex.getMessage, None, None))).attempt >>
-                F.delay(logger.error(ex))
-          }
-          .start
-      } yield DeferredResult(initServable, d)
-    }
-
-    // TODO need to remove it
-    def awaitServable(servable: Servable): F[Servable] = {
-      for {
-        _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, servable.modelVersion.hostSelector)
-        servableDef <- monitor.monitor(servable)
-        resultServable <- servableDef.get
-        _ <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))
-        _ <- servableDH.update(resultServable)
-      } yield resultServable
+        result <- deploy(initServable)
+      } yield result
     }
 
     override def stop(name: String): F[Servable] = {
       for {
         servable <- OptionT(servableRepository.get(name))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't stop Servable $name because it doesn't exist")))
-        apps <- appRepo.findServableUsage(name).compile.toList
+        apps <- appRepo.findServableUsage(name)
         _ <- apps match {
           case Nil =>
             servableDH.remove(name) >>
@@ -117,7 +102,7 @@ object ServableService extends Logging {
       } yield servable
     }
 
-    override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, Servable]] = {
+    override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[Servable] = {
       for {
         version <- OptionT(versionRepository.get(name, version))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model $name:$version doesn't exist")))
@@ -125,7 +110,7 @@ object ServableService extends Logging {
       } yield servable
     }
 
-    override def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, Servable]] = {
+    override def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[Servable] = {
       for {
         version <- OptionT(versionRepository.get(modelId))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model id=$modelId doesn't exist")))
@@ -153,5 +138,6 @@ object ServableService extends Logging {
       OptionT(servableRepository.get(name))
         .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find Servable with name=$name")))
     }
+
   }
 }

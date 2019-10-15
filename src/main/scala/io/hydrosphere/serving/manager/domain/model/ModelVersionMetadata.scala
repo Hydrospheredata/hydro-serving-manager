@@ -2,17 +2,17 @@ package io.hydrosphere.serving.manager.domain.model
 
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
+import io.hydrosphere.serving.manager.domain.{Contract, DomainError}
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.FetcherResult
 
 case class ModelVersionMetadata(
   modelName: String,
-  contract: ModelContract,
+  contract: Contract,
   profileTypes: Map[String, DataProfileType],
   runtime: DockerImage,
   hostSelector: Option[HostSelector],
@@ -21,27 +21,14 @@ case class ModelVersionMetadata(
 )
 
 object ModelVersionMetadata {
-  def combineMetadata(fetcherResult: Option[FetcherResult], upload: ModelUploadMetadata, hs: Option[HostSelector]): ModelVersionMetadata = {
+  def combineMetadata(fetcherResult: Option[FetcherResult], upload: ModelUploadMetadata, hs: Option[HostSelector]): Either[DomainError, ModelVersionMetadata] = {
     val contract = upload.contract
       .orElse(fetcherResult.map(_.modelContract))
       .getOrElse(ModelContract.defaultInstance)
 
     val metadata = fetcherResult.map(_.metadata).getOrElse(Map.empty) ++ upload.metadata.getOrElse(Map.empty)
 
-    ModelVersionMetadata(
-      modelName = upload.name,
-      contract = contract,
-      profileTypes = upload.profileTypes.getOrElse(Map.empty),
-      runtime = upload.runtime,
-      hostSelector = hs,
-      installCommand = upload.installCommand,
-      metadata = metadata
-    )
-  }
-
-
-  def validateContract(upload: ModelVersionMetadata): Either[InvalidRequest, Unit] = {
-    upload.contract.predict match {
+    contract.predict match {
       case None => Left(InvalidRequest("The model has no prediction signature"))
       case Some(predictSignature) =>
         val inputsNotEmpty = predictSignature.inputs.nonEmpty
@@ -49,7 +36,15 @@ object ModelVersionMetadata {
         val inputErrors = predictSignature.inputs.map(validateField)
         val outputErrors = predictSignature.outputs.map(validateField)
         if (inputsNotEmpty && outputsNotEmpty) {
-          Right(())
+          Right(ModelVersionMetadata(
+            modelName = upload.name,
+            contract = Contract(predictSignature, contract.modelName),
+            profileTypes = upload.profileTypes.getOrElse(Map.empty),
+            runtime = upload.runtime,
+            hostSelector = hs,
+            installCommand = upload.installCommand,
+            metadata = metadata
+          ))
         } else {
           Left(InvalidRequest(s"Error during prediction signature validation. " +
             s"(inputsNotEmpty=$inputsNotEmpty, " +

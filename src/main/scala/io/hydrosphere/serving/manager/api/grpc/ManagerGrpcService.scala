@@ -7,18 +7,15 @@ import com.google.protobuf.empty.Empty
 import io.grpc.stub.StreamObserver
 import io.hydrosphere.serving.manager.api.DeployServableRequest.ModelVersion
 import io.hydrosphere.serving.manager.api.ManagerServiceGrpc.ManagerService
-import io.hydrosphere.serving.manager.api.{DeployServableRequest, GetVersionRequest, RemoveServableRequest}
+import io.hydrosphere.serving.manager.api.{DeployServableRequest, GetServablesRequest, GetVersionRequest, RemoveServableRequest}
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionService
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import io.hydrosphere.serving.manager.domain.servable.ServableService
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.grpc
-import io.hydrosphere.serving.manager.grpc.entities.Servable
-import io.hydrosphere.serving.manager.util.DeferredResult
+import io.hydrosphere.serving.manager.grpc.entities.{Servable => GServable}
 import io.hydrosphere.serving.manager.util.grpc.Converters
 
 import scala.concurrent.Future
-import io.hydrosphere.serving.manager.api.GetServablesRequest
 
 class ManagerGrpcService[F[_]](
   versionService: ModelVersionService[F],
@@ -48,16 +45,14 @@ class ManagerGrpcService[F[_]](
     f.toIO.unsafeToFuture()
   }
 
-  override def deployServable(request: DeployServableRequest, responseObserver: StreamObserver[Servable]): Unit = {
+  override def deployServable(request: DeployServableRequest, responseObserver: StreamObserver[GServable]): Unit = {
     val flow = for {
       res <- request.modelVersion match {
-        case ModelVersion.Empty =>  F.raiseError[DeferredResult[F, GenericServable]](DomainError.invalidRequest("model version is not specified"))
+        case ModelVersion.Empty =>  F.raiseError[Servable](DomainError.invalidRequest("model version is not specified"))
         case ModelVersion.VersionId(value) => servableService.findAndDeploy(value, request.metadata)
         case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version, request.metadata) 
       }
-      _ <- F.delay(responseObserver.onNext(Converters.fromServable(res.started)))
-      completed <- res.completed.get
-      _ <- F.delay(responseObserver.onNext(Converters.fromServable(completed)))
+      _ <- F.delay(responseObserver.onNext(Converters.fromServable(res)))
       _ <- F.delay(responseObserver.onCompleted())
     } yield ()
 
@@ -66,14 +61,14 @@ class ManagerGrpcService[F[_]](
       .toIO.unsafeRunAsyncAndForget()
   }
 
-  override def removeServable(request: RemoveServableRequest): Future[Servable] = {
+  override def removeServable(request: RemoveServableRequest): Future[GServable] = {
     val flow = for {
       res <- servableService.stop(request.servableName)
     } yield Converters.fromServable(res)
     flow.toIO.unsafeToFuture()
   }
 
-  override def getServables(request: GetServablesRequest, responseObserver: StreamObserver[Servable]): Unit = {
+  override def getServables(request: GetServablesRequest, responseObserver: StreamObserver[GServable]): Unit = {
     val flow = for {
         servables <- request.filter match {
         case Some(filter) => servableService.getFiltered(name=filter.name, versionId=filter.versionId, metadata=filter.metadata) // return filtered

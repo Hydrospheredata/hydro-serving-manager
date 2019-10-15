@@ -50,7 +50,7 @@ object ModelVersionBuilder {
           created = Instant.now(),
           finished = None,
           modelVersion = version,
-          modelContract = metadata.contract,
+          contract = metadata.contract,
           runtime = metadata.runtime,
           model = model,
           hostSelector = metadata.hostSelector,
@@ -88,7 +88,7 @@ object ModelVersionBuilder {
     def prepare(modelVersion: ModelVersion, modelFileStructure: ModelFileStructure): F[ModelFileStructure] = {
       for {
         _ <- storageOps.writeBytes(modelFileStructure.dockerfile, BuildScript.generate(modelVersion).getBytes)
-        _ <- storageOps.writeBytes(modelFileStructure.contractPath, modelVersion.modelContract.toByteArray)
+        _ <- storageOps.writeBytes(modelFileStructure.contractPath, modelVersion.contract.toProto.toByteArray)
       } yield modelFileStructure
     }
   }

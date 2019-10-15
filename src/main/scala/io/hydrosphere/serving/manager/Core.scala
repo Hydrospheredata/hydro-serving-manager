@@ -2,24 +2,22 @@ package io.hydrosphere.serving.manager
 
 import cats.effect._
 import cats.implicits._
-import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, ApplicationSubscriber, DiscoveryTopic, ModelPublisher, ModelSubscriber, ServablePublisher, ServableSubscriber}
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
-import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationRepository, ApplicationService}
+import io.hydrosphere.serving.manager.discovery._
+import io.hydrosphere.serving.manager.domain.Monitor
+import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.host_selector.{HostSelectorRepository, HostSelectorService}
+import io.hydrosphere.serving.manager.domain.host_selector._
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
-import io.hydrosphere.serving.manager.domain.model.{ModelRepository, ModelService}
-import io.hydrosphere.serving.manager.domain.model_build.{BuildLogRepository, BuildLoggingService, ModelVersionBuilder}
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService}
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import io.hydrosphere.serving.manager.domain.servable.{ServableMonitor, ServableProbe, ServableRepository, ServableService}
+import io.hydrosphere.serving.manager.domain.model._
+import io.hydrosphere.serving.manager.domain.model_build._
+import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.servable._
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
-import io.hydrosphere.serving.manager.infrastructure.storage.{ModelUnpacker, StorageOps}
+import io.hydrosphere.serving.manager.infrastructure.storage._
 import io.hydrosphere.serving.manager.util.UUIDGenerator
-import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
+import io.hydrosphere.serving.manager.util.random._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -68,12 +66,14 @@ object Core {
     appRepo: ApplicationRepository[F],
     buildLogsRepo: BuildLogRepository[F],
   ): F[Core[F]] = {
+    implicit val servableProbe: ServableProbe[F] = ServableProbe.default[F]
     for {
-      appPubSub <- DiscoveryTopic.make[F, GenericApplication, String]()
+      appPubSub <- DiscoveryTopic.make[F, Application, String]()
       modelPubSub <- DiscoveryTopic.make[F, ModelVersion, Long]()
-      servablePubSub <- DiscoveryTopic.make[F, GenericServable, String]()
+      servablePubSub <- DiscoveryTopic.make[F, Servable, String]()
       buildLoggingService <- BuildLoggingService.make[F]()
-      core <- {
+      _ <- Monitor.monitoringLoop[F](servableRepo, appRepo)
+      core = {
         implicit val (appPub, appSub) = appPubSub
         implicit val (modelPub, modelSub) = modelPubSub
         implicit val (servablePub, servableSub) = servablePubSub
@@ -84,35 +84,28 @@ object Core {
         implicit val modelFetcher: ModelFetcher[F] = ModelFetcher.default[F]()
         implicit val hostSelectorService: HostSelectorService[F] = HostSelectorService[F](hostSelectorRepo)
         implicit val versionService: ModelVersionService[F] = ModelVersionService[F]()
-        implicit val servableProbe: ServableProbe[F] = ServableProbe.default[F]
-        for {
-          servableMonitor <- ServableMonitor.default[F](2.seconds, 1.minute)
-        } yield {
-          implicit val sm = servableMonitor.mon
-          implicit val versionBuilder: ModelVersionBuilder[F] = ModelVersionBuilder()
-          implicit val servableService: ServableService[F] = ServableService[F]()
-          implicit val graphComposer: VersionGraphComposer = VersionGraphComposer.default
-          implicit val appDeployer: ApplicationDeployer[F] = ApplicationDeployer.default()
-          implicit val appService: ApplicationService[F] = ApplicationService[F]()
-          implicit val modelService: ModelService[F] = ModelService[F]()
+        implicit val versionBuilder: ModelVersionBuilder[F] = ModelVersionBuilder()
+        implicit val servableService: ServableService[F] = ServableService[F]()
+        implicit val appDeployer: ApplicationDeployer[F] = ApplicationDeployer.default()
+        implicit val appService: ApplicationService[F] = ApplicationService[F]()
+        implicit val modelService: ModelService[F] = ModelService[F]()
 
-          val repos = Repositories(appRepo, hostSelectorRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo)
-          Core(
-            repos = repos,
-            buildLoggingService = buildLoggingService,
-            hostSelectorService = hostSelectorService,
-            modelService = modelService,
-            versionService = versionService,
-            modelPub = modelPub,
-            modelSub = modelSub,
-            appService = appService,
-            appPub = appPub,
-            appSub = appSub,
-            servableService = servableService,
-            servablePub = servablePub,
-            servableSub = servableSub
-          )
-        }
+        val repos = Repositories(appRepo, hostSelectorRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo)
+        Core(
+          repos = repos,
+          buildLoggingService = buildLoggingService,
+          hostSelectorService = hostSelectorService,
+          modelService = modelService,
+          versionService = versionService,
+          modelPub = modelPub,
+          modelSub = modelSub,
+          appService = appService,
+          appPub = appPub,
+          appSub = appSub,
+          servableService = servableService,
+          servablePub = servablePub,
+          servableSub = servableSub
+        )
       }
     } yield core
   }

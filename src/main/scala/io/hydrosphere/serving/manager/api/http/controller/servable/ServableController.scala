@@ -8,7 +8,7 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
+import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.{ServableRepository, ServableService}
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -25,7 +25,7 @@ class ServableController[F[_]: Effect](
   @Path("/")
   @ApiOperation(value = "servables", notes = "servables", nickname = "servables", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable], responseContainer = "List"),
+    new ApiResponse(code = 200, message = "Servable", response = classOf[Servable], responseContainer = "List"),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def listServables = path("servable") {
@@ -44,7 +44,7 @@ class ServableController[F[_]: Effect](
     new ApiImplicitParam(name = "name", required = true, dataType = "string", paramType = "path", value = "name")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable]),
+    new ApiResponse(code = 200, message = "Servable", response = classOf[Servable]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def getServable = path("servable" / Segment) { name =>
@@ -86,7 +86,7 @@ class ServableController[F[_]: Effect](
     new ApiImplicitParam(name = "DeployModelRequest", required = true, dataTypeClass = classOf[DeployModelRequest], paramType = "body")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable]),
+    new ApiResponse(code = 200, message = "Servable", response = classOf[Servable]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def deployModel = path("servable") {
@@ -94,7 +94,7 @@ class ServableController[F[_]: Effect](
       entity(as[DeployModelRequest]) { r =>
         completeF {
           servableService.findAndDeploy(r.modelName, r.version, r.metadata.getOrElse(Map.empty))
-            .map(x => ServableView.fromServable(x.started))
+            .map(x => ServableView.fromServable(x))
         }
       }
     }
@@ -106,7 +106,7 @@ class ServableController[F[_]: Effect](
     new ApiImplicitParam(name = "name", required = true, dataType = "string", paramType = "path", value = "name")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable]),
+    new ApiResponse(code = 200, message = "Servable", response = classOf[Servable]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def stopServable = path("servable" / Segment) { name =>

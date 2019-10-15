@@ -1,9 +1,8 @@
 package io.hydrosphere.serving.manager.domain
 
-import cats.Monad
+import cats.effect.implicits._
 import cats.effect.{Bracket, Concurrent}
 import cats.implicits._
-import cats.effect.implicits._
 import io.hydrosphere.serving.manager.domain.application.graph.ExecutionGraph
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableProbe, ServableRepository}
@@ -28,51 +27,61 @@ object Monitor extends Logging {
     probe: ServableProbe[F]
   ) = {
     for {
-      servables <- servableRepository.all().compile.toList
+      servables <- servableRepository.all()
       updatedServables <- monitorServables(servables)
-      usedApps <- updatedServables.traverse{ s =>
-        applicationRepository.findServableUsage(s.fullName).compile.toList.map(x => s -> x)
+      usedApps <- updatedServables.flatTraverse { s =>
+        applicationRepository.findServableUsage(s.fullName)
       }
-      usedAppsMap = usedApps.toMap
-      updatedApps <- monitorApps(usedAppsMap)
+      updatedApps = monitorApps(updatedServables, usedApps)
       _ <- updatedServables.traverse(servableRepository.upsert)
-      _ <- updatedServables.traverse(applicationRepository.update)
+      _ <- updatedApps.traverse(applicationRepository.update)
     } yield ()
     F.unit
   }
 
-  def monitorApps[F[_]](
-    servableDiff: Map[Servable, List[Application]]
-  )(implicit
-  F: Monad[F]
-  ) = {
-    val statusDiff = servableDiff.flatMap{
-      case (servable, apps) =>
-        servable.status match {
-          case Servable.Serving(msg, host, port) =>
-            apps.map {app =>
-              app.graph.nodes.find{ x =>
-                x match {
-                  case ExecutionGraph.ModelNode(id, mv, es) =>
-                    val x = es.find(_.fullName == servable.fullName)
-                  case ExecutionGraph.ABNode(id, submodels, signature) =>
-                  case ExecutionGraph(id, nodes, links, signature) =>
-                }
-              }
-              app.copy(status = Application.Healthy)
+  /**
+    * Here we need to update app graphs and status
+    *
+    * @return
+    */
+  def monitorApps(
+    usedServables: List[Servable],
+    usedApps: List[Application]
+  ): List[Application] = {
+    usedApps.map { app =>
+      var status: Application.Status = Application.Healthy
+      val updatedNodes = app.graph.nodes.map {
+        case ExecutionGraph.ModelNode(id, servable) =>
+          val updatedServable = usedServables.find(_.fullName == servable.fullName) match {
+            case Some(value) => value
+            case None => servable
+          }
+          updatedServable.status match {
+            case Servable.Serving(_, _, _) => status
+            case Servable.NotServing(msg, _, _) => status = Application.Unhealthy(msg.some)
+            case Servable.NotAvailable(msg, _, _) => status = Application.Unhealthy(msg.some)
+            case Servable.Starting(msg, _, _) => status = Application.Unhealthy(msg.some)
+          }
+          ExecutionGraph.ModelNode(id, updatedServable)
+        case ExecutionGraph.ABNode(id, submodels, contract) =>
+          val updatedSubmodels = submodels.map { case (sub, weight) =>
+            val updatedServable = usedServables.find(_.fullName == sub.servable.fullName) match {
+              case Some(value) => value
+              case None => sub.servable
             }
-          case _ =>
-            apps.map { app =>
-              app.copy(status = Application.Unhealthy)
+            updatedServable.status match {
+              case Servable.Serving(_, _, _) => status
+              case Servable.NotServing(msg, _, _) => status = Application.Unhealthy(msg.some)
+              case Servable.NotAvailable(msg, _, _) => status = Application.Unhealthy(msg.some)
+              case Servable.Starting(msg, _, _) => status = Application.Unhealthy(msg.some)
             }
-        }
-    }
-    // Now we merge app state diffs so there are no dupes.
-    // If there is Healthy :: Healthy :: Unhealthy states, they are reduced to Unhealthy
-    statusDiff.groupBy(_.id).map{
-      case (_, apps) => apps.map(_.status).fold(Application.Healthy) {
-        case (Application.Unhealthy, _) => Application.Unhealthy
+            ExecutionGraph.ModelNode(id, updatedServable) -> weight
+          }
+          ExecutionGraph.ABNode(id, updatedSubmodels, contract)
+        case x: ExecutionGraph.InternalNode => x
       }
+      val updatedGraph = app.graph.copy(nodes = updatedNodes)
+      app.copy(graph = updatedGraph, status = status)
     }
   }
 
@@ -81,13 +90,18 @@ object Monitor extends Logging {
   )(implicit
     F: Bracket[F, Throwable],
     probe: ServableProbe[F]
-  ) = {
+  ): F[List[Servable]] = {
     for {
-      maybeUpdatedServables <- servables.traverse(handleServable)
+      maybeUpdatedServables <- servables.traverse(x => handleServable(x))
     } yield maybeUpdatedServables.flatten
   }
 
-  def handleServable[F[_]](servable: Servable)(implicit F:Bracket[F, Throwable], probe: ServableProbe[F]) = {
+  def handleServable[F[_]](
+    servable: Servable
+  )(implicit
+    F: Bracket[F, Throwable],
+    probe: ServableProbe[F]
+  ): F[Option[Servable]] = {
     for {
       newStatus <- probe.probe(servable).handleError { x =>
         Servable.NotAvailable(s"Probe failed. ${x.getMessage}", None, None)

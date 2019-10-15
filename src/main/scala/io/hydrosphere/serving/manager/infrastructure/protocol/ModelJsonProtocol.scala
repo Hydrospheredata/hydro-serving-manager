@@ -2,8 +2,8 @@ package io.hydrosphere.serving.manager.infrastructure.protocol
 
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.graph._
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
-import io.hydrosphere.serving.manager.domain.clouddriver
+import io.hydrosphere.serving.manager.domain.application.graph.compat._
+import io.hydrosphere.serving.manager.domain.{Contract, clouddriver}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstance
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -57,6 +57,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val modelFormat = jsonFormat2(Model)
   implicit val environmentFormat = jsonFormat3(HostSelector)
   implicit val versionStatusFormat = enumFormat(ModelVersionStatus)
+  implicit val contractFormat = jsonFormat2(Contract.apply)
   implicit val modelVersionFormat = jsonFormat12(ModelVersion.apply)
   implicit val cloudServableFormat = jsonFormat3(CloudInstance.apply)
 
@@ -125,8 +126,43 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
     }
   }
 
-  implicit val applicationStageFormat = jsonFormat2(PipelineStage.apply)
+//  implicit val applicationStageFormat = jsonFormat2(PipelineStage.apply)
   implicit val applicationKafkaStreamingFormat = jsonFormat4(Application.KafkaParams)
+  implicit val graphLinkFormat = jsonFormat2(ExecutionGraph.DirectionalLink.apply)
+  implicit val modelNodeFormat = jsonFormat2(ExecutionGraph.ModelNode.apply)
+  implicit val abNodeFormat = jsonFormat3(ExecutionGraph.ABNode.apply)
+  implicit val internalNodeFormat = jsonFormat2(ExecutionGraph.InternalNode.apply)
+  implicit val executionNodeFormat = new RootJsonFormat[ExecutionGraph.ExecutionNode] {
+    override def write(obj: ExecutionGraph.ExecutionNode): JsValue = {
+      val fields = obj match {
+        case x: ExecutionGraph.ModelNode => x.toJson.asJsObject.fields ++ Map("type" -> JsString("ModelNode"))
+        case x: ExecutionGraph.ABNode => x.toJson.asJsObject.fields ++ Map("type" -> JsString("ABNode"))
+        case x: ExecutionGraph.InternalNode => x.toJson.asJsObject.fields ++ Map("type" -> JsString("InternalNode"))
+      }
+      JsObject(fields)
+    }
+
+    override def read(json: JsValue): ExecutionGraph.ExecutionNode = {
+      json match {
+        case JsObject(fields) =>
+          fields.get("type") match {
+            case Some(value) =>
+              value match {
+                case JsString(value) =>
+                  value match {
+                    case "ModelNode" => json.convertTo[ExecutionGraph.ModelNode]
+                    case "ABNode" => json.convertTo[ExecutionGraph.ABNode]
+                    case "InternalNode" => json.convertTo[ExecutionGraph.InternalNode]
+                    case x =>throw DeserializationException(s"Invalid node type: ${x}")
+                  }
+                case x =>  throw DeserializationException(s"Invalid ExecutionNode json: ${json}")
+              }
+            case None => throw DeserializationException(s"Invalid ExecutionNode json: ${json}")
+          }
+        case x => throw DeserializationException(s"Invalid ExecutionNode json: ${x}")
+      }
+    }
+  }
 }
 
 object ModelJsonProtocol extends ModelJsonProtocol

@@ -20,6 +20,7 @@ import spray.json._
 import java.time.Instant
 
 import cats.data.NonEmptyList
+import io.hydrosphere.serving.manager.domain.Contract
 
 object DBModelVersionRepository {
   final case class ModelVersionRow(
@@ -53,7 +54,7 @@ object DBModelVersionRepository {
     created = mvr.created_timestamp,
     finished = mvr.finished_timestamp,
     modelVersion = mvr.model_version,
-    modelContract = mvr.model_contract.parseJson.convertTo[ModelContract],
+    contract = mvr.model_contract.parseJson.convertTo[Contract],
     runtime = DockerImage(
       name = mvr.runtime_name,
       tag = mvr.runtime_version
@@ -81,7 +82,7 @@ object DBModelVersionRepository {
     created_timestamp = mv.created,
     finished_timestamp = mv.finished,
     model_version = mv.modelVersion,
-    model_contract = mv.modelContract.toJson.compactPrint,
+    model_contract = mv.contract.toJson.compactPrint,
     image_name = mv.image.name,
     image_tag = mv.image.tag,
     image_sha256 = mv.image.sha256,

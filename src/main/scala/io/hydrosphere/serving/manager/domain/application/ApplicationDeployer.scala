@@ -1,18 +1,21 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import cats.data.OptionT
+import cats.data.{NonEmptyList, OptionT}
 import cats.effect.Concurrent
-import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.implicits._
+import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.discovery.ApplicationPublisher
-import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
+import io.hydrosphere.serving.manager.domain.application.graph.ExecutionGraph
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
-import io.hydrosphere.serving.manager.util.DeferredResult
+import io.hydrosphere.serving.manager.domain.{Contract, DomainError}
+import io.hydrosphere.serving.manager.util.UUIDGenerator
+import io.hydrosphere.serving.manager.util.random.NameGenerator
+import io.hydrosphere.serving.model.api.MergeError
+import io.hydrosphere.serving.model.api.ops.ModelSignatureOps
 import org.apache.logging.log4j.scala.Logging
 
 trait ApplicationDeployer[F[_]] {
@@ -20,17 +23,76 @@ trait ApplicationDeployer[F[_]] {
     name: String,
     executionGraph: ExecutionGraphRequest,
     kafkaStreaming: List[Application.KafkaParams]
-  ): F[DeferredResult[F, Application]]
+  ): F[Application]
 }
 
 object ApplicationDeployer extends Logging {
+  def inferConcurrentNodes(
+    nodes: NonEmptyList[ExecutionGraph.ModelNode]
+  ): Either[DomainError, ModelSignature] = {
+    ApplicationValidator.inferStageSignature(nodes.map(_.servable.modelVersion).toList)
+  }
+
+  def inferGraphSignature(
+    nodes: NonEmptyList[ExecutionGraph.ExecutionNode],
+    links: NonEmptyList[ExecutionGraph.DirectionalLink]
+  ): Either[Seq[MergeError], Unit] = {
+    val inputLinks = links.filter(ExecutionGraph.InputLink.isInput)
+    val inputNodes = nodes.filter(n => inputLinks.exists(_.dest == n.id))
+    val input = inputNodes
+      .map(_.contract.predict)
+      .foldLeft(Either.right[Seq[MergeError], ModelSignature](ModelSignature.defaultInstance)) {
+        case (Right(a), b) => ModelSignatureOps.merge(a, b)
+        case (Left(err), _) => Left(err)
+      }
+      .map(x => ExecutionGraph.InternalNode.input(Contract(x)))
+
+    val outputLinks = links.filter(ExecutionGraph.OutputLink.isOutput)
+    val outputNodes = nodes.filter(n => outputLinks.exists(_.src == n.id))
+    val output = outputNodes
+      .map(_.contract.predict)
+      .foldLeft(Either.right[Seq[MergeError], ModelSignature](ModelSignature.defaultInstance)) {
+        case (Right(a), b) => ModelSignatureOps.merge(a, b)
+        case (Left(err), _) => Left(err)
+      }
+      .map(x => ExecutionGraph.InternalNode.input(Contract(x)))
+
+    for {
+      i <- input
+      o <- output
+      fullNodes = nodes ++ List(i, o)
+    } yield contractCheckTraverse(i, fullNodes, links)
+  }
+
+  // TODO Ensure that it traverses graph and check contract for nodes
+  // TODO Unsafe recursion. Ensure stack safety.
+  def contractCheckTraverse(
+    inputNode: ExecutionGraph.ExecutionNode,
+    nodes: NonEmptyList[ExecutionGraph.ExecutionNode],
+    links: NonEmptyList[ExecutionGraph.DirectionalLink]
+  ): Unit = {
+    def checkNode(node: ExecutionGraph.ExecutionNode): Either[Seq[MergeError], Unit] = {
+      val nodeLinks = links.filter(l => l.src == node.id)
+      val outputNodes = nodes.filter(n => nodeLinks.exists(_.dest == n.id))
+      val result = outputNodes.traverse { n =>
+        ModelSignatureOps.append(node.contract.predict, n.contract.predict)
+      }
+      val x = result.flatMap { _ =>
+        outputNodes.traverse(checkNode)
+      }
+      x.map(_ => ())
+    }
+    checkNode(inputNode)
+  }
+
   def default[F[_]]()(
     implicit
     F: Concurrent[F],
+    uuidGen: UUIDGenerator[F],
+    nameGenerator: NameGenerator[F],
     servableService: ServableService[F],
     versionRepository: ModelVersionRepository[F],
     applicationRepository: ApplicationRepository[F],
-    graphComposer: VersionGraphComposer,
     discoveryHub: ApplicationPublisher[F]
   ): ApplicationDeployer[F] = {
     new ApplicationDeployer[F] {
@@ -38,65 +100,73 @@ object ApplicationDeployer extends Logging {
         name: String,
         executionGraph: ExecutionGraphRequest,
         kafkaStreaming: List[Application.KafkaParams]
-      ): F[DeferredResult[F, Application]] = {
+      ): F[Application] = {
         for {
-          composedApp <- composeApp(name, None, executionGraph, kafkaStreaming)
+          composedApp <- composeApp(name, executionGraph, kafkaStreaming)
           repoApp <- applicationRepository.create(composedApp)
-          _ <- discoveryHub.update(repoApp)
           app = composedApp.copy(id = repoApp.id)
-          df <- Deferred[F, GenericApplication]
-          _ <- (for {
-            genericApp <- startServices(app)
-            _ <- F.delay(logger.debug("App services started. All ok."))
-            _ <- applicationRepository.update(genericApp)
-            _ <- discoveryHub.update(genericApp)
-            _ <- df.complete(genericApp)
-          } yield ())
-            .handleErrorWith { x =>
-              val failedApp = app.copy(status = Application.Failed(Option(x.getMessage)))
-              F.delay(logger.error(s"Error while buidling application $failedApp", x)) >>
-                applicationRepository.update(failedApp) >>
-                df.complete(failedApp).attempt.void
-            }
-            .start
-        } yield DeferredResult(app, df)
+          _ <- discoveryHub.update(app)
+          _ <- handleAppDeployment(app).start
+        } yield app
       }
 
       def composeApp(
         name: String,
-        namespace: Option[String],
         executionGraph: ExecutionGraphRequest,
-        kafkaStreaming: List[ApplicationKafkaStream]
-      ): F[AssemblingApp] = {
+        kafkaStreaming: List[Application.KafkaParams]
+      ): F[Application] = {
         for {
           _ <- checkApplicationName(name)
-          versions <- executionGraph.stages.traverse { f =>
+          nodes <- executionGraph.stages.traverse { f =>
             for {
               variants <- f.modelVariants.traverse { m =>
                 for {
                   version <- OptionT(versionRepository.get(m.modelVersionId))
-                    .map(Variant(_, m.weight))
-                    .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find modelversion $m")))
-                  _ <- version.item.status match {
+                    .getOrElseF(DomainError.notFound(s"Can't find ModelVersion $m").raiseError[F, ModelVersion])
+                  _ <- version.status match {
                     case ModelVersionStatus.Released => F.unit
                     case x =>
-                      F.raiseError[Unit](DomainError.invalidRequest(s"Can't deploy non-released ModelVersion: ${version.item.fullName} - $x"))
+                      DomainError
+                        .invalidRequest(s"Can't deploy non-released ModelVersion: ${version.fullName} - $x")
+                        .raiseError[F, Unit]
                   }
-                } yield version
+                  uuid <- uuidGen.generate()
+                  servablePrefix = nameGenerator.getName()
+                  fullPrefix = name + "-" + servablePrefix
+                  servableMeta = Map(
+                    "application.exec-node-id" -> uuid.toString,
+                    "application.name" -> name
+                  )
+                  status = Servable.NotServing("Not deployed yet", None, None)
+                  servable = Servable(version, fullPrefix, status, Nil, servableMeta)
+                } yield ExecutionGraph.ModelNode(uuid.toString, servable) -> m.weight
               }
-            } yield Node(variants)
+              uuid <- uuidGen.generate()
+              nodes <- variants match {
+                case NonEmptyList((head, _), Nil) =>
+                  head.pure[F].widen[ExecutionGraph.ExecutionNode]
+                case nel =>
+                  val res = for {
+                    signature <- F.fromEither(inferConcurrentNodes(nel.map(_._1)))
+                  } yield ExecutionGraph.ABNode(uuid.toString, nel, Contract(signature))
+                  res.widen[ExecutionGraph.ExecutionNode]
+              }
+            } yield nodes
           }
-          graphOrError = graphComposer.compose(versions)
-          graph <- F.fromEither(graphOrError)
+          inLink = ExecutionGraph.InputLink(nodes.head)
+          outLink = ExecutionGraph.OutputLink(nodes.last)
+          intermediateLinks = nodes.toList
+            .zip(nodes.tail)
+            .map((ExecutionGraph.link _).tupled)
+          graphLinks = NonEmptyList.one(inLink) ::: NonEmptyList.ofInitLast(intermediateLinks, outLink)
+          graph = ExecutionGraph(nodes, graphLinks, ???)
         } yield
           Application(
             id = 0,
             name = name,
-            namespace = namespace,
-            signature = graph.pipelineSignature,
             kafkaStreaming = kafkaStreaming,
-            status = Application.Assembling,
-            graph = graph.stages
+            status = Application.Unhealthy("Iniitializing".some),
+            graph = graph
           )
       }
 
@@ -105,11 +175,8 @@ object ApplicationDeployer extends Logging {
           _ <- ApplicationValidator.name(name) match {
             case Some(_) => F.unit
             case None =>
-              F.raiseError[Unit](
-                InvalidRequest(
-                  s"Application name $name contains invalid symbols. It should only contain latin letters, numbers '-' and '_'"
-                )
-              )
+              InvalidRequest(s"Application name $name contains invalid symbols. It should only contain latin letters, numbers '-' and '_'")
+                .raiseError[F, Unit]
           }
           maybeApp <- applicationRepository.get(name)
           _ <- maybeApp match {
@@ -120,31 +187,41 @@ object ApplicationDeployer extends Logging {
         } yield name
       }
 
-      private def startServices(app: AssemblingApp) = {
+      def deployGraphNodes(app: Application): F[Unit] = {
         for {
-          deployedServables <- app.versionGraph.traverse { stage =>
-            for {
-              variants <- stage.modelVariants.traverse { i =>
-                for {
-                  _ <- F.delay(logger.debug(s"Deploying ${i.item.fullName}"))
-                  result <- servableService.deploy(i.item, Map.empty)  // NOTE maybe infer some app-specific labels?
-                  servable <- result.completed.get
-                  okServable <- servable.status match {
-                    case _: Servable.Serving =>
-                      servable.asInstanceOf[OkServable].pure[F]
-                    case Servable.NotServing(msg, _, _) =>
-                      F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
-                    case Servable.NotAvailable(msg, _, _) =>
-                      F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
-                    case Servable.Starting(msg, _, _) =>
-                      F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
-                  }
-                } yield Variant(okServable, i.weight)
-              }
-            } yield ExecutionNode(variants, stage.signature)
+          _ <- app.graph.nodes.traverse {
+            case ExecutionGraph.InternalNode(_, _) => F.unit
+            case ExecutionGraph.ModelNode(id, servable) =>
+              for {
+                _ <- servableService.deploy(servable)
+              } yield ()
+            case ExecutionGraph.ABNode(id, submodels, _) =>
+              for {
+                _ <- submodels.traverse {
+                  case (ExecutionGraph.ModelNode(_, servable), _) =>
+                    for {
+                      _ <- servableService.deploy(servable)
+                    } yield ()
+                }
+              } yield ()
           }
-          finishedApp = app.copy(status = Application.Ready(deployedServables))
-        } yield finishedApp
+        } yield ()
+      }
+
+      def handleAppDeployment(
+        app: Application
+      ): F[Unit] = {
+        (for {
+          _ <- deployGraphNodes(app)
+          _ <- F.delay(logger.debug(s"${app.name} app servables started. Ok."))
+          _ <- applicationRepository.update(app)
+          _ <- discoveryHub.update(app)
+        } yield ())
+          .handleErrorWith { x =>
+            val failedApp = app.copy(status = Application.Unhealthy(Option(x.getMessage)))
+            F.delay(logger.error(s"Error while buidling application ${app.name}", x)) >>
+              applicationRepository.update(failedApp).void
+          }
       }
     }
   }

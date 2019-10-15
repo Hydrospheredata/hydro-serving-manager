@@ -18,6 +18,7 @@ import spray.json._
 
 
 object DBServableRepository {
+
   case class ServableRow(
     service_name: String,
     model_version_id: Long,
@@ -61,7 +62,7 @@ object DBServableRepository {
       status = status,
       usedApps = apps.getOrElse(Nil),
       metadata = sr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
-      )
+    )
   }
 
   def toServableT = (toServable _).tupled
@@ -96,31 +97,32 @@ object DBServableRepository {
 
   def getQ(name: String) =
     sql"""
-      |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
-      | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
-      | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-      | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-      |   WHERE service_name = $name
+         |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
+         | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
+         | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
+         | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
+         |   WHERE service_name = $name
       """.stripMargin.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])]
 
   def getManyQ(names: NonEmptyList[String]) = {
-    val frag = fr"""
-      |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
-      | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
-      | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-      | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-      |  WHERE """.stripMargin ++ Fragments.in(fr"service_name", names)
-      frag.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])]
+    val frag =
+      fr"""
+          |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
+          | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
+          | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
+          | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
+          |  WHERE """.stripMargin ++ Fragments.in(fr"service_name", names)
+    frag.query[(ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])]
   }
 
   def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]) = new ServableRepository[F] {
-    override def all(): F[List[GenericServable]] = {
+    override def all(): F[List[Servable]] = {
       for {
         rows <- allQ.to[List].transact(tx)
       } yield rows.map(toServableT)
     }
 
-    override def upsert(servable: GenericServable): F[GenericServable] = {
+    override def upsert(servable: Servable): F[Servable] = {
       val row = fromServable(servable)
       upsertQ(row).run.transact(tx).as(servable)
     }
@@ -129,13 +131,13 @@ object DBServableRepository {
       deleteQ(name).run.transact(tx)
     }
 
-    override def get(name: String): F[Option[GenericServable]] = {
+    override def get(name: String): F[Option[Servable]] = {
       for {
         row <- getQ(name).option.transact(tx)
       } yield row.map(toServableT)
     }
 
-    override def get(names: Seq[String]): F[List[GenericServable]] = {
+    override def get(names: Seq[String]): F[List[Servable]] = {
       val okCase = for {
         nonEmptyNames <- OptionT.fromOption[F](NonEmptyList.fromList(names.toList))
         rows <- OptionT.liftF(getManyQ(nonEmptyNames).to[List].transact(tx))

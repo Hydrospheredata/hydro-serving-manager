@@ -6,28 +6,25 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.discovery.ApplicationPublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.NotFound
-import io.hydrosphere.serving.manager.domain.application.Application._
+import io.hydrosphere.serving.manager.domain.application.graph.ExecutionGraph
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.ServableService
-import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.model.api.TensorExampleGenerator
 import io.hydrosphere.serving.model.api.json.TensorJsonLens
 import org.apache.logging.log4j.scala.Logging
 import spray.json.JsObject
-
-import scala.concurrent.ExecutionContext
 
 trait ApplicationService[F[_]] {
   def all(): F[List[Application]]
 
   def generateInputs(name: String): F[JsObject]
 
-  def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, Application]]
+  def create(appRequest: CreateApplicationRequest): F[Application]
 
   def delete(name: String): F[Application]
 
-  def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, Application]]
+  def update(appRequest: UpdateApplicationRequest): F[Application]
 
   def get(name: String): F[Application]
 }
@@ -47,13 +44,12 @@ object ApplicationService extends Logging {
     def generateInputs(name: String): F[JsObject] = {
       for {
         app <- get(name)
-        tensorData <- F.delay(TensorExampleGenerator(app.signature).inputs)
+        tensorData <- F.delay(TensorExampleGenerator(app.graph.signature).inputs)
         jsonData <- F.delay(TensorJsonLens.mapToJson(tensorData))
       } yield jsonData
     }
 
-
-    def create(req: CreateApplicationRequest): F[DeferredResult[F, Application]] = {
+    def create(req: CreateApplicationRequest): F[Application] = {
       applicationDeployer.deploy(req.name, req.executionGraph, req.kafkaStreaming.getOrElse(List.empty))
     }
 
@@ -62,20 +58,26 @@ object ApplicationService extends Logging {
         app <- get(name)
         _ <- discoveryHub.remove(app.name)
         _ <- applicationRepository.delete(app.id)
-        _ <- app.status match {
-          case Application.Ready(graph) =>
-            graph.traverse { s =>
-              s.variants.traverse { ss =>
-                servableService.stop(ss.item.fullName)
+        _ <- app.graph.nodes.traverse { node =>
+          node match {
+            case ExecutionGraph.ModelNode(id, servable) =>
+              F.delay(logger.debug(s"Stopping [${id}] ${servable.fullName}")) >>
+                servableService.stop(servable.fullName).void
+            case ExecutionGraph.ABNode(id, submodels, _) =>
+              submodels.traverse { m =>
+                F.delay(logger.debug(s"Stopping [${id}/${m._1.id}] ${m._1.servable.fullName}")) >>
+                  servableService.stop(m._1.servable.fullName)
               }.void
-            }.void
-          case _ =>
-            F.unit // TODO do we need to delete servables that don't run?
+            case ExecutionGraph.InternalNode(id, _) =>
+              F.delay(logger.debug(s"Stopping node (internal - noop) [${id}]"))
+              F.unit
+          }
         }
       } yield app
     }
 
-    def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, Application]] = {
+    // TODO improve update so it doesn't just recreate an application
+    def update(appRequest: UpdateApplicationRequest): F[Application] = {
       for {
         oldApplication <- OptionT(applicationRepository.get(appRequest.id))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find application id ${appRequest.id}")))
@@ -99,6 +101,6 @@ object ApplicationService extends Logging {
         .getOrElseF(F.raiseError(NotFound(s"Application with name $name is not found")))
     }
 
-    override def all(): fs2.Stream[F, Application] = applicationRepository.all()
+    override def all(): F[List[Application]] = applicationRepository.all()
   }
 }

@@ -5,10 +5,12 @@ import cats.effect.Bracket
 import cats.implicits._
 import doobie._
 import doobie.implicits._
+import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.graph._
+import io.hydrosphere.serving.manager.domain.application.graph.compat.{ServableGraphAdapter, VersionGraphAdapter}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
@@ -29,18 +31,18 @@ object DBApplicationRepository {
     kafka_streams: List[String],
     status_message: Option[String],
     used_model_versions: List[Long],
-    metadata: Option[String],
-    graph_nodes: List[String],
-    graph_links: List[String]
+    metadata: Option[String]
   )
 
+  // FIXME NEL is unsafe here. Fallback to old graph is Option is None
   def toApplication(ar: ApplicationRow, versions: Map[Long, ModelVersion], servables: Map[String, Servable]): Try[Application] = Try {
     val signature =  ModelSignature.fromAscii(ar.application_contract)
-    val graph = ExecutionGraph(
-      nodes = ar.graph_nodes.map(_.parseJson.convertTo[ExecutionGraph.ExecutionNode]),
-      links = ar.graph_links.map(_.parseJson.convertTo[ExecutionGraph.DirectionalLink]),
-      signature = signature
-    )
+    val graph = ??? // TODO convert old graph to the new one
+//    val graph = ExecutionGraph(
+//      nodes = NonEmptyList.fromList(ar.graph_nodes.map(_.parseJson.convertTo[ExecutionGraph.ExecutionNode])).get,
+//      links = NonEmptyList.fromList(ar.graph_links.map(_.parseJson.convertTo[ExecutionGraph.DirectionalLink])).get,
+//      signature = signature
+//    )
     val status = ar.status.toLowerCase match {
       case "healthy" => Application.Healthy
       case "unhealthy" => Application.Unhealthy(ar.status_message)
@@ -66,8 +68,7 @@ object DBApplicationRepository {
       case Application.Unhealthy(reason) =>
         ("Unhealthy", reason)
     }
-    val nodes = app.graph.nodes.map(_.toJson.compactPrint)
-    val links = app.graph.links.map(_.toJson.compactPrint)
+    val graph = ???
     val contract = app.graph.signature.toProtoString
     val metadata = app.metadata.maybeEmpty.map(_.toJson.compactPrint)
     val kafkaParams = app.kafkaStreaming.map(_.toJson.compactPrint)
@@ -77,14 +78,12 @@ object DBApplicationRepository {
       namespace = None,
       status = status,
       application_contract = contract,
-      execution_graph = "",
+      execution_graph = graph,
       used_servables = servables,
       used_model_versions = versionsIdx,
       kafka_streams = kafkaParams,
       status_message = msg,
       metadata = metadata,
-      graph_links = links,
-      graph_nodes = nodes
     )
   }
 

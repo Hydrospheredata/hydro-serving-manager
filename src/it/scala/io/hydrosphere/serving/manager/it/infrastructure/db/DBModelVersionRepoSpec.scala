@@ -122,7 +122,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
         created = time,
         finished = Some(time),
         modelVersion = 1,
-        modelContract = ModelContract.defaultInstance,
+        contract = ModelContract.defaultInstance,
         runtime = dummyImage,
         model = model,
         hostSelector = None,

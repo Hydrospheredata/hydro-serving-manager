@@ -8,6 +8,7 @@ import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.application.graph._
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.application._
+import io.hydrosphere.serving.manager.domain.application.graph.compat.{ServableGraphAdapter, VersionGraphAdapter}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
@@ -61,7 +62,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
           for {
             servables <- servableRepository.get(servableNames)
             versions = servables.map(_.modelVersion.id)
-            newApp = rawApp.copy(used_model_versions = versions)
+            newApp = rawApp.copy(used_model_versions = versions, used_servables = servables.map(_.fullName))
           } yield newApp
       }
       for {
@@ -73,18 +74,8 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
     def restoreServables(rawApp: ApplicationRow) = {
       val oldGraph = rawApp.execution_graph.parseJson.convertTo[VersionGraphAdapter]
       for {
-        _ <- oldGraph.stages.traverse { stage =>
-          stage.modelVariants.traverse { variant =>
-            logger.debug(s"Cleaning old $variant")
-            val x = for {
-              instance <- OptionT(cloudDriver.getByVersionId(variant.modelVersion.id))
-              _ <- OptionT.liftF(cloudDriver.remove(instance.name))
-            } yield instance
-            x.value
-          }.void
-        }
-        _ = logger.debug(s"Deleting app ${rawApp.id}")
         _ <- appsRepo.delete(rawApp.id)
+        _ =  logger.debug(s"Deleted app ${rawApp.id}")
         graph = ExecutionGraphRequest(
           oldGraph.stages.map { stage =>
             PipelineStageRequest(
@@ -97,7 +88,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
             )
           }
         )
-        streaming = rawApp.kafka_streams.map(p => p.parseJson.convertTo[ApplicationKafkaStream])
+        streaming = rawApp.kafka_streams.map(p => p.parseJson.convertTo[Application.KafkaParams])
         _ = logger.debug(s"Restoring ${rawApp.application_name}")
         newApp <- appDeployer.deploy(rawApp.application_name, graph, streaming)
       } yield rawApp
