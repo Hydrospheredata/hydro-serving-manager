@@ -67,6 +67,7 @@ object BuildLoggingService extends Logging {
             (_, signal, buf) = row
             _ <- OptionT.liftF(signal.set(true))
             _ <- OptionT.liftF(buildLogRepository.add(modelVersionId, buf.toList))
+            _ <- OptionT.liftF(state.update(x => x.filterKeys(_ != modelVersionId)))
           } yield ()
           f.value
         }

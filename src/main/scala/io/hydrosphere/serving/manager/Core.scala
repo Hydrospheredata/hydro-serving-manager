@@ -5,15 +5,15 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, ApplicationSubscriber, DiscoveryTopic, ModelPublisher, ModelSubscriber, ServablePublisher, ServableSubscriber}
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
-import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationRepository, ApplicationService}
+import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationEvents, ApplicationRepository, ApplicationService}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelectorRepository, HostSelectorService}
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model.{ModelRepository, ModelService}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLogRepository, BuildLoggingService, ModelVersionBuilder}
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionEvents, ModelVersionRepository, ModelVersionService}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import io.hydrosphere.serving.manager.domain.servable.{ServableMonitor, ServableProbe, ServableRepository, ServableService}
+import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableMonitor, ServableProbe, ServableRepository, ServableService}
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
@@ -39,14 +39,14 @@ final case class Core[F[_]](
   hostSelectorService: HostSelectorService[F],
   modelService: ModelService[F],
   versionService: ModelVersionService[F],
-  modelPub: ModelPublisher[F],
-  modelSub: ModelSubscriber[F],
+  modelPub: ModelVersionEvents.Publisher[F],
+  modelSub: ModelVersionEvents.Subscriber[F],
   appService: ApplicationService[F],
-  appPub: ApplicationPublisher[F],
-  appSub: ApplicationSubscriber[F],
+  appPub: ApplicationEvents.Publisher[F],
+  appSub: ApplicationEvents.Subscriber[F],
   servableService: ServableService[F],
-  servablePub: ServablePublisher[F],
-  servableSub: ServableSubscriber[F]
+  servablePub: ServableEvents.Publisher[F],
+  servableSub: ServableEvents.Subscriber[F]
 )
 
 object Core {
@@ -69,9 +69,9 @@ object Core {
     buildLogsRepo: BuildLogRepository[F],
   ): F[Core[F]] = {
     for {
-      appPubSub <- DiscoveryTopic.make[F, GenericApplication, String]()
-      modelPubSub <- DiscoveryTopic.make[F, ModelVersion, Long]()
-      servablePubSub <- DiscoveryTopic.make[F, GenericServable, String]()
+      appPubSub <- ApplicationEvents.makeTopic
+      modelPubSub <- ModelVersionEvents.makeTopic
+      servablePubSub <- ServableEvents.makeTopic
       buildLoggingService <- BuildLoggingService.make[F]()
       core <- {
         implicit val (appPub, appSub) = appPubSub

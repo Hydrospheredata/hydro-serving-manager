@@ -3,20 +3,17 @@ package io.hydrosphere.serving.manager.domain.application
 import cats.data._
 import cats.effect.Concurrent
 import cats.implicits._
-import io.hydrosphere.serving.manager.discovery.ApplicationPublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.NotFound
 import io.hydrosphere.serving.manager.domain.application.Application._
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.servable.ServableService
+import io.hydrosphere.serving.manager.domain.servable.{ServableGC, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.model.api.TensorExampleGenerator
 import io.hydrosphere.serving.model.api.json.TensorJsonLens
 import org.apache.logging.log4j.scala.Logging
 import spray.json.JsObject
-
-import scala.concurrent.ExecutionContext
 
 trait ApplicationService[F[_]] {
   def all(): F[List[GenericApplication]]
@@ -40,7 +37,7 @@ object ApplicationService extends Logging {
     applicationRepository: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     servableService: ServableService[F],
-    discoveryHub: ApplicationPublisher[F],
+    discoveryHub: ApplicationEvents.Publisher[F],
     applicationDeployer: ApplicationDeployer[F]
   ): ApplicationService[F] = new ApplicationService[F] {
 

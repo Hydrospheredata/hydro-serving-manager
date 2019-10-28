@@ -3,7 +3,6 @@ package io.hydrosphere.serving.manager.domain.model_version
 import cats.MonadError
 import cats.data.OptionT
 import cats.implicits._
-import io.hydrosphere.serving.manager.discovery.ModelPublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.model.ModelValidator
@@ -30,7 +29,7 @@ object ModelVersionService {
     implicit F: MonadError[F, Throwable],
     modelVersionRepository: ModelVersionRepository[F],
     applicationRepo: ApplicationRepository[F],
-    modelPublisher: ModelPublisher[F]
+    modelPublisher: ModelVersionEvents.Publisher[F]
   ): ModelVersionService[F] = new ModelVersionService[F] with Logging {
 
     def list: F[List[ModelVersionView]] = {

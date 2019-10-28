@@ -9,21 +9,23 @@ import com.google.protobuf.empty.Empty
 import fs2.concurrent.SignallingRef
 import io.grpc.stub.StreamObserver
 import io.hydrosphere.serving.discovery.serving.ServingDiscoveryGrpc.ServingDiscovery
-import io.hydrosphere.serving.discovery.serving.{ApplicationDiscoveryEvent, ServableDiscoveryEvent}
+import io.hydrosphere.serving.discovery.serving.{ApplicationDiscoveryEvent, MetricSpecDiscoveryEvent, ServableDiscoveryEvent}
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent.{Initial, ItemRemove, ItemUpdate}
-import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, ServableSubscriber}
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationService}
-import io.hydrosphere.serving.manager.domain.servable.ServableService
+import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationEvents, ApplicationService}
+import io.hydrosphere.serving.manager.domain.monitoring.{MetricSpecEvents, Monitoring, MonitoringRepository}
+import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableService}
 import io.hydrosphere.serving.manager.util.grpc.Converters
 import org.apache.logging.log4j.scala.Logging
 
 
 class GrpcServingDiscovery[F[_]](
-  appSub: ApplicationSubscriber[F],
-  servableSub: ServableSubscriber[F],
+  appSub: ApplicationEvents.Subscriber[F],
+  servableSub: ServableEvents.Subscriber[F],
+  metricSpecSub: MetricSpecEvents.Subscriber[F],
   appService: ApplicationService[F],
-  servableService: ServableService[F]
+  servableService: ServableService[F],
+  monitoringService: MonitoringRepository[F]
 )(implicit F: ConcurrentEffect[F]) extends ServingDiscovery with Logging {
 
   private def runSync[A](f: => F[A]): A = f.toIO.unsafeRunSync()
@@ -102,5 +104,39 @@ class GrpcServingDiscovery[F[_]](
         }
       }
     }
+  }
+
+  override def watchMetricSpec(responseObserver: StreamObserver[MetricSpecDiscoveryEvent]): StreamObserver[Empty] = {
+    val id = UUID.randomUUID().toString
+    logger.debug(s"MetricSpec subscriber $id registered")
+    val flow = for {
+      metrics <- monitoringService.all()
+      initEvents = metrics.grouped(10).toList.map { batch =>
+        val converted = batch.map(Converters.fromMetricSpec)
+        MetricSpecDiscoveryEvent(added = converted)
+      }
+      _ <- initEvents.traverse { ev =>
+        F.delay(responseObserver.onNext(ev))
+      }
+      signal <- SignallingRef[F, Boolean](false)
+      _ <- metricSpecSub.subscribe.interruptWhen(signal).map {
+        case Initial => MetricSpecDiscoveryEvent()
+        case ItemUpdate(items) => MetricSpecDiscoveryEvent(added = items.map(Converters.fromMetricSpec))
+        case ItemRemove(items) => MetricSpecDiscoveryEvent(removedIdx = items)
+      }.evalMap(x => F.delay(responseObserver.onNext(x)))
+        .compile.drain.start
+    } yield new StreamObserver[Empty] {
+      override def onNext(value: Empty): Unit = ()
+
+      override def onError(t: Throwable): Unit = {
+        logger.debug("Servable stream failed", t)
+        runSync(signal.set(true))
+      }
+
+      override def onCompleted(): Unit = {
+        runSync(signal.set(true))
+      }
+    }
+    runSync(flow)
   }
 }

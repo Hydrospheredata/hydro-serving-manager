@@ -5,7 +5,6 @@ import cats.effect._
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.implicits._
-import io.hydrosphere.serving.manager.discovery.ServablePublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver._
@@ -56,7 +55,7 @@ object ServableService extends Logging {
     appRepo: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     monitor: ServableMonitor[F],
-    servableDH: ServablePublisher[F]
+    servableDH: ServableEvents.Publisher[F]
   ): ServableService[F] = new ServableService[F] {
     override def all(): F[List[Servable.GenericServable]] = {
       servableRepository.all()
