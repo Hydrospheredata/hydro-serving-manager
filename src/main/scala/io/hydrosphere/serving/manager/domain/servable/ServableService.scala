@@ -9,6 +9,7 @@ import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
+import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator}
 import io.hydrosphere.serving.manager.util.random.NameGenerator
@@ -55,13 +56,14 @@ object ServableService extends Logging {
     appRepo: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     monitor: ServableMonitor[F],
-    servableDH: ServableEvents.Publisher[F]
+    servableDH: ServableEvents.Publisher[F],
+    monitoringRepository: MonitoringRepository[F]
   ): ServableService[F] = new ServableService[F] {
     override def all(): F[List[Servable.GenericServable]] = {
       servableRepository.all()
     }
 
-    override def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): F[List[Servable.GenericServable]] = {
+    override def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String, String]): F[List[Servable.GenericServable]] = {
       val maybeMetadata = if (metadata.nonEmpty) metadata.some else None
       val filtersMaybe = name.map(filterByName) :: versionId.map(filterByVersionId) :: maybeMetadata.map(filterByMetadata) :: Nil
       val filters = filtersMaybe.flatten
@@ -105,6 +107,17 @@ object ServableService extends Logging {
       for {
         servable <- OptionT(servableRepository.get(name))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't stop Servable $name because it doesn't exist")))
+
+        metricSpec <- servable.metadata.get(Monitoring.MetricSpecIdKey).flatTraverse { metricSpecId =>
+          monitoringRepository.get(metricSpecId)
+        }
+        _ <- metricSpec match {
+          case Some(_) =>
+            val error = DomainError.invalidRequest(s"Can't delete servable because it's used by MetricSpec ${metricSpec}")
+            F.raiseError[Unit](error)
+          case None => F.unit
+        }
+
         apps <- appRepo.findServableUsage(name)
         _ <- apps match {
           case Nil =>

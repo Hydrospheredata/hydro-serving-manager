@@ -18,6 +18,8 @@ trait Monitoring[F[_]] {
 
 object Monitoring extends Logging {
 
+  final val MetricSpecIdKey = "metric-spec-id"
+
   case class NoMonitoringModelFound(spec: CustomModelMetricSpec) extends RuntimeException(s"Can't find a model version with id ${spec.modelVersionId} for metric spec ${spec.id}")
 
   def apply[F[_]]()(
@@ -34,15 +36,15 @@ object Monitoring extends Logging {
           .getOrElseF(NoMonitoringModelFound(spec).raiseError[F, ModelVersion])
         mvTarget <- OptionT(versionRepo.get(spec.modelVersionId))
           .getOrElseF(NoMonitoringModelFound(spec).raiseError[F, ModelVersion])
-        _ <- repo.insert(spec)
         servableMetadata = Map(
-          "metric-spec-id" -> spec.id,
+          MetricSpecIdKey -> spec.id,
           "metric-spec-name" -> spec.name,
           "metric-spec-target-id" -> mvTarget.id.toString,
           "metric-spec-target-name" -> mvTarget.fullName
         )
         monitorServable <- servableService.deploy(mvMonitor, servableMetadata)
         deployedSpec = spec.copy(config = spec.config.copy(servable = monitorServable.started.some))
+        _ <- repo.insert(deployedSpec)
         _ <- pub.update(deployedSpec)
       } yield spec
     }
