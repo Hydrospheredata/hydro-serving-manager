@@ -5,7 +5,6 @@ import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.implicits._
-import io.hydrosphere.serving.manager.discovery.ApplicationPublisher
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.application.Application.{AssemblingApp, GenericApplication}
@@ -33,7 +32,7 @@ object ApplicationDeployer extends Logging {
     versionRepository: ModelVersionRepository[F],
     applicationRepository: ApplicationRepository[F],
     graphComposer: VersionGraphComposer,
-    discoveryHub: ApplicationPublisher[F]
+    discoveryHub: ApplicationEvents.Publisher[F]
   ): ApplicationDeployer[F] = {
     new ApplicationDeployer[F] {
       override def deploy(

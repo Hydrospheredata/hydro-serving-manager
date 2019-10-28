@@ -7,7 +7,7 @@ import cats.effect.{Concurrent, IO}
 import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent, ModelPublisher}
+import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, DockerLogger, ModelVersionBuilder}
@@ -89,7 +89,7 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def readBytes(path: Path): IO[Option[Array[Byte]]] = ???
           override def writeBytes(path: Path, bytes: Array[Byte]): IO[Path] = IO.pure(path)
         }
-        val mh = new ModelPublisher[IO] {
+        val mh = new ModelVersionEvents.Publisher[IO] {
           override def publish(t: DiscoveryEvent[ModelVersion, Long]): IO[Unit] = IO.unit
         }
         val bl = new BuildLoggingService[IO] {

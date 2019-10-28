@@ -28,7 +28,7 @@ import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionRepository
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.Database
-import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBBuildLogRepository, DBHostSelectorRepository, DBModelRepository, DBModelVersionRepository, DBServableRepository}
+import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBBuildLogRepository, DBHostSelectorRepository, DBModelRepository, DBModelVersionRepository, DBMonitoringRepository, DBServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
@@ -81,13 +81,14 @@ object App {
         implicit val servableRepo = DBServableRepository.make()
         implicit val appRepo = DBApplicationRepository.make()
         implicit val buildLogRepo = DBBuildLogRepository.make()
+        implicit val monitoringRepo = DBMonitoringRepository.make()
         implicit val imageRepo = ImageRepository.fromConfig(dockerClient, dockerLogger, config.dockerRepository)
         implicit val imageBuilder = new DockerImageBuilder(dockerClient, dockerClientConfig)
 
         Resource.liftF(Core.make[F]())
       }
       grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
-      discoveryService = new GrpcServingDiscovery[F](core.appSub, core.servableSub, core.appService, core.servableService)
+      discoveryService = new GrpcServingDiscovery[F](core.appSub, core.servableSub, core.monitoringSub , core.appService, core.servableService, core.repos.monitoringRepository)
       grpc = GrpcServer.default(config, grpcService, discoveryService)
 
       modelController = new ModelController[F](
@@ -99,7 +100,7 @@ object App {
       appController = new ApplicationController[F](core.appService)
       hsController = new HostSelectorController[F](core.hostSelectorService)
       servableController = new ServableController[F](core.servableService, cloudDriver)
-      sseController = new SSEController[F](core.appSub, core.modelSub, core.servableSub)
+      sseController = new SSEController[F](core.appSub, core.modelSub, core.servableSub, core.monitoringSub)
 
       apiClasses = modelController.getClass ::
         appController.getClass :: hsController.getClass ::

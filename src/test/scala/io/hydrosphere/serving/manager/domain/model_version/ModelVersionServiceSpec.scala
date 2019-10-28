@@ -6,7 +6,7 @@ import cats.MonadError
 import cats.effect.IO
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent, ModelPublisher}
+import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 
@@ -113,7 +113,7 @@ class ModelVersionServiceSpec extends GenericUnitTest {
         override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]] = ???
       }
       val events = ListBuffer.empty[Long]
-      val modelPub = new ModelPublisher[IO] {
+      val modelPub = new ModelVersionEvents.Publisher[IO] {
         override def publish(t: DiscoveryEvent[ModelVersion, Long]): IO[Unit] = {
           t match {
             case DiscoveryEvent.Initial => IO.unit

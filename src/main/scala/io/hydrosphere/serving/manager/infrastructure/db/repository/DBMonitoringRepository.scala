@@ -31,8 +31,9 @@ object DBMonitoringRepository {
   )
 
   def parseConfig(row: MetricSpecRow) = {
+    val metricKind = CustomModelMetricSpec.getClass.getSimpleName
     row.kind match {
-      case CustomModelMetricSpec.getClass.getSimpleName =>
+      case `metricKind` =>
         Try(row.config.parseJson.convertTo[CustomModelConfigRow]).toEither
       case _ => Left(UnknownMetricSpec(row))
     }
@@ -58,32 +59,32 @@ object DBMonitoringRepository {
 
   def upsertQ(metricSpec: MetricSpecRow) =
     sql"""
-         INSERT INTO hydro_serving.metric_specs(kind, name, modelVersionId, config, withHealth, id)
-         VALUES (${metricSpec.kind}, ${metricSpec.name}, ${metricSpec.modelVersionId}, ${metricSpec.config.toJson}, ${metricSpec.withHealth}, ${metricSpec.id})
+         INSERT INTO hydro_serving.metric_specs(kind, name, modelVersionId, config, id)
+         VALUES (${metricSpec.kind}, ${metricSpec.name}, ${metricSpec.modelVersionId}, ${metricSpec.config}, ${metricSpec.id})
          ON CONFLICT (id) DO UPDATE
          SET kind = ${metricSpec.kind},
              name = ${metricSpec.name},
              modelVersionId = ${metricSpec.modelVersionId},
-             config = ${metricSpec.config.toJson},
+             config = ${metricSpec.config},
        """.update
 
   def selectByIdQ(specId: String) =
     sql"""
-         SELECT kind, name, modelVersionId, config, withHealth, id
+         SELECT kind, name, modelVersionId, config, id
          FROM hydro_serving.metric_specs
          WHERE id = $specId
        """.query[MetricSpecRow]
 
   def selectByVersionId(modelVersionId: Long) =
     sql"""
-           SELECT kind, name, modelVersionId, config, withHealth, id
+           SELECT kind, name, modelVersionId, config, id
            FROM hydro_serving.metric_specs
            WHERE modelVersionId = $modelVersionId
          """.query[MetricSpecRow]
 
   final val allQ =
     sql"""
-           SELECT kind, name, modelVersionId, config, withHealth, id
+           SELECT kind, name, modelVersionId, config, id
            FROM hydro_serving.metric_specs
          """.query[MetricSpecRow]
 
@@ -103,7 +104,7 @@ object DBMonitoringRepository {
     override def get(id: String): F[Option[CustomModelMetricSpec]] = {
       val flow = for {
         raw <- OptionT(selectByIdQ(id).option.transact(tx))
-        res <- OptionT.liftF(getFullMetricSpec(raw))
+        res <- OptionT.liftF[F, CustomModelMetricSpec](getFullMetricSpec(raw))
       } yield res
       flow.value
     }

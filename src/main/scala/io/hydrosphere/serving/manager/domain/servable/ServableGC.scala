@@ -26,7 +26,7 @@ object ServableGC {
   ) = {
     for {
       state <- Ref.of[F, Chain[ModelVersion]](Chain.empty)
-      gcFbr <- gcLoopStep(state).foreverM.start
+//      gcFbr <- gcLoopStep(state).foreverM.start
     } yield new ServableGC[F] {
       override def mark(modelVersion: ModelVersion): F[Unit] = {
         state.update(x => x :+ modelVersion)
@@ -44,10 +44,10 @@ object ServableGC {
   ) = {
     for {
       state <- rState.get
-      newStateDiff <- state.traverse(gcModelVersion)
-      newState = newStateDiff.flatten
-      _ <- rState.update(x => x.filterNot(mv => newState.contains(mv)))
-    } yield ???
+//      newStateDiff <- state.traverse(gcModelVersion)
+//      newState = newStateDiff.flatten
+//      _ <- rState.update(x => x.filterNot(mv => newState.contains(mv)))
+    } yield ()
   }
 
   def gcModelVersion[F[_]](modelVersion: ModelVersion)(

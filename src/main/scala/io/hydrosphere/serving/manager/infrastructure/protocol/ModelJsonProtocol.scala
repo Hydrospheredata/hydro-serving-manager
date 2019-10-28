@@ -9,7 +9,9 @@ import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, ThresholdCmpOperator}
 import io.hydrosphere.serving.manager.domain.servable.Servable
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository.CustomModelConfigRow
 import spray.json._
 
 import scala.util.Try
@@ -129,6 +131,38 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val applicationStageFormat          = jsonFormat2(PipelineStage.apply)
   implicit val applicationKafkaStreamingFormat = jsonFormat4(ApplicationKafkaStream)
   implicit val execNode = jsonFormat2(ExecutionNode.apply)
+
+  implicit val cmpOp = new RootJsonFormat[ThresholdCmpOperator] {
+    override def write(obj: ThresholdCmpOperator): JsValue = {
+      obj match {
+        case ThresholdCmpOperator.Eq => JsString("Eq")
+        case ThresholdCmpOperator.NotEq => JsString("NotEq")
+        case ThresholdCmpOperator.Greater => JsString("Greater")
+        case ThresholdCmpOperator.Less => JsString("Less")
+        case ThresholdCmpOperator.GreaterEq => JsString("GreaterEq")
+        case ThresholdCmpOperator.LessEq => JsString("LessEq")
+      }
+    }
+
+    override def read(json: JsValue): ThresholdCmpOperator = {
+      json match {
+        case JsString(value) =>
+          value match {
+            case "Eq" =>  ThresholdCmpOperator.Eq
+            case "NotEq" =>  ThresholdCmpOperator.NotEq
+            case "Greater" =>  ThresholdCmpOperator.Greater
+            case "Less" =>  ThresholdCmpOperator.Less
+            case "GreaterEq" =>  ThresholdCmpOperator.GreaterEq
+            case "LessEq" =>  ThresholdCmpOperator.LessEq
+            case x => throw DeserializationException(s"Invalid ThresholdCmpOperator json $x")
+          }
+        case x => throw DeserializationException(s"Invalid ThresholdCmpOperator json $x")
+      }
+    }
+  }
+  implicit val customSpecConfig = jsonFormat4(CustomModelMetricSpecConfiguration.apply)
+  implicit val customSpec = jsonFormat4(CustomModelMetricSpec.apply)
+  implicit val customModelConfigRow = jsonFormat4(CustomModelConfigRow.apply)
 }
 
 object ModelJsonProtocol extends ModelJsonProtocol

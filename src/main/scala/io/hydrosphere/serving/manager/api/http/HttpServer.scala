@@ -17,7 +17,6 @@ import io.hydrosphere.serving.manager.api.http.controller.model.ModelController
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
 import io.hydrosphere.serving.manager.api.http.controller.{AkkaHttpControllerDsl, SwaggerDocController}
 import io.hydrosphere.serving.manager.config.{ApplicationConfig, ManagerConfiguration}
-import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, ModelSubscriber, ServableSubscriber}
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorService
 import io.hydrosphere.serving.manager.util.AsyncUtil
 
