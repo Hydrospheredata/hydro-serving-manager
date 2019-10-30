@@ -1,7 +1,7 @@
 CREATE TABLE hydro_serving.metric_specs(
-    id varchar not null primary key,
-    kind varchar not null,
-    name varchar not null,
-    modelVersionId int not null,
-    config json
+    id VARCHAR NOT NULL PRIMARY KEY,
+    kind VARCHAR NOT NULL,
+    name VARCHAR NOT NULL,
+    modelVersionId BIGINT NOT NULL,
+    config VARCHAR
 );

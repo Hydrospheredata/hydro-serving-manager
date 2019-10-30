@@ -7,20 +7,22 @@ import doobie.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import spray.json._
-import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, MonitoringRepository, ThresholdCmpOperator}
+import io.hydrosphere.serving.manager.domain.monitoring._
 
 import scala.util.Try
 
 object DBMonitoringRepository {
 
-  case class UnknownMetricSpec(row: MetricSpecRow) extends RuntimeException(s"Unknown MetricSpec id=${row.id} name=${row.name} kind=${row.kind}")
+  case class InvalidMetricSpecConfig(row: MetricSpecRow)
+    extends RuntimeException(s"Invalid config for MetricSpec id=${row.id} name=${row.name} kind=${row.kind} config=${row.config}")
+
 
   case class MetricSpecRow(
-    id: String,
     kind: String,
     name: String,
     modelVersionId: Long,
-    config: String,
+    config: Option[String],
+    id: String
   )
 
   case class CustomModelConfigRow(
@@ -31,11 +33,13 @@ object DBMonitoringRepository {
   )
 
   def parseConfig(row: MetricSpecRow) = {
-    val metricKind = CustomModelMetricSpec.getClass.getSimpleName
     row.kind match {
-      case `metricKind` =>
-        Try(row.config.parseJson.convertTo[CustomModelConfigRow]).toEither
-      case _ => Left(UnknownMetricSpec(row))
+      case "CustomModelMetricSpec" =>
+        for {
+          config <- row.config.toRight(InvalidMetricSpecConfig(row))
+          parsedConfig <- Try(config.parseJson.convertTo[CustomModelConfigRow]).toEither
+        } yield parsedConfig
+      case _ => Left(InvalidMetricSpecConfig(row))
     }
   }
 
@@ -52,7 +56,7 @@ object DBMonitoringRepository {
         kind = spec.productPrefix,
         name = spec.name,
         modelVersionId = spec.modelVersionId,
-        config = json
+        config = json.some
       )
     }
   }
@@ -65,7 +69,7 @@ object DBMonitoringRepository {
          SET kind = ${metricSpec.kind},
              name = ${metricSpec.name},
              modelVersionId = ${metricSpec.modelVersionId},
-             config = ${metricSpec.config},
+             config = ${metricSpec.config}
        """.update
 
   def selectByIdQ(specId: String) =
@@ -75,7 +79,7 @@ object DBMonitoringRepository {
          WHERE id = $specId
        """.query[MetricSpecRow]
 
-  def selectByVersionId(modelVersionId: Long) =
+  def selectByVersionIdQ(modelVersionId: Long) =
     sql"""
            SELECT kind, name, modelVersionId, config, id
            FROM hydro_serving.metric_specs
@@ -120,7 +124,7 @@ object DBMonitoringRepository {
       deleteQ(id).run.transact(tx).void
     }
 
-    def getFullMetricSpec(rawSpec: MetricSpecRow) = {
+    def getFullMetricSpec(rawSpec: MetricSpecRow): F[CustomModelMetricSpec] = {
       for {
         parsedConfig <- F.fromEither(parseConfig(rawSpec))
         servableRow <- parsedConfig.servableName.flatTraverse { servableName =>
