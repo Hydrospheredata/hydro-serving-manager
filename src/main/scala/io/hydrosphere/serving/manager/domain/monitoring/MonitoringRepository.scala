@@ -6,7 +6,9 @@ trait MonitoringRepository[F[_]] {
 
   def get(id: String): F[Option[CustomModelMetricSpec]]
 
-  def insert(spec: CustomModelMetricSpec): F[Unit]
+  def forModelVersion(id: Long): F[List[CustomModelMetricSpec]]
+
+  def upsert(spec: CustomModelMetricSpec): F[Unit]
 
   def delete(id: String): F[Unit]
 }

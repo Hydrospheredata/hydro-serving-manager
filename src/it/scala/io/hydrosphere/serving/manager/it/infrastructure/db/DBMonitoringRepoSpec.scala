@@ -54,7 +54,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
           servable = None
         )
       )
-      repo.insert(msRow).unsafeRunSync()
+      repo.upsert(msRow).unsafeRunSync()
 
       val msRow2 = CustomModelMetricSpec(
         name = "metric-with-servable",
@@ -67,7 +67,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
           servable = Some(servable)
         )
       )
-      repo.insert(msRow2).unsafeRunSync()
+      repo.upsert(msRow2).unsafeRunSync()
       succeed
     }
 

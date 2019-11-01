@@ -38,7 +38,8 @@ object ApplicationService extends Logging {
     versionRepository: ModelVersionRepository[F],
     servableService: ServableService[F],
     discoveryHub: ApplicationEvents.Publisher[F],
-    applicationDeployer: ApplicationDeployer[F]
+    applicationDeployer: ApplicationDeployer[F],
+    servableGC: ServableGC[F]
   ): ApplicationService[F] = new ApplicationService[F] {
 
     def generateInputs(name: String): F[JsObject] = {
@@ -48,7 +49,6 @@ object ApplicationService extends Logging {
         jsonData <- F.delay(TensorJsonLens.mapToJson(tensorData))
       } yield jsonData
     }
-
 
     def create(req: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
       applicationDeployer.deploy(req.name, req.executionGraph, req.kafkaStreaming.getOrElse(List.empty))
@@ -68,6 +68,11 @@ object ApplicationService extends Logging {
             }.void
           case _ =>
             F.unit // TODO do we need to delete servables that don't run?
+        }
+        _ <- app.versionGraph.traverse { s =>
+          s.modelVariants.traverse { mv =>
+            servableGC.mark(mv.item)
+          }.void
         }
       } yield app
     }

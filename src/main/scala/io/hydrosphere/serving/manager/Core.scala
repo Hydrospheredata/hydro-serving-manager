@@ -71,13 +71,16 @@ object Core {
     buildLogsRepo: BuildLogRepository[F],
     monitoringRepo: MonitoringRepository[F]
   ): F[Core[F]] = {
+    implicit val servableProbe: ServableProbe[F] = ServableProbe.default[F]
     for {
       appPubSub <- ApplicationEvents.makeTopic
       modelPubSub <- ModelVersionEvents.makeTopic
       servablePubSub <- ServableEvents.makeTopic
       monitoringPubSub <- MetricSpecEvents.makeTopic
       buildLoggingService <- BuildLoggingService.make[F]()
+      servableMonitor <- ServableMonitor.default[F](2.seconds, 1.minute)
       core <- {
+        implicit val sMon = servableMonitor.mon
         implicit val (appPub, appSub) = appPubSub
         implicit val (modelPub, modelSub) = modelPubSub
         implicit val (servablePub, servableSub) = servablePubSub
@@ -89,17 +92,16 @@ object Core {
         implicit val modelFetcher: ModelFetcher[F] = ModelFetcher.default[F]()
         implicit val hostSelectorService: HostSelectorService[F] = HostSelectorService[F](hostSelectorRepo)
         implicit val versionService: ModelVersionService[F] = ModelVersionService[F]()
-        implicit val servableProbe: ServableProbe[F] = ServableProbe.default[F]
+        implicit val servableService: ServableService[F] = ServableService[F]()
+        implicit val monitoringService: Monitoring[F] = Monitoring[F]()
+        implicit val versionBuilder: ModelVersionBuilder[F] = ModelVersionBuilder()
+        implicit val graphComposer: VersionGraphComposer = VersionGraphComposer.default
         for {
-          servableMonitor <- ServableMonitor.default[F](2.seconds, 1.minute)
+          gc <- ServableGC.empty[F](1.hour)
         } yield {
-          implicit val sm: ServableMonitor[F] = servableMonitor.mon
-          implicit val versionBuilder: ModelVersionBuilder[F] = ModelVersionBuilder()
-          implicit val servableService: ServableService[F] = ServableService[F]()
-          implicit val graphComposer: VersionGraphComposer = VersionGraphComposer.default
+          implicit val servableGC: ServableGC[F] = gc
           implicit val appDeployer: ApplicationDeployer[F] = ApplicationDeployer.default()
           implicit val appService: ApplicationService[F] = ApplicationService[F]()
-          implicit val monitoringService: Monitoring[F] = Monitoring[F]()
           implicit val modelService: ModelService[F] = ModelService[F]()
 
           val repos = Repositories(appRepo, hostSelectorRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo, monitoringRepo)

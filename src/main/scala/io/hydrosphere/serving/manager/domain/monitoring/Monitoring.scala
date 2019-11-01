@@ -13,6 +13,8 @@ trait Monitoring[F[_]] {
   def create(spec: CustomModelMetricSpec): F[CustomModelMetricSpec]
 
   def delete(specId: String): F[Unit]
+
+  def update(spec: CustomModelMetricSpec): F[CustomModelMetricSpec]
 }
 
 
@@ -44,7 +46,7 @@ object Monitoring extends Logging {
         )
         monitorServable <- servableService.deploy(mvMonitor, servableMetadata)
         deployedSpec = spec.copy(config = spec.config.copy(servable = monitorServable.started.some))
-        _ <- repo.insert(deployedSpec)
+        _ <- repo.upsert(deployedSpec)
         _ <- pub.update(deployedSpec)
       } yield spec
     }
@@ -60,6 +62,13 @@ object Monitoring extends Logging {
         _ = logger.debug("Send MetricSpec remove event")
         _ <- pub.remove(specId)
       } yield ()
+    }
+
+    override def update(spec: CustomModelMetricSpec): F[CustomModelMetricSpec] = {
+      for {
+        _ <- repo.upsert(spec)
+        _ <- pub.update(spec)
+      } yield spec
     }
   }
 }

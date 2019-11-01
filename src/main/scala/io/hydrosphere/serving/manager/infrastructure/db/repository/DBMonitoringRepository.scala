@@ -113,7 +113,7 @@ object DBMonitoringRepository {
       flow.value
     }
 
-    override def insert(spec: CustomModelMetricSpec): F[Unit] = {
+    override def upsert(spec: CustomModelMetricSpec): F[Unit] = {
       for {
         row <- F.fromEither(toRowConfig(spec))
         _ <- upsertQ(row).run.transact(tx)
@@ -122,6 +122,13 @@ object DBMonitoringRepository {
 
     override def delete(id: String): F[Unit] = {
       deleteQ(id).run.transact(tx).void
+    }
+
+    override def forModelVersion(id: Long): F[List[CustomModelMetricSpec]] = {
+      for {
+        raw <- selectByVersionIdQ(id).to[List].transact(tx)
+        res <- raw.traverse(getFullMetricSpec)
+      } yield res
     }
 
     def getFullMetricSpec(rawSpec: MetricSpecRow): F[CustomModelMetricSpec] = {
