@@ -6,18 +6,12 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import cats.effect.{Async, ConcurrentEffect, ContextShift, Effect}
+import cats.effect.Async
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import io.hydrosphere.serving.BuildInfo
-import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationController
-import io.hydrosphere.serving.manager.api.http.controller.events.SSEController
-import io.hydrosphere.serving.manager.api.http.controller.host_selector.HostSelectorController
-import io.hydrosphere.serving.manager.api.http.controller.model.ModelController
-import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
-import io.hydrosphere.serving.manager.api.http.controller.{AkkaHttpControllerDsl, SwaggerDocController}
-import io.hydrosphere.serving.manager.config.{ApplicationConfig, ManagerConfiguration}
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorService
+import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
+import io.hydrosphere.serving.manager.config.ApplicationConfig
 import io.hydrosphere.serving.manager.util.AsyncUtil
 
 import scala.collection.immutable.Seq
@@ -36,12 +30,13 @@ object HttpServer extends AkkaHttpControllerDsl {
     applicationRoutes: Route,
     hostSelectorRoutes: Route,
     servableRoutes: Route,
-    sseRoutes: Route
-  )(
-    implicit as: ActorSystem,
+    sseRoutes: Route,
+    monitoringRoutes: Route
+  )(implicit
+    as: ActorSystem,
     am: ActorMaterializer,
     ec: ExecutionContext
-  ) = {
+  ): HttpServer[F] = {
     val controllerRoutes: Route = pathPrefix("v2") {
       handleExceptions(commonExceptionHandler) {
         swaggerRoutes ~
@@ -49,7 +44,8 @@ object HttpServer extends AkkaHttpControllerDsl {
           applicationRoutes ~
           hostSelectorRoutes ~
           servableRoutes ~
-          sseRoutes
+          sseRoutes ~
+          monitoringRoutes
       }
     }
 

@@ -15,6 +15,8 @@ trait Monitoring[F[_]] {
   def delete(specId: String): F[Unit]
 
   def update(spec: CustomModelMetricSpec): F[CustomModelMetricSpec]
+
+  def all(): F[List[CustomModelMetricSpec]]
 }
 
 
@@ -69,6 +71,10 @@ object Monitoring extends Logging {
         _ <- repo.upsert(spec)
         _ <- pub.update(spec)
       } yield spec
+    }
+
+    override def all(): F[List[CustomModelMetricSpec]] = {
+      repo.all()
     }
   }
 }

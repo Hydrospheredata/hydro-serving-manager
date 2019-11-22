@@ -58,6 +58,7 @@ object Core {
     ec: ExecutionContext,
     timer: Timer[F],
     rng: RNG[F],
+    uuid: UUIDGenerator[F],
     storageOps: StorageOps[F],
     cloudDriver: CloudDriver[F],
     predictionCtor: PredictionClient.Factory[F],
@@ -87,7 +88,6 @@ object Core {
         implicit val (metricPub, metricSub) = monitoringPubSub
         implicit val bl: BuildLoggingService[F] = buildLoggingService
         implicit val nameGen: NameGenerator[F] = NameGenerator.haiku[F]()
-        implicit val uuidGen: UUIDGenerator[F] = UUIDGenerator.default[F]()
         implicit val modelUnpacker: ModelUnpacker[F] = ModelUnpacker.default[F]()
         implicit val modelFetcher: ModelFetcher[F] = ModelFetcher.default[F]()
         implicit val hostSelectorService: HostSelectorService[F] = HostSelectorService[F](hostSelectorRepo)

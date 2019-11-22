@@ -134,7 +134,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
 
   implicit val cmpOp = new RootJsonFormat[ThresholdCmpOperator] {
     override def write(obj: ThresholdCmpOperator): JsValue = {
-      obj match {
+      val kind = obj match {
         case ThresholdCmpOperator.Eq => JsString("Eq")
         case ThresholdCmpOperator.NotEq => JsString("NotEq")
         case ThresholdCmpOperator.Greater => JsString("Greater")
@@ -142,19 +142,28 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
         case ThresholdCmpOperator.GreaterEq => JsString("GreaterEq")
         case ThresholdCmpOperator.LessEq => JsString("LessEq")
       }
+      JsObject(Map("kind" -> kind))
     }
 
     override def read(json: JsValue): ThresholdCmpOperator = {
       json match {
-        case JsString(value) =>
-          value match {
-            case "Eq" =>  ThresholdCmpOperator.Eq
-            case "NotEq" =>  ThresholdCmpOperator.NotEq
-            case "Greater" =>  ThresholdCmpOperator.Greater
-            case "Less" =>  ThresholdCmpOperator.Less
-            case "GreaterEq" =>  ThresholdCmpOperator.GreaterEq
-            case "LessEq" =>  ThresholdCmpOperator.LessEq
-            case x => throw DeserializationException(s"Invalid ThresholdCmpOperator json $x")
+        case JsObject(fields) =>
+          fields.get("kind") match {
+            case Some(kind) =>
+              kind match {
+                case JsString(value) =>
+                  value match {
+                    case "Eq" => ThresholdCmpOperator.Eq
+                    case "NotEq" => ThresholdCmpOperator.NotEq
+                    case "Greater" => ThresholdCmpOperator.Greater
+                    case "Less" => ThresholdCmpOperator.Less
+                    case "GreaterEq" => ThresholdCmpOperator.GreaterEq
+                    case "LessEq" => ThresholdCmpOperator.LessEq
+                    case x => throw DeserializationException(s"Invalid ThresholdCmpOperator kind $x")
+                  }
+                case x => throw DeserializationException(s"Invalid ThresholdCmpOperator kind type. Expected string, got: $x")
+              }
+            case None => throw DeserializationException(s"Invalid ThresholdCmpOperator json. 'kind' field expected $fields")
           }
         case x => throw DeserializationException(s"Invalid ThresholdCmpOperator json $x")
       }

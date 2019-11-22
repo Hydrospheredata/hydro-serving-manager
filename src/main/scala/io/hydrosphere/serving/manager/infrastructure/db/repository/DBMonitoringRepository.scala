@@ -27,8 +27,8 @@ object DBMonitoringRepository {
 
   case class CustomModelConfigRow(
     modelVersionId: Long,
-    thresholdValue: Option[Double],
-    thresholdOp: Option[ThresholdCmpOperator],
+    thresholdValue: Double,
+    thresholdOp: ThresholdCmpOperator,
     servableName: Option[String]
   )
 

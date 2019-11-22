@@ -7,8 +7,8 @@ import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 
 case class CustomModelMetricSpecConfiguration(
   modelVersionId: Long,
-  threshold: Option[Double],
-  thresholdCmpOperator: Option[ThresholdCmpOperator],
+  threshold: Double,
+  thresholdCmpOperator: ThresholdCmpOperator,
   servable: Option[GenericServable]
 )
 

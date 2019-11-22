@@ -25,14 +25,11 @@ object Converters {
   }
 
   def fromMetricSpecConfig(specConfig: CustomModelMetricSpecConfiguration): CustomModelMetric = {
-    val threshold = for {
-      value <- specConfig.threshold
-      op <- specConfig.thresholdCmpOperator
-    } yield ThresholdConfig(value, mapThresholdOperator(op))
+    val threshold = ThresholdConfig(specConfig.threshold, mapThresholdOperator(specConfig.thresholdCmpOperator))
 
     CustomModelMetric(
       monitorModelId = specConfig.modelVersionId,
-      threshold = threshold,
+      threshold = Some(threshold),
       servable = specConfig.servable.map(fromServable)
     )
   }
