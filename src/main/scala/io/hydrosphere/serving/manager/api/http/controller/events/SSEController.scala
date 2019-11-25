@@ -12,6 +12,10 @@ import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
 import io.hydrosphere.serving.manager.discovery._
+import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
+import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
+import io.hydrosphere.serving.manager.domain.servable.ServableEvents
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import spray.json._
 import streamz.converter._
@@ -20,9 +24,10 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class SSEController[F[_]](
-  applicationSubscriber: ApplicationSubscriber[F],
-  modelSubscriber: ModelSubscriber[F],
-  servableSubscriber: ServableSubscriber[F]
+  applicationSubscriber: ApplicationEvents.Subscriber[F],
+  modelSubscriber: ModelVersionEvents.Subscriber[F],
+  servableSubscriber: ServableEvents.Subscriber[F],
+  metricSpecSubscriber: MetricSpecEvents.Subscriber[F]
 )(
   implicit F: ConcurrentEffect[F],
   cs: ContextShift[F],
@@ -36,16 +41,19 @@ class SSEController[F[_]](
     get {
       val id = UUID.randomUUID().toString
       complete {
-        val apps = applicationSubscriber.subscribe
-        val appsSSE = apps.flatMap(x => fs2.Stream.emits(SSEController.fromAppDiscovery(x)))
+        val appsSSE = applicationSubscriber.subscribe
+          .flatMap(x => fs2.Stream.emits(SSEController.fromAppDiscovery(x)))
 
-        val models = modelSubscriber.subscribe
-        val modelSSE = models.flatMap(x => fs2.Stream.emits(SSEController.fromModelDiscovery(x)))
+        val modelSSE = modelSubscriber.subscribe
+          .flatMap(x => fs2.Stream.emits(SSEController.fromModelDiscovery(x)))
 
-        val servables = servableSubscriber.subscribe
-        val servableSSE = servables.flatMap(x => fs2.Stream.emits(SSEController.fromServableDiscovery(x)))
+        val servableSSE = servableSubscriber.subscribe
+          .flatMap(x => fs2.Stream.emits(SSEController.fromServableDiscovery(x)))
 
-        val joined = appsSSE merge modelSSE merge servableSSE
+        val msSSE = metricSpecSubscriber.subscribe
+          .flatMap(x => fs2.Stream.emits(SSEController.fromMetricSpecDiscovery(x)))
+
+        val joined = appsSSE merge modelSSE merge servableSSE merge msSSE
 
         Source.fromGraph(joined.toSource)
           .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
@@ -63,7 +71,7 @@ class SSEController[F[_]](
 }
 
 object SSEController extends CompleteJsonProtocol {
-  def fromServableDiscovery[F[_]](x: ServableSubscriber[F]#Event): List[ServerSentEvent] = {
+  def fromServableDiscovery(x: ServableEvents.Event): List[ServerSentEvent] = {
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -83,7 +91,7 @@ object SSEController extends CompleteJsonProtocol {
     }
   }
 
-  def fromModelDiscovery[F[_]](x: ModelSubscriber[F]#Event): List[ServerSentEvent] = {
+  def fromModelDiscovery(x: ModelVersionEvents.Event): List[ServerSentEvent] = {
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -103,7 +111,7 @@ object SSEController extends CompleteJsonProtocol {
     }
   }
 
-  def fromAppDiscovery[F[_]](x: ApplicationSubscriber[F]#Event): List[ServerSentEvent] = {
+  def fromAppDiscovery(x: ApplicationEvents.Event): List[ServerSentEvent] = {
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -118,6 +126,26 @@ object SSEController extends CompleteJsonProtocol {
           ServerSentEvent(
             data = i.toString,
             `type` = "ApplicationRemove"
+          )
+        }
+    }
+  }
+
+  def fromMetricSpecDiscovery(x: MetricSpecEvents.Event): List[ServerSentEvent] = {
+    x match {
+      case DiscoveryEvent.Initial => Nil
+      case DiscoveryEvent.ItemUpdate(items) =>
+        items.map { ms =>
+          ServerSentEvent(
+            data = ms.toJson.compactPrint,
+            `type` = "MetricSpecUpdate"
+          )
+        }
+      case DiscoveryEvent.ItemRemove(items) =>
+        items.map { ms =>
+          ServerSentEvent(
+            data = ms,
+            `type` = "MetricSpecRemove"
           )
         }
     }

@@ -7,7 +7,6 @@ import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.implicits._
 import com.spotify.docker.client.ProgressHandler
-import io.hydrosphere.serving.manager.discovery.ModelPublisher
 import io.hydrosphere.serving.manager.domain.image.{ImageBuilder, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
@@ -27,7 +26,7 @@ object ModelVersionBuilder {
     imageRepository: ImageRepository[F],
     modelVersionService: ModelVersionService[F],
     storageOps: StorageOps[F],
-    modelDiscoveryHub: ModelPublisher[F],
+    modelDiscoveryHub: ModelVersionEvents.Publisher[F],
     buildLoggingService: BuildLoggingService[F]
   ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] with Logging {
     override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion]] = {

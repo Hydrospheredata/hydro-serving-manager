@@ -5,13 +5,44 @@ import cats.implicits._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.graph.Variant
+import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, ThresholdCmpOperator}
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
 import io.hydrosphere.serving.manager.grpc.entities.Servable.ServableStatus
+import io.hydrosphere.serving.manager.grpc.entities.{CustomModelMetric, ServingApp, ThresholdConfig, Servable => GServable, Stage => GStage}
 import io.hydrosphere.serving.manager.{domain, grpc}
-import io.hydrosphere.serving.manager.grpc.entities.{ServingApp, Servable => GServable, Stage => GStage}
 
 object Converters {
+  def mapThresholdOperator(thresholdCmpOperator: ThresholdCmpOperator): ThresholdConfig.CmpOp = {
+    thresholdCmpOperator match {
+      case ThresholdCmpOperator.Eq => ThresholdConfig.CmpOp.EQ
+      case ThresholdCmpOperator.NotEq => ThresholdConfig.CmpOp.NOT_EQ
+      case ThresholdCmpOperator.Greater => ThresholdConfig.CmpOp.GREATER
+      case ThresholdCmpOperator.Less =>ThresholdConfig.CmpOp.LESS
+      case ThresholdCmpOperator.GreaterEq =>ThresholdConfig.CmpOp.GREATER_EQ
+      case ThresholdCmpOperator.LessEq =>ThresholdConfig.CmpOp.LESS_EQ
+    }
+  }
+
+  def fromMetricSpecConfig(specConfig: CustomModelMetricSpecConfiguration): CustomModelMetric = {
+    val threshold = ThresholdConfig(specConfig.threshold, mapThresholdOperator(specConfig.thresholdCmpOperator))
+
+    CustomModelMetric(
+      monitorModelId = specConfig.modelVersionId,
+      threshold = Some(threshold),
+      servable = specConfig.servable.map(fromServable)
+    )
+  }
+
+  def fromMetricSpec(metricSpec: CustomModelMetricSpec): grpc.entities.MetricSpec = {
+    grpc.entities.MetricSpec(
+      id = metricSpec.id,
+      name = metricSpec.name,
+      modelVersionId = metricSpec.modelVersionId,
+      customModelConfig = fromMetricSpecConfig(metricSpec.config).some,
+    )
+  }
+
   def fromModelVersion(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion = grpc.entities.ModelVersion(
     id = mv.id,
     version = mv.modelVersion,

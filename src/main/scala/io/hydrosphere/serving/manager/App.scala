@@ -12,7 +12,7 @@ import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.api.ManagerServiceGrpc
 import io.hydrosphere.serving.manager.api.grpc.{GrpcServer, GrpcServingDiscovery, ManagerGrpcService}
 import io.hydrosphere.serving.manager.api.http.HttpServer
-import io.hydrosphere.serving.manager.api.http.controller.SwaggerDocController
+import io.hydrosphere.serving.manager.api.http.controller.{MonitoringController, SwaggerDocController}
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationController
 import io.hydrosphere.serving.manager.api.http.controller.events.SSEController
 import io.hydrosphere.serving.manager.api.http.controller.host_selector.HostSelectorController
@@ -28,10 +28,11 @@ import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionRepository
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.Database
-import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBBuildLogRepository, DBHostSelectorRepository, DBModelRepository, DBModelVersionRepository, DBServableRepository}
+import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBBuildLogRepository, DBHostSelectorRepository, DBModelRepository, DBModelVersionRepository, DBMonitoringRepository, DBServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.RNG
 
 import scala.concurrent.duration._
@@ -60,6 +61,7 @@ object App {
     implicit val grpcCtor = GrpcChannel.plaintextFactory[F]
     implicit val predictionCtor = PredictionClient.clientCtor[F](grpcCtor)
     implicit val storageOps = StorageOps.default[F]
+    implicit val uuidGen = UUIDGenerator.default[F]()
 
     for {
       rngF <- Resource.liftF(RNG.default[F])
@@ -81,13 +83,14 @@ object App {
         implicit val servableRepo = DBServableRepository.make()
         implicit val appRepo = DBApplicationRepository.make()
         implicit val buildLogRepo = DBBuildLogRepository.make()
+        implicit val monitoringRepo = DBMonitoringRepository.make()
         implicit val imageRepo = ImageRepository.fromConfig(dockerClient, dockerLogger, config.dockerRepository)
         implicit val imageBuilder = new DockerImageBuilder(dockerClient, dockerClientConfig)
 
         Resource.liftF(Core.make[F]())
       }
       grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
-      discoveryService = new GrpcServingDiscovery[F](core.appSub, core.servableSub, core.appService, core.servableService)
+      discoveryService = new GrpcServingDiscovery[F](core.appSub, core.servableSub, core.monitoringSub , core.appService, core.servableService, core.repos.monitoringRepository)
       grpc = GrpcServer.default(config, grpcService, discoveryService)
 
       modelController = new ModelController[F](
@@ -99,11 +102,13 @@ object App {
       appController = new ApplicationController[F](core.appService)
       hsController = new HostSelectorController[F](core.hostSelectorService)
       servableController = new ServableController[F](core.servableService, cloudDriver)
-      sseController = new SSEController[F](core.appSub, core.modelSub, core.servableSub)
+      sseController = new SSEController[F](core.appSub, core.modelSub, core.servableSub, core.monitoringSub)
+      monitoringController = new MonitoringController[F](core.monitoringService, core.repos.monitoringRepository)
 
       apiClasses = modelController.getClass ::
         appController.getClass :: hsController.getClass ::
-        servableController.getClass:: sseController.getClass :: Nil
+        servableController.getClass:: sseController.getClass ::
+        monitoringController.getClass :: Nil
       swaggerController = new SwaggerDocController(apiClasses.toSet, "2")
 
       http = HttpServer.akkaBased(
@@ -113,7 +118,8 @@ object App {
         applicationRoutes = appController.routes,
         hostSelectorRoutes = hsController.routes,
         servableRoutes = servableController.routes,
-        sseRoutes = sseController.routes
+        sseRoutes = sseController.routes,
+        monitoringRoutes = monitoringController.routes
       )
     } yield App(config, core, grpc, http, tx)
   }

@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager.domain.servable
 
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
 case class Servable[+T <: Servable.Status](

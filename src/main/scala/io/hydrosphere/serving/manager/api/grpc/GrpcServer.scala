@@ -1,15 +1,10 @@
 package io.hydrosphere.serving.manager.api.grpc
 
-import cats.effect.{ConcurrentEffect, Sync}
-import io.grpc.Server
+import cats.effect.Sync
 import io.hydrosphere.serving.discovery.serving.ServingDiscoveryGrpc
 import io.hydrosphere.serving.grpc.BuilderWrapper
 import io.hydrosphere.serving.manager.api.ManagerServiceGrpc
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
-import io.hydrosphere.serving.manager.discovery.{ApplicationSubscriber, ServableSubscriber}
-import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersionRepository
-import io.hydrosphere.serving.manager.domain.servable.{ServableRepository, ServableService}
 
 import scala.concurrent.ExecutionContext
 

@@ -12,7 +12,7 @@ import fs2.concurrent.Queue
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent, ServablePublisher}
+import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
@@ -344,7 +344,7 @@ class ServableSpec extends GenericUnitTest {
         }
       }
       val events = ListBuffer.empty[GenericServable]
-      val dh = new ServablePublisher[IO] {
+      val dh = new ServableEvents.Publisher[IO] {
         override def update(item: GenericServable): IO[Unit] = IO(events += item)
         override def remove(itemId: String): IO[Unit] = IO.unit
         override def publish(t: DiscoveryEvent[GenericServable, String]): IO[Unit] = {
@@ -366,7 +366,7 @@ class ServableSpec extends GenericUnitTest {
         override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
         override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
       }
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh)
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, null)
       val result = service.deploy(mv, Map.empty).unsafeRunSync().completed.get.unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty
@@ -446,7 +446,7 @@ class ServableSpec extends GenericUnitTest {
       }
 
       val events = ListBuffer.empty[GenericServable]
-      val dh = new ServablePublisher[IO] {
+      val dh = new ServableEvents.Publisher[IO] {
         override def publish(t: DiscoveryEvent[GenericServable, String]): IO[Unit] = {
           t match {
             case DiscoveryEvent.Initial => IO.unit
@@ -466,7 +466,7 @@ class ServableSpec extends GenericUnitTest {
         override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
         override def findServableUsage(servableName: String): IO[List[GenericApplication]] = IO(Nil)
       }
-      val service = ServableService[IO]()(Concurrent[IO],timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh)
+      val service = ServableService[IO]()(Concurrent[IO],timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, null)
       val result = service.stop("test-model-1-delete-me").unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty
@@ -543,7 +543,7 @@ class ServableSpec extends GenericUnitTest {
       }
 
       val events = ListBuffer.empty[GenericServable]
-      val dh = new ServablePublisher[IO] {
+      val dh = new ServableEvents.Publisher[IO] {
         override def publish(t: DiscoveryEvent[GenericServable, String]): IO[Unit] = {
           t match {
             case DiscoveryEvent.Initial => IO.unit
@@ -565,7 +565,7 @@ class ServableSpec extends GenericUnitTest {
         }
         override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
       }
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh)
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, null)
       val result = service.stop("test-model-1-delete-me").attempt.unsafeRunSync()
       assert(result.isLeft, result)
     }
@@ -616,7 +616,7 @@ class ServableSpec extends GenericUnitTest {
         override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
 
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, null, servableRepo, null, null, null, null)
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, null, servableRepo, null, null, null, null, null)
       val r1 = service.getFiltered(Some("model-1-kek"), None, Map.empty).unsafeRunSync()
       assert(r1 == List(s1))
       val r2 = service.getFiltered(None, Some(1), Map.empty).unsafeRunSync()
@@ -652,7 +652,7 @@ class ServableSpec extends GenericUnitTest {
         }
       }
 
-      val servablePublisher = new ServablePublisher[IO] {
+      val servablePublisher = new ServableEvents.Publisher[IO] {
         override def publish(t: DiscoveryEvent[GenericServable, String]): IO[Unit] = IO.unit
       }
 
@@ -687,7 +687,7 @@ class ServableSpec extends GenericUnitTest {
         override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
 
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cd, servableRepo, null, versionRepo, servableMonitor, servablePublisher)
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cd, servableRepo, null, versionRepo, servableMonitor, servablePublisher, null)
       val metadata = Map("author" -> "me", "date" -> "now")
       val result = service.findAndDeploy(1, metadata).unsafeRunSync()
       assert(result.started.metadata == metadata)

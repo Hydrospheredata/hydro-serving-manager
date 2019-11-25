@@ -9,7 +9,7 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.{ApplicationPublisher, DiscoveryEvent}
+import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.graph.{Variant, VersionGraphComposer}
@@ -18,7 +18,7 @@ import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.servable.Servable._
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableGC, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.tensorflow.types.DataType
 import org.mockito.Matchers
@@ -85,7 +85,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           def get(name: String): IO[GenericServable] = ???
         }
         val graphComposer = VersionGraphComposer.default
-        val discoveryHub = new ApplicationPublisher[IO] {
+        val discoveryHub = new ApplicationEvents.Publisher[IO] {
           override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = IO.unit
         }
         val appDeployer = ApplicationDeployer.default[IO]()(
@@ -147,7 +147,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           def get(name: String): IO[GenericServable] = ???
         }
         val graphComposer = VersionGraphComposer.default
-        val discoveryHub = new ApplicationPublisher[IO] {
+        val discoveryHub = new ApplicationEvents.Publisher[IO] {
           override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = IO.unit
         }
         val appDeployer = ApplicationDeployer.default[IO]()(
@@ -216,7 +216,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         }
 
         val appChanged = ListBuffer.empty[GenericApplication]
-        val discoveryHub = new ApplicationPublisher[IO] {
+        val discoveryHub = new ApplicationEvents.Publisher[IO] {
           override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = {
             t match {
               case DiscoveryEvent.Initial => IO.unit
@@ -296,7 +296,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         }
 
         val apps = ListBuffer.empty[GenericApplication]
-        val eventPublisher = new ApplicationPublisher[IO] {
+        val eventPublisher = new ApplicationEvents.Publisher[IO] {
           override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = {
             t match {
               case DiscoveryEvent.Initial => IO.unit
@@ -318,13 +318,15 @@ class ApplicationServiceSpec extends GenericUnitTest {
             DeferredResult.completed[IO, GenericApplication](ogApp)
           }
         }
+        val gc = ServableGC.noop[IO]()
         val applicationService = ApplicationService[IO]()(
           Concurrent[IO],
           appRepo,
           versionRepo,
           servableService,
           eventPublisher,
-          appDep
+          appDep,
+          gc
         )
         val updateReq = UpdateApplicationRequest(1, "test", None, graph, Option.empty, Option.empty)
         applicationService.update(updateReq).map { res =>

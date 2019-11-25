@@ -51,9 +51,9 @@ class ManagerGrpcService[F[_]](
   override def deployServable(request: DeployServableRequest, responseObserver: StreamObserver[Servable]): Unit = {
     val flow = for {
       res <- request.modelVersion match {
-        case ModelVersion.Empty =>  F.raiseError[DeferredResult[F, GenericServable]](DomainError.invalidRequest("model version is not specified"))
+        case ModelVersion.Empty => F.raiseError[DeferredResult[F, GenericServable]](DomainError.invalidRequest("model version is not specified"))
         case ModelVersion.VersionId(value) => servableService.findAndDeploy(value, request.metadata)
-        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version, request.metadata) 
+        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version, request.metadata)
       }
       _ <- F.delay(responseObserver.onNext(Converters.fromServable(res.started)))
       completed <- res.completed.get
@@ -75,12 +75,12 @@ class ManagerGrpcService[F[_]](
 
   override def getServables(request: GetServablesRequest, responseObserver: StreamObserver[Servable]): Unit = {
     val flow = for {
-        servables <- request.filter match {
-        case Some(filter) => servableService.getFiltered(name=filter.name, versionId=filter.versionId, metadata=filter.metadata) // return filtered
+      servables <- request.filter match {
+        case Some(filter) => servableService.getFiltered(name = filter.name, versionId = filter.versionId, metadata = filter.metadata) // return filtered
         case None => servableService.all()
-       }
-       _ <- F.delay{ 
-         servables.foreach{ s =>
+      }
+      _ <- F.delay {
+        servables.foreach { s =>
           responseObserver.onNext(Converters.fromServable(s))
         }
       }
@@ -88,7 +88,7 @@ class ManagerGrpcService[F[_]](
     } yield ()
 
     flow
-    .onError { case x => F.delay(responseObserver.onError(x)) }
-    .toIO.unsafeRunAsyncAndForget()
+      .onError { case x => F.delay(responseObserver.onError(x)) }
+      .toIO.unsafeRunAsyncAndForget()
   }
 }
