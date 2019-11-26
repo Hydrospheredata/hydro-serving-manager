@@ -50,7 +50,7 @@ object Monitoring extends Logging {
         deployedSpec = spec.copy(config = spec.config.copy(servable = monitorServable.started.some))
         _ <- repo.upsert(deployedSpec)
         _ <- pub.update(deployedSpec)
-      } yield spec
+      } yield deployedSpec
     }
 
     override def delete(specId: String): F[Unit] = {
