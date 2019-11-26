@@ -40,7 +40,8 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )))
       )
       val versionService = ModelVersionService.apply[IO]()(
@@ -66,7 +67,8 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )))
       )
       val versionService = ModelVersionService.apply[IO]()(
@@ -95,7 +97,8 @@ class ModelVersionServiceSpec extends GenericUnitTest {
               hostSelector = None,
               status = ModelVersionStatus.Assembling,
               installCommand = None,
-              metadata = Map.empty
+              metadata = Map.empty,
+              isExternal = false
             )
           )
         }
@@ -162,7 +165,8 @@ class ModelVersionServiceSpec extends GenericUnitTest {
               hostSelector = None,
               status = ModelVersionStatus.Assembling,
               installCommand = None,
-              metadata = Map.empty
+              metadata = Map.empty,
+              isExternal = false
             )))
           )
           val versionService = ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null, null)

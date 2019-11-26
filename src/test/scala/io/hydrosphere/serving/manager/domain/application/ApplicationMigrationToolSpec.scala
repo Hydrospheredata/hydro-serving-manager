@@ -79,7 +79,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       }
       val modelVersion = ModelVersion(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
         ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,
-        ModelVersionStatus.Released, None, Map.empty
+        ModelVersionStatus.Released, None, Map.empty, false
       )
       val appGraph = NonEmptyList.of(
         PipelineStage(
@@ -171,7 +171,8 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        isExternal = false
       )
       val servable = Servable(mv, "kek", Servable.Serving("Ok", "host", 9090), Nil)
       val sMap = Map(
@@ -223,7 +224,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       }
       val modelVersion = ModelVersion(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
         ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,
-        ModelVersionStatus.Released, None, Map.empty
+        ModelVersionStatus.Released, None, Map.empty, false
       )
       val appGraph = NonEmptyList.of(
         PipelineStage(

@@ -38,7 +38,8 @@ class GrpcSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Assembling,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )
       ))
       when(versionService.get(1000)).thenReturn(IO.raiseError(new IllegalArgumentException("1000")))
@@ -77,7 +78,8 @@ class GrpcSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Assembling,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         ),
         DMV(
           id = 2,
@@ -91,7 +93,8 @@ class GrpcSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Assembling,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )
       )))
 

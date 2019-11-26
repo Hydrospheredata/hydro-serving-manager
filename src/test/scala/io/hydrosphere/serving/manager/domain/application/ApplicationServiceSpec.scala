@@ -44,7 +44,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
     hostSelector = None,
     status = ModelVersionStatus.Released,
     installCommand = None,
-    metadata = Map.empty
+    metadata = Map.empty,
+    isExternal = false
   )
   describe("Application Deployer") {
 

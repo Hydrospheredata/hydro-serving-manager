@@ -51,7 +51,8 @@ class ServableSpec extends GenericUnitTest {
     hostSelector = None,
     status = ModelVersionStatus.Assembling,
     installCommand = None,
-    metadata = Map.empty
+    metadata = Map.empty,
+    isExternal = false
   )
   val servable = Servable(mv, "test", Servable.Starting("Init", None, None), Nil)
 
@@ -389,7 +390,8 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        isExternal = false
       )
 
       val initServable = Servable(
@@ -486,7 +488,8 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        isExternal = false
       )
 
       val initServable = Servable(
@@ -583,7 +586,8 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        isExternal = false
       )
 
       val s1 = Servable(
@@ -640,7 +644,8 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        isExternal = false
       )
 
       val servableMonitor = new ServableMonitor[IO] {

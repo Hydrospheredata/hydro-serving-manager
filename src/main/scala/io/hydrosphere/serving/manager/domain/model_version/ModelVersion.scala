@@ -22,7 +22,8 @@ case class ModelVersion(
   hostSelector: Option[HostSelector],
   status: ModelVersionStatus,
   installCommand: Option[String],
-  metadata: Map[String, String]
+  metadata: Map[String, String],
+  isExternal: Boolean
 ) {
   def fullName: String = s"${model.name}:$modelVersion"
 }

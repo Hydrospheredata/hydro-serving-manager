@@ -55,7 +55,8 @@ object ModelVersionBuilder {
           hostSelector = metadata.hostSelector,
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
-          metadata = metadata.metadata
+          metadata = metadata.metadata,
+          isExternal = false
         )
         modelVersion <- modelVersionRepository.create(mv)
       } yield modelVersion

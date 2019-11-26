@@ -70,7 +70,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )
 
         val uploadFile = Paths.get("123123")
@@ -161,7 +162,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )
         val upload = ModelUploadMetadata(
           name = modelName,
@@ -277,7 +279,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )
         val app = Application(
           id = 1,
@@ -302,7 +305,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )
         val servable = Servable(
           modelVersion = servableFailedVersion,
@@ -324,7 +328,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )
         val okVersion2 = ModelVersion(
           id = 4,
@@ -338,7 +343,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          isExternal = false
         )
         val modelRepo = new ModelRepository[IO] {
           override def create(entity: Model): IO[Model] = ???

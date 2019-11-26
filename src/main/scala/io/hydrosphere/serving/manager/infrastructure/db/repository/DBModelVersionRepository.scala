@@ -1,7 +1,5 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
-import java.time.LocalDateTime
-
 import cats.effect.Bracket
 import cats.implicits._
 import doobie._
@@ -38,7 +36,8 @@ object DBModelVersionRepository {
     status: String,
     profile_types: Option[String],
     install_command: Option[String],
-    metadata: Option[String]
+    metadata: Option[String],
+    is_external: Boolean
   )
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
@@ -71,7 +70,8 @@ object DBModelVersionRepository {
     },
     status = ModelVersionStatus.withName(mvr.status),
     installCommand = mvr.install_command,
-    metadata = mvr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
+    metadata = mvr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty),
+    isExternal = mvr.is_external
   )
 
   def fromModelVersion(mv: ModelVersion) = ModelVersionRow(
@@ -90,7 +90,8 @@ object DBModelVersionRepository {
     status = mv.status.toString,
     profile_types = None,
     install_command = mv.installCommand,
-    metadata = if(mv.metadata.nonEmpty) {mv.metadata.toJson.compactPrint.some} else {None}
+    metadata = if(mv.metadata.nonEmpty) {mv.metadata.toJson.compactPrint.some} else None,
+    is_external = mv.isExternal
   )
 
   def toModelVersionT = (toModelVersion _).tupled
