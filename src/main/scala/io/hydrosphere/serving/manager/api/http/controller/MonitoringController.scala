@@ -70,7 +70,7 @@ class MonitoringController[F[_]](
 
   def deleteSpec: Route = path("metricspec" / Segment) { id =>
     delete {
-      completeF(monitoringService.delete(id).map(_ => "ok"))
+      completeF(monitoringService.delete(id).map(fromMetricSpec))
     }
   }
 
