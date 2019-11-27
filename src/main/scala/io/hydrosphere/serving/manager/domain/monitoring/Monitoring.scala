@@ -12,7 +12,7 @@ import org.apache.logging.log4j.scala.Logging
 trait Monitoring[F[_]] {
   def create(spec: CustomModelMetricSpec): F[CustomModelMetricSpec]
 
-  def delete(specId: String): F[Unit]
+  def delete(specId: String): F[CustomModelMetricSpec]
 
   def update(spec: CustomModelMetricSpec): F[CustomModelMetricSpec]
 
@@ -50,10 +50,10 @@ object Monitoring extends Logging {
         deployedSpec = spec.copy(config = spec.config.copy(servable = monitorServable.started.some))
         _ <- repo.upsert(deployedSpec)
         _ <- pub.update(deployedSpec)
-      } yield spec
+      } yield deployedSpec
     }
 
-    override def delete(specId: String): F[Unit] = {
+    override def delete(specId: String): F[CustomModelMetricSpec] = {
       for {
         spec <- OptionT(repo.get(specId)).getOrElseF(F.raiseError(DomainError.NotFound(s"MetricSpec with id ${specId} not found")))
         _ <- repo.delete(specId)
@@ -63,7 +63,7 @@ object Monitoring extends Logging {
         }
         _ = logger.debug("Send MetricSpec remove event")
         _ <- pub.remove(specId)
-      } yield ()
+      } yield spec
     }
 
     override def update(spec: CustomModelMetricSpec): F[CustomModelMetricSpec] = {
