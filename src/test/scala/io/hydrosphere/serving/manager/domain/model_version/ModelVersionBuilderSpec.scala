@@ -39,7 +39,6 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         val modelVersionMetadata = ModelVersionMetadata(
           modelName = model.name,
           contract = ModelContract.defaultInstance,
-          profileTypes = Map.empty,
           runtime = DockerImage("run", "time"),
           hostSelector = None,
           installCommand = None,

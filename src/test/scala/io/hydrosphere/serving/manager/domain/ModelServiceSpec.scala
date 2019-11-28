@@ -232,7 +232,6 @@ class ModelServiceSpec extends GenericUnitTest {
         assert(res.hostSelector === None)
         assert(res.installCommand === Some("echo hello"))
         assert(res.metadata === Map("author" -> "me"))
-        assert(res.profileTypes === Map("a" -> DataProfileType.IMAGE))
       }
 
       it("uploaded and fetched") {
@@ -260,7 +259,6 @@ class ModelServiceSpec extends GenericUnitTest {
         assert(res.hostSelector === None)
         assert(res.installCommand === Some("echo hello"))
         assert(res.metadata === Map("author" -> "me", "overriden" -> "true", "f" -> "123"))
-        assert(res.profileTypes === Map("a" -> DataProfileType.IMAGE))
       }
     }
 

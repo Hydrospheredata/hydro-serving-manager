@@ -89,6 +89,24 @@ class ModelController[F[_]](
     }
   }
 
+  @Path("/register")
+  @ApiOperation(value = "Register an external model", notes = "Register an external model", nickname = "registerModel", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "body", value = "RegisterModelRequest", required = true,
+      dataTypeClass = classOf[RegisterModelRequest], paramType = "body")
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "ModelVersion", response = classOf[ModelVersion]),
+    new ApiResponse(code = 500, message = "Internal server error")
+  ))
+  def registerModel = pathPrefix("model" / "register") {
+    post {
+      entity(as[RegisterModelRequest]) { req =>
+        ???
+      }
+    }
+  }
+
   @Path("/version")
   @ApiOperation(value = "All ModelVersion", notes = "All ModelVersion", nickname = "allModelVersions", httpMethod = "GET")
   @ApiResponses(Array(
@@ -162,5 +180,5 @@ class ModelController[F[_]](
     }
   }
 
-  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions ~ buildLogs
+  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions ~ buildLogs ~ registerModel
 }
