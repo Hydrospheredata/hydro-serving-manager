@@ -76,21 +76,27 @@ object ServableService extends Logging {
     }
 
     override def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
-      for {
-        randomSuffix <- generateUniqueSuffix(modelVersion)
-        d <- Deferred[F, GenericServable]
-        initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata)
-        _ <- servableRepository.upsert(initServable)
-        _ <- awaitServable(initServable)
-          .flatMap(d.complete)
-          .onError {
-            case NonFatal(ex) =>
-              cloudDriver.remove(initServable.fullName).attempt >>
-                d.complete(initServable.copy(status = Servable.NotServing(ex.getMessage, None, None))).attempt >>
-                F.delay(logger.error(ex))
-          }
-          .start
-      } yield DeferredResult(initServable, d)
+      if (modelVersion.isExternal) {
+        DomainError
+          .invalidRequest(s"Deployment of external model is unavailable. modelVersionId=${modelVersion.id} name=${modelVersion.fullName}")
+          .raiseError[F, DeferredResult[F, GenericServable]]
+      } else {
+        for {
+          randomSuffix <- generateUniqueSuffix(modelVersion)
+          d <- Deferred[F, GenericServable]
+          initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata)
+          _ <- servableRepository.upsert(initServable)
+          _ <- awaitServable(initServable)
+            .flatMap(d.complete)
+            .onError {
+              case NonFatal(ex) =>
+                cloudDriver.remove(initServable.fullName).attempt >>
+                  d.complete(initServable.copy(status = Servable.NotServing(ex.getMessage, None, None))).attempt >>
+                  F.delay(logger.error(ex))
+            }
+            .start
+        } yield DeferredResult(initServable, d)
+      }
     }
 
     def awaitServable(servable: GenericServable): F[GenericServable] = {
