@@ -78,6 +78,9 @@ object ApplicationDeployer extends Logging {
                   version <- OptionT(versionRepository.get(m.modelVersionId))
                     .map(Variant(_, m.weight))
                     .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find modelversion $m")))
+                  _ <- if (version.item.isExternal) {
+                    DomainError.invalidRequest(s"Can't deploy external ModelVersion ${version.item.fullName}").raiseError[F, Unit]
+                  } else F.unit
                   _ <- version.item.status match {
                     case ModelVersionStatus.Released => F.unit
                     case x =>

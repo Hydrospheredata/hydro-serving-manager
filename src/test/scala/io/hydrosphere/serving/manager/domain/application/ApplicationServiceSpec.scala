@@ -10,6 +10,7 @@ import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
+import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.graph.{Variant, VersionGraphComposer}
@@ -48,6 +49,47 @@ class ApplicationServiceSpec extends GenericUnitTest {
     isExternal = false
   )
   describe("Application Deployer") {
+
+    it("should reject application with external ModelVersion") {
+      val externalMv = modelVersion.copy(isExternal = true)
+
+      val appRepo = mock[ApplicationRepository[IO]]
+      when(appRepo.get("test")).thenReturn(IO(None))
+
+      val versionRepo = mock[ModelVersionRepository[IO]]
+      when(versionRepo.get(1)).thenReturn(IO(Some(externalMv)))
+      val servableService = new ServableService[IO] {
+        def all(): IO[List[Servable.GenericServable]] = ???
+        def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+        def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def stop(name: String): IO[GenericServable] = ???
+        def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def get(name: String): IO[GenericServable] = ???
+      }
+      val graphComposer = VersionGraphComposer.default
+      val discoveryHub = new ApplicationEvents.Publisher[IO] {
+        override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = IO.unit
+      }
+      val appDeployer = ApplicationDeployer.default[IO]()(
+        Concurrent[IO],
+        applicationRepository = appRepo,
+        versionRepository = versionRepo,
+        servableService= servableService,
+        discoveryHub = discoveryHub,
+        graphComposer = graphComposer
+      )
+      val graph = ExecutionGraphRequest(NonEmptyList.of(
+        PipelineStageRequest(NonEmptyList.of(
+          ModelVariantRequest(
+            modelVersionId = 1,
+            weight = 100
+          )
+        ))
+      ))
+      val result = appDeployer.deploy("test", graph, List.empty).attempt.unsafeRunSync()
+      result.left.value.getClass should be (classOf[DomainError.InvalidRequest])
+    }
 
     it("should start application build") {
       ioAssert {
