@@ -12,7 +12,7 @@ import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder, I
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, DockerLogger, ModelVersionBuilder}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
-import io.hydrosphere.serving.manager.util.docker.DockerProgress
+import io.hydrosphere.serving.manager.util.DockerProgress
 import org.mockito.Matchers
 
 import scala.concurrent.duration._

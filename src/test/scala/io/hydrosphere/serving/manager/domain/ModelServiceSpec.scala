@@ -5,7 +5,7 @@ import java.time.Instant
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.IO
+import cats.effect.{Clock, IO}
 import cats.effect.concurrent.Deferred
 import cats.syntax.option._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
@@ -35,6 +35,7 @@ import org.mockito.Matchers
 
 class ModelServiceSpec extends GenericUnitTest {
   val dummyImage = DockerImage("a", "b")
+  implicit val clock = Clock.create[IO]
 
   describe("Model service") {
     describe("uploads") {
@@ -112,6 +113,7 @@ class ModelServiceSpec extends GenericUnitTest {
 
         val modelManagementService = ModelService[IO]()(
           MonadError[IO, Throwable],
+          clock,
           modelRepository = modelRepo,
           modelVersionService = modelVersionService,
           storageService = storageMock,
@@ -119,7 +121,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelectorRepository = selectorRepo,
           fetcher = fetcher,
           modelVersionBuilder = versionBuilder,
-          servableRepo = null
+          servableRepo = null,
+          modelVersionRepository = null
         )
 
         val maybeModel = modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
@@ -196,6 +199,7 @@ class ModelServiceSpec extends GenericUnitTest {
 
         val modelManagementService = ModelService[IO]()(
           MonadError[IO, Throwable],
+          clock,
           modelRepository = modelRepo,
           modelVersionService = null,
           storageService = storageMock,
@@ -203,7 +207,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelectorRepository = null,
           fetcher = fetcher,
           modelVersionBuilder = versionService,
-          servableRepo = null
+          servableRepo = null,
+          modelVersionRepository = null
         )
 
         val maybeModel = modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
@@ -416,6 +421,7 @@ class ModelServiceSpec extends GenericUnitTest {
         }
         val modelService = ModelService.apply[IO]()(
           MonadError[IO, Throwable],
+          clock,
           modelRepository = modelRepo,
           appRepo = appRepo,
           servableRepo = servableRepo,
@@ -423,7 +429,8 @@ class ModelServiceSpec extends GenericUnitTest {
           storageService = null,
           hostSelectorRepository = null,
           fetcher = null,
-          modelVersionBuilder = null
+          modelVersionBuilder = null,
+          modelVersionRepository = null
         )
         val result = modelService.deleteModel(okModel.id).unsafeRunSync()
         assert(result.name == okModel.name)

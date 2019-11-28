@@ -37,7 +37,7 @@ import io.hydrosphere.serving.manager.util.random.RNG
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
-import io.hydrosphere.serving.manager.util.docker.DockerProgress
+import io.hydrosphere.serving.manager.util.DockerProgress
 
 
 case class App[F[_]](

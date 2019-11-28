@@ -2,7 +2,7 @@ package io.hydrosphere.serving.manager.infrastructure.protocol
 
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
 import io.hydrosphere.serving.manager.api.http.controller.host_selector.CreateHostSelector
-import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
+import io.hydrosphere.serving.manager.api.http.controller.model.{ModelUploadMetadata, RegisterModelRequest}
 import io.hydrosphere.serving.manager.api.http.controller.servable.DeployModelRequest
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionView
@@ -43,6 +43,8 @@ trait CompleteJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol 
   implicit val deployModelFormat = jsonFormat3(DeployModelRequest.apply)
 
   implicit val appView = jsonFormat8(ApplicationView.apply)
+
+  implicit val modelRegister = jsonFormat5(RegisterModelRequest.apply)
 }
 
 object CompleteJsonProtocol extends CompleteJsonProtocol

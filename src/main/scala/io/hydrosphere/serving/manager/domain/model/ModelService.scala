@@ -12,6 +12,7 @@ import io.hydrosphere.serving.manager.domain.DomainError.{InvalidRequest, NotFou
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository}
+import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
@@ -152,12 +153,12 @@ object ModelService {
         timestamp <- clock.instant()
         mv = ModelVersion(
           id = 0,
-          image = modelReq.image,
+          image = modelReq.image.getOrElse(DockerImage.dummyImage),
           created = timestamp,
           finished = Some(timestamp),
           modelVersion = version,
           modelContract = modelReq.contract,
-          runtime = modelReq.image,
+          runtime = modelReq.runtime.getOrElse(DockerImage.dummyImage),
           model = parentModel,
           hostSelector = None,
           status = ModelVersionStatus.Released,

@@ -5,7 +5,8 @@ import io.hydrosphere.serving.manager.domain.image.DockerImage
 
 case class RegisterModelRequest(
   name: String,
-  image: DockerImage,
   contract: ModelContract,
-  metadata: Option[Map[String, String]] = None
+  metadata: Option[Map[String, String]] = None,
+  image: Option[DockerImage] = None,
+  runtime: Option[DockerImage] = None,
 )

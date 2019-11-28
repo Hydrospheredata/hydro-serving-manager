@@ -102,7 +102,9 @@ class ModelController[F[_]](
   def registerModel = pathPrefix("model" / "register") {
     post {
       entity(as[RegisterModelRequest]) { req =>
-        ???
+        completeF {
+          modelManagementService.registerModel(req)
+        }
       }
     }
   }
