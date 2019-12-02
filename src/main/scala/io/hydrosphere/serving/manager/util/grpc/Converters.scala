@@ -5,6 +5,7 @@ import cats.implicits._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.graph.Variant
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, ThresholdCmpOperator}
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
@@ -43,19 +44,32 @@ object Converters {
     )
   }
 
-  def fromModelVersion(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion = grpc.entities.ModelVersion(
-    id = mv.id,
-    version = mv.modelVersion,
-    modelType = "",
-    status = mv.status.toString,
-    selector = mv.hostSelector.map(s => grpc.entities.HostSelector(s.id, s.name)),
-    model = Some(grpc.entities.Model(mv.model.id, mv.model.name)),
-    contract = Some(ModelContract(mv.modelContract.modelName, mv.modelContract.predict)),
-    image = Some(grpc.entities.DockerImage(mv.image.name, mv.image.tag)),
-    imageSha = mv.image.sha256.getOrElse(""),
-    runtime = Some(grpc.entities.DockerImage(mv.runtime.name, mv.runtime.tag)),
-    metadata = mv.metadata
-  )
+  def fromModelVersion(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion = {
+    mv match {
+      case imv: ModelVersion.Internal =>
+        grpc.entities.ModelVersion(
+          id = imv.id,
+          version = imv.modelVersion,
+          status = imv.status.toString,
+          selector = imv.hostSelector.map(s => grpc.entities.HostSelector(s.id, s.name)),
+          model = Some(grpc.entities.Model(imv.model.id, imv.model.name)),
+          contract = Some(imv.modelContract),
+          image = Some(grpc.entities.DockerImage(imv.image.name, imv.image.tag)),
+          imageSha = imv.image.sha256.getOrElse(""),
+          runtime = Some(grpc.entities.DockerImage(imv.runtime.name, imv.runtime.tag)),
+          metadata = imv.metadata
+        )
+      case emv: ModelVersion.External =>
+        grpc.entities.ModelVersion(
+          id = emv.id,
+          version = emv.modelVersion,
+          status = ModelVersionStatus.Released.toString,
+          model = Some(grpc.entities.Model(emv.model.id, emv.model.name)),
+          contract = Some(emv.modelContract),
+          metadata = emv.metadata,
+        )
+    }
+  }
 
   def fromServable(s: domain.servable.Servable.GenericServable): grpc.entities.Servable = {
     val (status, host, port) = s.status match {
@@ -86,27 +100,12 @@ object Converters {
     )
   }
 
-  def modelVersionToGrpcEntity(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion =
-    grpc.entities.ModelVersion(
-      id = mv.id,
-      version = mv.modelVersion,
-      modelType = "",
-      status = mv.status.toString,
-      selector = mv.hostSelector.map(s => grpc.entities.HostSelector(s.id, s.name)),
-      model = grpc.entities.Model(mv.model.id, mv.model.name).some,
-      contract = ModelContract(mv.modelContract.modelName, mv.modelContract.predict).some,
-      image = grpc.entities.DockerImage(mv.image.name, mv.image.tag).some,
-      imageSha = mv.image.sha256.getOrElse(""),
-      runtime = grpc.entities.DockerImage(mv.runtime.name, mv.runtime.tag).some,
-      metadata = mv.metadata
-    )
-
   def toGServable(mv: Variant[OkServable]): GServable = {
     GServable(
       host = mv.item.status.host,
       port = mv.item.status.port,
       weight = mv.weight,
-      modelVersion = modelVersionToGrpcEntity(mv.item.modelVersion).some,
+      modelVersion = fromModelVersion(mv.item.modelVersion).some,
       name = mv.item.fullName,
       metadata = mv.item.metadata
     )

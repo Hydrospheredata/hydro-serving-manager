@@ -9,7 +9,7 @@ import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.requests._
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.manager.domain.model_version.InternalModelVersion
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 import org.scalatest.BeforeAndAfterAll
@@ -43,9 +43,9 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
     ))
   )
 
-  var mv1: ModelVersion = _
-  var mv2: ModelVersion = _
-  var mv3: ModelVersion = _
+  var mv1: InternalModelVersion = _
+  var mv2: InternalModelVersion = _
+  var mv3: InternalModelVersion = _
 
   describe("Application service") {
     it("should create a simple application") {

@@ -30,7 +30,7 @@ object ApplicationValidator {
     * @param modelVariants modelVariants
     * @return
     */
-  def inferStageSignature(modelVariants: Seq[ModelVersion]): Either[DomainError, ModelSignature] = {
+  def inferStageSignature(modelVariants: Seq[ModelVersion.Internal]): Either[DomainError, ModelSignature] = {
     if (modelVariants.isEmpty) {
       Left(DomainError.invalidRequest("Invalid application: no stages in the graph."))
     } else {

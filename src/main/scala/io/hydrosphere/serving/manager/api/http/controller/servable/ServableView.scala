@@ -6,7 +6,7 @@ import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 
 case class ServableView(
-  modelVersion: ModelVersion,
+  modelVersion: ModelVersion.Internal,
   status: Servable.Status,
   fullName: String
 )

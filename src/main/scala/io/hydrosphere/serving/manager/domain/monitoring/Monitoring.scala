@@ -37,7 +37,11 @@ object Monitoring extends Logging {
     override def create(spec: CustomModelMetricSpec): F[CustomModelMetricSpec] = {
       for {
         mvMonitor <- OptionT(versionRepo.get(spec.config.modelVersionId))
-          .getOrElseF(NoMonitoringModelFound(spec).raiseError[F, ModelVersion])
+          .flatMap {
+            case x: ModelVersion.Internal => OptionT.pure(x)
+            case _: ModelVersion.External => OptionT.none[F, ModelVersion.Internal]
+          }
+          .getOrElseF(NoMonitoringModelFound(spec).raiseError[F, ModelVersion.Internal])
         mvTarget <- OptionT(versionRepo.get(spec.modelVersionId))
           .getOrElseF(NoMonitoringModelFound(spec).raiseError[F, ModelVersion])
         servableMetadata = Map(

@@ -13,14 +13,15 @@ import io.hydrosphere.serving.manager.domain.application.Application.GenericAppl
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.graph._
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import io.hydrosphere.serving.manager.util.CollectionOps._
 import spray.json._
+
 import scala.util.{Failure, Success, Try}
 import cats.data.NonEmptyList
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
 object DBApplicationRepository {
   final case class ApplicationRow(
@@ -37,7 +38,7 @@ object DBApplicationRepository {
     metadata: Option[String]
   )
 
-  def toApplication(ar: ApplicationRow, versions: Map[Long, ModelVersion], servables: Map[String, GenericServable]): Either[AppDBSchemaError, GenericApplication] = {
+  def toApplication(ar: ApplicationRow, versions: Map[Long, ModelVersion.Internal], servables: Map[String, GenericServable]): Either[AppDBSchemaError, GenericApplication] = {
     val jsonGraph = ar.execution_graph.parseJson
     for {
       statusAndGraph <- ar.status match {
@@ -312,19 +313,33 @@ object DBApplicationRepository {
      versions <- {
        val allVersions = apps.flatMap(_.used_model_versions)
        NonEmptyList.fromList(allVersions) match {
-         case Some(x) => DBModelVersionRepository.findVersionsQ(x).to[List]
+         case Some(x) =>
+           DBModelVersionRepository.findVersionsQ(x)
+             .to[List]
+             .map { list =>
+               list
+                 .map(DBModelVersionRepository.toModelVersionT)
+                 .collect {
+                   case x: ModelVersion.Internal => x
+                 }
+             }
          case None => Nil.pure[ConnectionIO]
        }
      }
-     versionMap = versions.map(x => x._1.model_version_id -> DBModelVersionRepository.toModelVersionT(x)).toMap
+     versionMap = versions.map(x => x.id -> x).toMap
      servables <- {
        val allServables = apps.flatMap(_.used_servables)
        NonEmptyList.fromList(allServables) match {
-         case Some(x) => DBServableRepository.getManyQ(x).to[List]
+         case Some(x) =>
+           DBServableRepository.getManyQ(x)
+             .to[List]
+             .map(list => list.map(x => DBServableRepository.toServableT(x)).collect{
+               case Right(x) => x
+             })
          case None => Nil.pure[ConnectionIO]
        }
      }
-     servableMap = servables.map(x => x._1.service_name -> DBServableRepository.toServableT(x)).toMap
+     servableMap = servables.map(x => x.fullName -> x).toMap
    } yield versionMap -> servableMap
   }
 

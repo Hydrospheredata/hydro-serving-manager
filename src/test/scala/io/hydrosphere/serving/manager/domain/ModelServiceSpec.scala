@@ -20,7 +20,7 @@ import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphCompo
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, ModelService, ModelVersionMetadata}
+import io.hydrosphere.serving.manager.domain.model._
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
@@ -56,7 +56,7 @@ class ModelServiceSpec extends GenericUnitTest {
             Seq(ModelField("out", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)))
           ))
         )
-        val modelVersion = ModelVersion(
+        val modelVersion = ModelVersion.Internal(
           id = 1,
           image = DockerImage(
             name = modelName,
@@ -71,8 +71,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          isExternal = false
+          metadata = Map.empty
         )
 
         val uploadFile = Paths.get("123123")
@@ -95,10 +94,10 @@ class ModelServiceSpec extends GenericUnitTest {
 
         val versionBuilder = mock[ModelVersionBuilder[IO]]
         when(versionBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(IO(
-          DeferredResult(modelVersion, new Deferred[IO, ModelVersion] {
+          DeferredResult(modelVersion, new Deferred[IO, ModelVersion.Internal] {
             override def get = IO(modelVersion)
 
-            override def complete(a: ModelVersion) = IO.unit
+            override def complete(a: ModelVersion.Internal) = IO.unit
           })
         ))
 
@@ -150,7 +149,7 @@ class ModelServiceSpec extends GenericUnitTest {
             Seq(ModelField("out", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)))
           ))
         )
-        val modelVersion = ModelVersion(
+        val modelVersion = ModelVersion.Internal(
           id = 1,
           image = DockerImage(
             name = modelName,
@@ -165,8 +164,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          isExternal = false
+          metadata = Map.empty
         )
         val upload = ModelUploadMetadata(
           name = modelName,
@@ -187,10 +185,10 @@ class ModelServiceSpec extends GenericUnitTest {
 
         val versionService = mock[ModelVersionBuilder[IO]]
         when(versionService.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(IO(
-          DeferredResult(modelVersion, new Deferred[IO, ModelVersion] {
+          DeferredResult(modelVersion, new Deferred[IO, ModelVersion.Internal] {
             override def get = IO(modelVersion)
 
-            override def complete(a: ModelVersion) = IO.unit
+            override def complete(a: ModelVersion.Internal) = IO.unit
           })
         ))
         val fetcher = new ModelFetcher[IO] {
@@ -270,7 +268,7 @@ class ModelServiceSpec extends GenericUnitTest {
     describe("CRUD") {
       it("should correctly delete a model and fail if there are live deps") {
         val appFailedModel = Model(1, "app-failing")
-        val appFailedVersion = ModelVersion(
+        val appFailedVersion = ModelVersion.Internal(
           id = 1,
           image = dummyImage,
           created = Instant.now(),
@@ -282,8 +280,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          isExternal = false
+          metadata = Map.empty
         )
         val app = Application(
           id = 1,
@@ -296,7 +293,7 @@ class ModelServiceSpec extends GenericUnitTest {
         )
 
         val servableFailedModel = Model(2, "servable-failing")
-        val servableFailedVersion = ModelVersion(
+        val servableFailedVersion = ModelVersion.Internal(
           id = 2,
           image = dummyImage,
           created = Instant.now(),
@@ -308,8 +305,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          isExternal = false
+          metadata = Map.empty
         )
         val servable = Servable(
           modelVersion = servableFailedVersion,
@@ -319,7 +315,7 @@ class ModelServiceSpec extends GenericUnitTest {
           metadata = Map.empty
         )
         val okModel = Model(3, "ok")
-        val okVersion1 = ModelVersion(
+        val okVersion1 = ModelVersion.Internal(
           id = 3,
           image = dummyImage,
           created = Instant.now(),
@@ -331,10 +327,9 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          isExternal = false
+          metadata = Map.empty
         )
-        val okVersion2 = ModelVersion(
+        val okVersion2 = ModelVersion.Internal(
           id = 4,
           image = dummyImage,
           created = Instant.now(),
@@ -346,8 +341,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          isExternal = false
+          metadata = Map.empty
         )
         val modelRepo = new ModelRepository[IO] {
           override def create(entity: Model): IO[Model] = ???
@@ -398,12 +392,12 @@ class ModelServiceSpec extends GenericUnitTest {
           }
         }
         val modelVersionService = new ModelVersionService[IO] {
-          override def all(): IO[List[ModelVersion]] = ???
-          override def get(id: Long): IO[ModelVersion] = ???
-          override def get(name: String, version: Long): IO[ModelVersion] = ???
+          override def all(): IO[List[ModelVersion.Internal]] = ???
+          override def get(id: Long): IO[ModelVersion.Internal] = ???
+          override def get(name: String, version: Long): IO[ModelVersion.Internal] = ???
           override def getNextModelVersion(modelId: Long): IO[Long] = ???
           override def list: IO[List[ModelVersionView]] = ???
-          override def listForModel(modelId: Long): IO[List[ModelVersion]] = {
+          override def listForModel(modelId: Long): IO[List[ModelVersion.Internal]] = {
             modelId match {
               case appFailedModel.id => IO.pure(appFailedVersion :: Nil)
               case servableFailedModel.id => IO.pure(servableFailedVersion :: Nil)
@@ -411,7 +405,7 @@ class ModelServiceSpec extends GenericUnitTest {
               case _ => IO.raiseError(new RuntimeException(s"Shouldn't delete model $modelId"))
             }
           }
-          override def delete(versionId: Long): IO[Option[ModelVersion]] = {
+          override def delete(versionId: Long): IO[Option[ModelVersion.Internal]] = {
             versionId match {
               case okVersion1.id => IO.pure(Some(okVersion1))
               case okVersion2.id => IO.pure(Some(okVersion2))
@@ -432,6 +426,7 @@ class ModelServiceSpec extends GenericUnitTest {
           modelVersionBuilder = null,
           modelVersionRepository = null
         )
+
         val result = modelService.deleteModel(okModel.id).unsafeRunSync()
         assert(result.name == okModel.name)
 

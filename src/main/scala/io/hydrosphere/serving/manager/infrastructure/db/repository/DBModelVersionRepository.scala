@@ -42,57 +42,99 @@ object DBModelVersionRepository {
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
 
-  def toModelVersion(mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow]): ModelVersion = ModelVersion(
-    id = mvr.model_version_id,
-    image = DockerImage(
+  def toModelVersion(mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow]): ModelVersion = {
+    val image = DockerImage(
       name = mvr.image_name,
       tag = mvr.image_tag,
       sha256 = mvr.image_sha256
-    ),
-    created = mvr.created_timestamp,
-    finished = mvr.finished_timestamp,
-    modelVersion = mvr.model_version,
-    modelContract = mvr.model_contract.parseJson.convertTo[ModelContract],
-    runtime = DockerImage(
-      name = mvr.runtime_name,
-      tag = mvr.runtime_version
-    ),
-    model = Model(
+    )
+    val model = Model(
       id = mr.model_id,
       name = mr.name
-    ),
-    hostSelector = hsr.map { h =>
-      HostSelector(
-        id = h.host_selector_id,
-        name = h.name,
-        nodeSelector = h.node_selector
+    )
+    val runtime = DockerImage(
+      name = mvr.runtime_name,
+      tag = mvr.runtime_version
+    )
+    val contract = mvr.model_contract.parseJson.convertTo[ModelContract]
+    val metadata = mvr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
+    if (mvr.is_external) {
+      ModelVersion.External(
+        id = mvr.model_version_id,
+        created = mvr.created_timestamp,
+        modelVersion = mvr.model_version,
+        modelContract = contract,
+        model = model,
+        metadata = metadata
       )
-    },
-    status = ModelVersionStatus.withName(mvr.status),
-    installCommand = mvr.install_command,
-    metadata = mvr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty),
-    isExternal = mvr.is_external
-  )
+    } else {
+      ModelVersion.Internal(
+        id = mvr.model_version_id,
+        image = image,
+        created = mvr.created_timestamp,
+        finished = mvr.finished_timestamp,
+        modelVersion = mvr.model_version,
+        modelContract = contract,
+        runtime = runtime,
+        model = model,
+        hostSelector = hsr.map { h =>
+          HostSelector(
+            id = h.host_selector_id,
+            name = h.name,
+            nodeSelector = h.node_selector
+          )
+        },
+        status = ModelVersionStatus.withName(mvr.status),
+        installCommand = mvr.install_command,
+        metadata = metadata,
+      )
+    }
+  }
 
-  def fromModelVersion(mv: ModelVersion) = ModelVersionRow(
-    model_version_id = mv.id,
-    model_id = mv.model.id,
-    host_selector = mv.hostSelector.map(_.id),
-    created_timestamp = mv.created,
-    finished_timestamp = mv.finished,
-    model_version = mv.modelVersion,
-    model_contract = mv.modelContract.toJson.compactPrint,
-    image_name = mv.image.name,
-    image_tag = mv.image.tag,
-    image_sha256 = mv.image.sha256,
-    runtime_name = mv.runtime.name,
-    runtime_version = mv.runtime.tag,
-    status = mv.status.toString,
-    profile_types = None,
-    install_command = mv.installCommand,
-    metadata = if(mv.metadata.nonEmpty) {mv.metadata.toJson.compactPrint.some} else None,
-    is_external = mv.isExternal
-  )
+  def fromModelVersion(amv: ModelVersion): ModelVersionRow = {
+    amv match {
+      case mv: ModelVersion.Internal =>
+        ModelVersionRow(
+          model_version_id = mv.id,
+          model_id = mv.model.id,
+          host_selector = mv.hostSelector.map(_.id),
+          created_timestamp = mv.created,
+          finished_timestamp = mv.finished,
+          model_version = mv.modelVersion,
+          model_contract = mv.modelContract.toJson.compactPrint,
+          image_name = mv.image.name,
+          image_tag = mv.image.tag,
+          image_sha256 = mv.image.sha256,
+          runtime_name = mv.runtime.name,
+          runtime_version = mv.runtime.tag,
+          status = mv.status.toString,
+          profile_types = None,
+          install_command = mv.installCommand,
+          metadata = if(mv.metadata.nonEmpty) {mv.metadata.toJson.compactPrint.some} else None,
+          is_external = false
+        )
+      case ModelVersion.External(id, created, modelVersion, modelContract, model, metadata) =>
+        ModelVersionRow(
+          model_version_id = id,
+          model_id = model.id,
+          host_selector = None,
+          created_timestamp = created,
+          finished_timestamp = Some(created),
+          model_version = modelVersion,
+          model_contract = modelContract.toJson.compactPrint,
+          image_name = DockerImage.dummyImage.name,
+          image_tag = DockerImage.dummyImage.tag,
+          image_sha256 = None,
+          runtime_name = DockerImage.dummyImage.name,
+          runtime_version = DockerImage.dummyImage.tag,
+          status = ModelVersionStatus.Released.toString,
+          profile_types = None,
+          install_command = None,
+          metadata = if(metadata.nonEmpty) {metadata.toJson.compactPrint.some} else None,
+          is_external = true
+        )
+    }
+  }
 
   def toModelVersionT = (toModelVersion _).tupled
 
@@ -225,7 +267,10 @@ object DBModelVersionRepository {
     override def create(entity: ModelVersion): F[ModelVersion] = {
       for {
         id <- insertQ(fromModelVersion(entity)).withUniqueGeneratedKeys[Long]("model_version_id").transact(tx)
-      } yield entity.copy(id = id)
+      } yield entity match {
+        case imv:  ModelVersion.Internal => imv.copy(id = id)
+        case emv:  ModelVersion.External => emv.copy(id = id)
+      }
     }
 
     override def update(entity: ModelVersion): F[Int] = {

@@ -1,12 +1,12 @@
 package io.hydrosphere.serving.manager.domain
 
-import java.time.{Instant, LocalDateTime}
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, ContextShift, IO, Resource, Timer}
+import cats.effect.{Concurrent, IO, Resource, Timer}
 import cats.implicits._
 import fs2.concurrent.Queue
 import io.hydrosphere.serving.contract.model_contract.ModelContract
@@ -19,12 +19,11 @@ import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInst
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableMonitor.MonitoringEntry
 import io.hydrosphere.serving.manager.domain.servable._
-import io.hydrosphere.serving.manager.grpc.entities
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.ApplicationRow
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.util.UUIDGenerator
@@ -38,9 +37,17 @@ import scala.concurrent.duration._
 class ServableSpec extends GenericUnitTest {
   implicit val rng: RNG[IO] = RNG.default[IO].unsafeRunSync()
   implicit val nameGen: NameGenerator[IO] = NameGenerator.haiku[IO]()
-  implicit val uuidGen = UUIDGenerator.default[IO]()
+  implicit val uuidGen: UUIDGenerator[IO] = UUIDGenerator.default[IO]()
   implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
-  val mv = ModelVersion(
+  val externalMv = ModelVersion.External(
+    id = 1,
+    created = Instant.now(),
+    modelVersion = 1,
+    modelContract = ModelContract.defaultInstance,
+    model = Model(1, "name"),
+    metadata = Map.empty
+  )
+  val mv = ModelVersion.Internal(
     id = 10,
     image = DockerImage("name", "tag"),
     created = Instant.now(),
@@ -52,8 +59,7 @@ class ServableSpec extends GenericUnitTest {
     hostSelector = None,
     status = ModelVersionStatus.Assembling,
     installCommand = None,
-    metadata = Map.empty,
-    isExternal = false
+    metadata = Map.empty
   )
   val servable = Servable(mv, "test", Servable.Starting("Init", None, None), Nil)
 
@@ -297,8 +303,6 @@ class ServableSpec extends GenericUnitTest {
 
   describe("CRUD") {
     it("should not deploy an external ModelVersion") {
-      val externalMv = mv.copy(isExternal = true)
-
       val cloudDriver = new CloudDriver[IO] {
         override def instances: IO[List[CloudInstance]] = ???
         override def instance(name: String): IO[Option[CloudInstance]] = ???
@@ -319,7 +323,7 @@ class ServableSpec extends GenericUnitTest {
       }
       val versionRepo = new ModelVersionRepository[IO] {
         override def create(entity: ModelVersion): IO[ModelVersion] = ???
-        override def get(id: Long): IO[Option[ModelVersion]] = ???
+        override def get(id: Long): IO[Option[ModelVersion]] = IO(Some(externalMv))
         override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
         override def delete(id: Long): IO[Int] = ???
         override def all(): IO[List[ModelVersion]] = ???
@@ -356,7 +360,7 @@ class ServableSpec extends GenericUnitTest {
       }
 
       val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, monitoringRepo)
-      val deployResult = service.deploy(externalMv, Map.empty).attempt.unsafeRunSync()
+      val deployResult = service.findAndDeploy(1, Map.empty).attempt.unsafeRunSync()
       deployResult.left.value should be (DomainError.invalidRequest(s"Deployment of external model is unavailable. modelVersionId=${externalMv.id} name=${externalMv.fullName}"))
     }
 
@@ -443,7 +447,7 @@ class ServableSpec extends GenericUnitTest {
     }
 
     it("should be able to delete Servable") {
-      val mv = ModelVersion(
+      val mv = ModelVersion.Internal(
         id = 10,
         image = DockerImage("name", "tag"),
         created = Instant.now(),
@@ -455,8 +459,7 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty,
-        isExternal = false
+        metadata = Map.empty
       )
 
       val initServable = Servable(
@@ -541,7 +544,7 @@ class ServableSpec extends GenericUnitTest {
     }
 
     it("should reject deletion of used Servable") {
-      val mv = ModelVersion(
+      val mv = ModelVersion.Internal(
         id = 10,
         image = DockerImage("name", "tag"),
         created = Instant.now(),
@@ -553,8 +556,7 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty,
-        isExternal = false
+        metadata = Map.empty
       )
 
       val initServable = Servable(
@@ -639,7 +641,7 @@ class ServableSpec extends GenericUnitTest {
     }
 
     it("should be able to filter servables") {
-      val mv = ModelVersion(
+      val mv = ModelVersion.Internal(
         id = 1,
         image = DockerImage("name", "tag"),
         created = Instant.now(),
@@ -651,8 +653,7 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty,
-        isExternal = false
+        metadata = Map.empty
       )
 
       val s1 = Servable(
@@ -697,7 +698,7 @@ class ServableSpec extends GenericUnitTest {
     }
 
     it("should be able to deploy ModelVersion") {
-      val mv = ModelVersion(
+      val mv = ModelVersion.Internal(
         id = 1,
         image = DockerImage("name", "tag"),
         created = Instant.now(),
@@ -709,8 +710,7 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty,
-        isExternal = false
+        metadata = Map.empty
       )
 
       val servableMonitor = new ServableMonitor[IO] {

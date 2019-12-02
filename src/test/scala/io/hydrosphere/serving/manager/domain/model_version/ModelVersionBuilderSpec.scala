@@ -10,7 +10,7 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
-import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, DockerLogger, ModelVersionBuilder}
+import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, ModelVersionBuilder}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DockerProgress
 import org.mockito.Matchers
@@ -92,7 +92,7 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def publish(t: DiscoveryEvent[ModelVersion, Long]): IO[Unit] = IO.unit
         }
         val bl = new BuildLoggingService[IO] {
-          override def makeLogger(modelVersion: ModelVersion): IO[ProgressHandler] = IO(DockerProgress.makeLogger(println))
+          override def makeLogger(modelVersion: ModelVersion.Internal): IO[ProgressHandler] = IO(DockerProgress.makeLogger(println))
           override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
           override def getLogs(modelVersionId: Long, sinceLine: Int): IO[Option[fs2.Stream[IO, String]]] = IO(None)
         }

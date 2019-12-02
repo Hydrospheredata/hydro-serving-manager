@@ -15,7 +15,7 @@ import io.hydrosphere.serving.manager.util.DeferredResult
 import org.apache.logging.log4j.scala.Logging
 
 trait ModelVersionBuilder[F[_]]{
-  def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion]]
+  def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion.Internal]]
 }
 
 object ModelVersionBuilder {
@@ -29,12 +29,12 @@ object ModelVersionBuilder {
     modelDiscoveryHub: ModelVersionEvents.Publisher[F],
     buildLoggingService: BuildLoggingService[F]
   ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] with Logging {
-    override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion]] = {
+    override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion.Internal]] = {
       for {
         init <- initialVersion(model, metadata)
         handler <- buildLoggingService.makeLogger(init)
         _ <- modelDiscoveryHub.update(init)
-        deferred <- Deferred[F, ModelVersion]
+        deferred <- Deferred[F, ModelVersion.Internal]
         _ <- handleBuild(init, modelFileStructure, handler).flatMap(deferred.complete).start
       } yield DeferredResult(init, deferred)
     }
@@ -43,7 +43,7 @@ object ModelVersionBuilder {
       for {
         version <- modelVersionService.getNextModelVersion(model.id)
         image = imageRepository.getImage(metadata.modelName, version.toString)
-        mv = ModelVersion(
+        mv = ModelVersion.Internal(
           id = 0,
           image = image,
           created = Instant.now(),
@@ -56,13 +56,12 @@ object ModelVersionBuilder {
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
           metadata = metadata.metadata,
-          isExternal = false
         )
         modelVersion <- modelVersionRepository.create(mv)
-      } yield modelVersion
+      } yield mv.copy(id = modelVersion.id)
     }
 
-    def handleBuild(mv: ModelVersion, modelFileStructure: ModelFileStructure, handler: ProgressHandler) = {
+    def handleBuild(mv: ModelVersion.Internal, modelFileStructure: ModelFileStructure, handler: ProgressHandler) = {
       val innerCompleted = for {
         buildPath <- prepare(mv, modelFileStructure)
         imageSha <- imageBuilder.build(buildPath.root, mv.image, handler)
@@ -85,7 +84,7 @@ object ModelVersionBuilder {
       }
     }
 
-    def prepare(modelVersion: ModelVersion, modelFileStructure: ModelFileStructure): F[ModelFileStructure] = {
+    def prepare(modelVersion: ModelVersion.Internal, modelFileStructure: ModelFileStructure): F[ModelFileStructure] = {
       for {
         _ <- storageOps.writeBytes(modelFileStructure.dockerfile, BuildScript.generate(modelVersion).getBytes)
         _ <- storageOps.writeBytes(modelFileStructure.contractPath, modelVersion.modelContract.toByteArray)

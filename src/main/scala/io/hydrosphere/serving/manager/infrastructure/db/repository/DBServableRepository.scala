@@ -15,6 +15,8 @@ import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtoc
 import io.hydrosphere.serving.manager.util.CollectionOps._
 import cats.data.NonEmptyList
 import cats.data.OptionT
+import io.hydrosphere.serving.manager.domain.DomainError
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import spray.json._
 
 
@@ -59,13 +61,18 @@ object DBServableRepository {
       case ("NotAvailable", host, port) => Servable.NotAvailable(sr.status_text, host, port)
       case (_, host, port) => Servable.Starting(sr.status_text, host, port)
     }
-    Servable(
-      modelVersion = modelVersion,
-      nameSuffix = suffix,
-      status = status,
-      usedApps = apps.getOrElse(Nil),
-      metadata = sr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
-    )
+    modelVersion match {
+      case imv: ModelVersion.Internal =>
+        Right(Servable(
+          modelVersion = imv,
+          nameSuffix = suffix,
+          status = status,
+          usedApps = apps.getOrElse(Nil),
+          metadata = sr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
+        ))
+      case emv: ModelVersion.External =>
+        Left(DomainError.internalError(s"Impossible Servable ${sr.service_name} with external ModelVersion: ${emv}"))
+    }
   }
 
   def toServableT = (toServable _).tupled
@@ -132,13 +139,17 @@ object DBServableRepository {
     override def findForModelVersion(versionId: Long): F[List[GenericServable]] = {
       for {
         rows <- findForModelVersionQ(versionId).to[List].transact(tx)
-      } yield rows.map(toServableT)
+      } yield rows.map(x => toServableT(x).toOption).collect {
+        case Some(x) => x
+      }
     }
 
     override def all(): F[List[GenericServable]] = {
       for {
         rows <- allQ.to[List].transact(tx)
-      } yield rows.map(toServableT)
+      } yield rows.map(x => toServableT(x).toOption).collect {
+        case Some(x) => x
+      }
     }
 
     override def upsert(servable: GenericServable): F[GenericServable] = {
@@ -153,14 +164,16 @@ object DBServableRepository {
     override def get(name: String): F[Option[GenericServable]] = {
       for {
         row <- getQ(name).option.transact(tx)
-      } yield row.map(toServableT)
+      } yield row.flatMap(x => toServableT(x).toOption)
     }
 
     override def get(names: Seq[String]): F[List[GenericServable]] = {
       val okCase = for {
         nonEmptyNames <- OptionT.fromOption[F](NonEmptyList.fromList(names.toList))
         rows <- OptionT.liftF(getManyQ(nonEmptyNames).to[List].transact(tx))
-      } yield rows.map(toServableT)
+      } yield rows.map(x => toServableT(x).toOption).collect {
+        case Some(x) => x
+      }
       okCase.getOrElse(Nil)
     }
   }

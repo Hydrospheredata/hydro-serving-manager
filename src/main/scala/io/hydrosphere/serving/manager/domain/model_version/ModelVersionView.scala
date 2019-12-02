@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
-import java.time.{Instant, LocalDateTime}
+import java.time.Instant
 
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
@@ -10,34 +10,55 @@ import io.hydrosphere.serving.manager.domain.model.Model
 
 case class ModelVersionView(
   id: Long,
-  image: DockerImage,
   created: Instant,
   finished: Option[Instant],
   modelVersion: Long,
   modelContract: ModelContract,
-  runtime: DockerImage,
   model: Model,
-  hostSelector: Option[HostSelector],
   status: String,
   metadata: Map[String, String],
-  applications: Seq[String]
+  applications: List[String],
+  image: Option[DockerImage],
+  runtime: Option[DockerImage],
+  hostSelector: Option[HostSelector],
+  isExternal: Boolean
 )
 
 object ModelVersionView {
-  def fromVersion(modelVersion: ModelVersion, applications: Seq[GenericApplication]) = {
-    ModelVersionView(
-      id = modelVersion.id,
-      image = modelVersion.image,
-      created = modelVersion.created,
-      finished = modelVersion.finished,
-      modelVersion = modelVersion.modelVersion,
-      modelContract = modelVersion.modelContract,
-      runtime = modelVersion.runtime,
-      model = modelVersion.model,
-      hostSelector = modelVersion.hostSelector,
-      status = modelVersion.status.toString,
-      applications = applications.map(_.name),
-      metadata = modelVersion.metadata
-    )
+  def fromVersion(amv: ModelVersion, applications: List[GenericApplication]): ModelVersionView = {
+    amv match {
+      case internalMV: ModelVersion.Internal =>
+        ModelVersionView(
+          id = internalMV.id,
+          image = Some(internalMV.image),
+          created = internalMV.created,
+          finished = internalMV.finished,
+          modelVersion = internalMV.modelVersion,
+          modelContract = internalMV.modelContract,
+          runtime = Some(internalMV.runtime),
+          model = internalMV.model,
+          hostSelector = internalMV.hostSelector,
+          status = internalMV.status.toString,
+          applications = applications.map(_.name),
+          metadata = internalMV.metadata,
+          isExternal = false
+        )
+      case ModelVersion.External(id, created, modelVersion, modelContract, model, metadata) =>
+        ModelVersionView(
+          id = id,
+          image = None,
+          created = created,
+          finished = Some(created),
+          modelVersion = modelVersion,
+          modelContract = modelContract,
+          runtime = None,
+          model = model,
+          hostSelector = None,
+          status = ModelVersionStatus.Released.toString,
+          applications = Nil,
+          metadata = metadata,
+          isExternal = true
+        )
+    }
   }
 }

@@ -10,20 +10,43 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersionStatus.Mo
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import java.time.LocalDateTime
 
-case class ModelVersion(
-  id: Long,
-  image: DockerImage,
-  created: Instant,
-  finished: Option[Instant],
-  modelVersion: Long,
-  modelContract: ModelContract,
-  runtime: DockerImage,
-  model: Model,
-  hostSelector: Option[HostSelector],
-  status: ModelVersionStatus,
-  installCommand: Option[String],
-  metadata: Map[String, String],
-  isExternal: Boolean
-) {
-  def fullName: String = s"${model.name}:$modelVersion"
+sealed trait ModelVersion extends Product with Serializable {
+  def id: Long
+  def modelContract: ModelContract
+  def modelVersion: Long
+  def model: Model
+  def metadata: Map[String, String]
+  def fullName: String
+}
+
+object ModelVersion {
+
+  case class Internal(
+    id: Long,
+    image: DockerImage,
+    created: Instant,
+    finished: Option[Instant],
+    modelVersion: Long,
+    modelContract: ModelContract,
+    runtime: DockerImage,
+    model: Model,
+    hostSelector: Option[HostSelector],
+    status: ModelVersionStatus,
+    installCommand: Option[String],
+    metadata: Map[String, String]
+  ) extends ModelVersion {
+    def fullName: String = s"${model.name}:$modelVersion"
+  }
+
+  case class External(
+    id: Long,
+    created: Instant,
+    modelVersion: Long,
+    modelContract: ModelContract,
+    model: Model,
+    metadata: Map[String, String],
+  ) extends ModelVersion {
+    def fullName: String = s"${model.name}:$modelVersion"
+  }
+
 }

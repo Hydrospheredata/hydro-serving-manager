@@ -14,22 +14,22 @@ import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService}
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.storage.ModelUnpacker
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
 import io.hydrosphere.serving.manager.util.DeferredResult
-import org.apache.logging.log4j.scala.Logging
 import io.hydrosphere.serving.manager.util.InstantClockSyntax._
+import org.apache.logging.log4j.scala.Logging
 
 trait ModelService[F[_]] {
   def get(modelId: Long): F[Model]
 
   def deleteModel(modelId: Long): F[Model]
 
-  def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion]]
+  def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion.Internal]]
 
-  def registerModel(modelReq: RegisterModelRequest): F[ModelVersion]
+  def registerModel(modelReq: RegisterModelRequest): F[ModelVersion.External]
 
   def checkIfUnique(targetModel: Model, newModelInfo: Model): F[Model]
 
@@ -63,7 +63,7 @@ object ModelService {
       } yield model
     }
 
-    def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion]] = {
+    def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion.Internal]] = {
       val maybeHostSelector = meta.hostSelectorName match {
         case Some(value) =>
           OptionT(hostSelectorRepository.get(value))
@@ -144,30 +144,23 @@ object ModelService {
         )
     }
 
-    override def registerModel(modelReq: RegisterModelRequest): F[ModelVersion] = {
+    override def registerModel(modelReq: RegisterModelRequest): F[ModelVersion.External] = {
       for {
         _ <- F.fromOption(ModelValidator.name(modelReq.name), DomainError.invalidRequest("Model name contains invalid characters"))
         _ <- F.fromEither(ModelVersionMetadata.validateContract(modelReq.contract))
         parentModel <- createIfNecessary(modelReq.name)
         version <- modelVersionService.getNextModelVersion(parentModel.id)
         timestamp <- clock.instant()
-        mv = ModelVersion(
+        mv = ModelVersion.External(
           id = 0,
-          image = modelReq.image.getOrElse(DockerImage.dummyImage),
           created = timestamp,
-          finished = Some(timestamp),
           modelVersion = version,
           modelContract = modelReq.contract,
-          runtime = modelReq.runtime.getOrElse(DockerImage.dummyImage),
           model = parentModel,
-          hostSelector = None,
-          status = ModelVersionStatus.Released,
-          installCommand = None,
           metadata = modelReq.metadata.getOrElse(Map.empty),
-          isExternal = true
         )
         ver <- modelVersionRepository.create(mv)
-      } yield ver
+      } yield mv.copy(id = ver.id)
     }
   }
 }

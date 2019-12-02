@@ -2,8 +2,9 @@ package io.hydrosphere.serving.manager.domain.model_build
 
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
+
 object BuildScript {
-  final def generate(modelVersion: ModelVersion): String = {
+  final def generate(modelVersion: ModelVersion.Internal): String = {
     val commandSeq = Seq(
       s"FROM ${modelVersion.runtime.fullName}",
       s"LABEL ${Parameters.modelNameLabel}=${modelVersion.model.name}",

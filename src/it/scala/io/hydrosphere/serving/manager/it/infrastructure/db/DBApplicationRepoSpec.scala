@@ -11,7 +11,7 @@ import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Variant}
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.manager.domain.model_version.InternalModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
@@ -33,7 +33,7 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
       predict = signature.some
     ).some
   )
-  var mv1: ModelVersion = _
+  var mv1: InternalModelVersion = _
   var servable: Servable.OkServable = _
 
   describe("Queries") {

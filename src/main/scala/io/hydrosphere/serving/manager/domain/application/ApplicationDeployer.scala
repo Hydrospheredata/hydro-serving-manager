@@ -10,7 +10,7 @@ import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.application.Application.{AssemblingApp, GenericApplication}
 import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Node, Variant, VersionGraphComposer}
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -78,15 +78,18 @@ object ApplicationDeployer extends Logging {
                   version <- OptionT(versionRepository.get(m.modelVersionId))
                     .map(Variant(_, m.weight))
                     .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find modelversion $m")))
-                  _ <- if (version.item.isExternal) {
-                    DomainError.invalidRequest(s"Can't deploy external ModelVersion ${version.item.fullName}").raiseError[F, Unit]
-                  } else F.unit
-                  _ <- version.item.status match {
+                  internalVersion <- version.item match {
+                    case imv:  ModelVersion.Internal =>
+                      imv.pure[F]
+                    case emv:  ModelVersion.External =>
+                      DomainError.invalidRequest(s"Can't deploy external ModelVersion ${emv.fullName}").raiseError[F,  ModelVersion.Internal]
+                  }
+                  _ <- internalVersion.status match {
                     case ModelVersionStatus.Released => F.unit
                     case x =>
                       F.raiseError[Unit](DomainError.invalidRequest(s"Can't deploy non-released ModelVersion: ${version.item.fullName} - $x"))
                   }
-                } yield version
+                } yield version.copy(item = internalVersion)
               }
             } yield Node(variants)
           }

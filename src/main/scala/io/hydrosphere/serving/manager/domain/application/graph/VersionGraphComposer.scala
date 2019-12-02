@@ -9,13 +9,13 @@ import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphCompo
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
 trait VersionGraphComposer {
-  def compose(nodes: NonEmptyList[Node[ModelVersion]]): Either[DomainError, VersionPipeline]
+  def compose(nodes: NonEmptyList[Node[ModelVersion.Internal]]): Either[DomainError, VersionPipeline]
 }
 
 object VersionGraphComposer {
 
   case class PipelineStage(
-    modelVariants: NonEmptyList[Variant[ModelVersion]],
+    modelVariants: NonEmptyList[Variant[ModelVersion.Internal]],
     signature: ModelSignature
   )
 
@@ -24,7 +24,7 @@ object VersionGraphComposer {
   def default: VersionGraphComposer = {
     new VersionGraphComposer {
       override def compose(
-        nodes: NonEmptyList[Node[ModelVersion]]
+        nodes: NonEmptyList[Node[ModelVersion.Internal]]
       ): Either[DomainError, VersionPipeline] = {
         nodes match {
           case NonEmptyList(singleStage, Nil) if singleStage.variants.length == 1 =>
@@ -35,7 +35,7 @@ object VersionGraphComposer {
       }
 
       private def inferSimpleApp(
-        version: Variant[ModelVersion]
+        version: Variant[ModelVersion.Internal]
       ): Either[DomainError, VersionPipeline] = {
         for {
           signature <- Either.fromOption(
@@ -54,7 +54,7 @@ object VersionGraphComposer {
       }
 
       private def inferPipelineApp(
-        stages: NonEmptyList[Node[ModelVersion]]
+        stages: NonEmptyList[Node[ModelVersion.Internal]]
       ): Either[DomainError, VersionPipeline] = {
         val parsedStages = stages.traverse { stage =>
           val stageWeight = stage.variants.map(_.weight).foldLeft(0)(_ + _)

@@ -137,7 +137,7 @@ object DBMonitoringRepository {
         servableRow <- parsedConfig.servableName.flatTraverse { servableName =>
           DBServableRepository.getQ(servableName).option.transact(tx)
         }
-        servable = servableRow.map(DBServableRepository.toServableT)
+        servable <- servableRow.traverse(x => F.fromEither(DBServableRepository.toServableT(x)))
       } yield {
         val config = CustomModelMetricSpecConfiguration(
           modelVersionId = parsedConfig.modelVersionId,

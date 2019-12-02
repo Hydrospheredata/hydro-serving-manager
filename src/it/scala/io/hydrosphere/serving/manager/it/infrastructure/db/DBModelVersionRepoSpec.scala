@@ -7,7 +7,7 @@ import cats.effect.IO
 import doobie.scalatest.IOChecker
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version.{InternalModelVersion, ModelVersionStatus}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
@@ -16,7 +16,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor
   val time = Instant.now()
   var model: Model = _
-  var version: ModelVersion = _
+  var version: InternalModelVersion = _
 
   describe("Queries") {
     val row = ModelVersionRow(
@@ -116,7 +116,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
     } yield {
       println(s"Created: $m")
       model = m
-      version = ModelVersion(
+      version = InternalModelVersion(
         id = 0,
         image = dummyImage,
         created = time,

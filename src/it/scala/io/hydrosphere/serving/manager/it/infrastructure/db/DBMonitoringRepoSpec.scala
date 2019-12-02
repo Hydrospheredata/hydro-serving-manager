@@ -8,7 +8,7 @@ import doobie.scalatest.IOChecker
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version.{InternalModelVersion, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, ThresholdCmpOperator}
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository
@@ -18,7 +18,7 @@ import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
   implicit val transactor = app.transactor
 
-  var version: ModelVersion = _
+  var version: InternalModelVersion = _
   var servable: Servable.GenericServable = _
 
   describe("Queries") {
@@ -108,7 +108,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mv = ModelVersion(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
+      mv = InternalModelVersion(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
       mv <- app.core.repos.versionRepo.create(mv)
       serv = Servable(mv, "test-servable", Servable.Serving("ok", "here", 90), Nil, Map.empty)
       res <- app.core.repos.servableRepo.upsert(serv)

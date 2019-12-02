@@ -14,9 +14,9 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.FiniteDuration
 
 trait ServableGC[F[_]] {
-  def mark(modelVersion: ModelVersion): F[Unit]
+  def mark(modelVersion: ModelVersion.Internal): F[Unit]
 
-  def unmark(modelVersion: ModelVersion): F[Unit]
+  def unmark(modelVersion: ModelVersion.Internal): F[Unit]
 }
 
 
@@ -26,9 +26,9 @@ object ServableGC {
 
   def noop[F[_]]()(implicit F: Applicative[F]): ServableGC[F] = {
     new ServableGC[F] {
-      override def mark(modelVersion: ModelVersion): F[Unit] = F.unit
+      override def mark(modelVersion: ModelVersion.Internal): F[Unit] = F.unit
 
-      override def unmark(modelVersion: ModelVersion): F[Unit] = F.unit
+      override def unmark(modelVersion: ModelVersion.Internal): F[Unit] = F.unit
     }
   }
 
@@ -58,13 +58,13 @@ object ServableGC {
     for {
       _ <- gcLoopStep[F](state, deletionDelay).foreverM[Unit].start
     } yield new ServableGC[F] {
-      override def mark(modelVersion: ModelVersion): F[Unit] = {
+      override def mark(modelVersion: ModelVersion.Internal): F[Unit] = {
         for {
           time <- clock.monotonic(TimeUnit.MILLISECONDS)
         } yield state += (modelVersion.id -> time)
       }
 
-      override def unmark(modelVersion: ModelVersion): F[Unit] = F.delay {
+      override def unmark(modelVersion: ModelVersion.Internal): F[Unit] = F.delay {
         state -= modelVersion.id
       }
     }
