@@ -11,7 +11,7 @@ import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetad
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version.{InternalModelVersion, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository.ServableRow
@@ -21,7 +21,7 @@ import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor
 
-  var mv1: InternalModelVersion = _
+  var mv1: ModelVersion.Internal = _
 
   describe("Queries") {
     it("should have correct queries") {
@@ -66,11 +66,11 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mv = InternalModelVersion(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
+      mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
       mv <- app.core.repos.versionRepo.create(mv)
     } yield {
       println(s"Created: $mv")
-      mv1 = mv
+      mv1 = mv.asInstanceOf[ModelVersion.Internal]
     }
     f.unsafeRunSync()
   }

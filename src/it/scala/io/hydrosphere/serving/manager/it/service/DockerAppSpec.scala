@@ -8,10 +8,11 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.application.requests.{CreateApplicationRequest, ExecutionGraphRequest, ModelVariantRequest, PipelineStageRequest}
-import io.hydrosphere.serving.manager.domain.model_version.InternalModelVersion
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 import org.scalatest.BeforeAndAfterAll
+
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 
@@ -37,8 +38,8 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
     ))
   )
 
-  var mv1: InternalModelVersion = _
-  var mv2: InternalModelVersion = _
+  var mv1: ModelVersion.Internal = _
+  var mv2: ModelVersion.Internal = _
 
   describe("Application and Servable service") {
     it("should delete unused servables after deletion") {
