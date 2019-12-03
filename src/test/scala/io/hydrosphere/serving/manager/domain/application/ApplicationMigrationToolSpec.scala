@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import java.time.{Instant, LocalDateTime}
+import java.time.Instant
 
 import akka.stream.scaladsl.Source
 import cats.data.NonEmptyList
@@ -14,7 +14,6 @@ import io.hydrosphere.serving.manager.domain.application.graph.Variant
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
-import io.hydrosphere.serving.manager.domain.host_selector
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
@@ -23,7 +22,7 @@ import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.{AppDBSchemaErrors, ApplicationRow, UsingModelVersionIsMissing}
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository._
 import io.hydrosphere.serving.manager.util.DeferredResult
 
 import scala.collection.mutable.ListBuffer
@@ -77,7 +76,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
 
         override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
-      val modelVersion = ModelVersion(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
+      val modelVersion = ModelVersion.Internal(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
         ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,
         ModelVersionStatus.Released, None, Map.empty
       )
@@ -159,7 +158,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
           |   ]
           |}
         """.stripMargin
-      val mv = ModelVersion(
+      val mv = ModelVersion.Internal(
         id = 1,
         image = DockerImage("", ""),
         created = Instant.now(),
@@ -221,7 +220,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
 
         override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
-      val modelVersion = ModelVersion(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
+      val modelVersion = ModelVersion.Internal(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
         ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,
         ModelVersionStatus.Released, None, Map.empty
       )

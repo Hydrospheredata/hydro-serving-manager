@@ -18,7 +18,7 @@ import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
   implicit val transactor = app.transactor
 
-  var version: ModelVersion = _
+  var version: ModelVersion.Internal = _
   var servable: Servable.GenericServable = _
 
   describe("Queries") {
@@ -49,8 +49,8 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
         id = "1",
         config = CustomModelMetricSpecConfiguration(
           modelVersionId = 1,
-          threshold = Some(123),
-          thresholdCmpOperator = Some(ThresholdCmpOperator.LessEq),
+          threshold = 123,
+          thresholdCmpOperator = ThresholdCmpOperator.LessEq,
           servable = None
         )
       )
@@ -62,8 +62,8 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
         id = "2",
         config = CustomModelMetricSpecConfiguration(
           modelVersionId = 1,
-          threshold = Some(123),
-          thresholdCmpOperator = Some(ThresholdCmpOperator.LessEq),
+          threshold = 123,
+          thresholdCmpOperator = ThresholdCmpOperator.LessEq,
           servable = Some(servable)
         )
       )
@@ -84,8 +84,8 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
       assert(result.modelVersionId == 2)
       assert(result.name == "metric-with-servable")
       assert(result.config.servable.get == servable)
-      assert(result.config.thresholdCmpOperator.get == ThresholdCmpOperator.LessEq)
-      assert(result.config.threshold.get == 123)
+      assert(result.config.thresholdCmpOperator == ThresholdCmpOperator.LessEq)
+      assert(result.config.threshold == 123)
       assert(result.config.modelVersionId == 1)
     }
 
@@ -97,8 +97,8 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
       assert(result.modelVersionId == 2)
       assert(result.name == "metric-with-servable")
       assert(result.config.servable.get == servable)
-      assert(result.config.thresholdCmpOperator.get == ThresholdCmpOperator.LessEq)
-      assert(result.config.threshold.get == 123)
+      assert(result.config.thresholdCmpOperator == ThresholdCmpOperator.LessEq)
+      assert(result.config.threshold == 123)
       assert(result.config.modelVersionId == 1)
     }
   }
@@ -108,14 +108,15 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mv = ModelVersion(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
-      mv <- app.core.repos.versionRepo.create(mv)
-      serv = Servable(mv, "test-servable", Servable.Serving("ok", "here", 90), Nil, Map.empty)
+      mvOld = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
+      mv <- app.core.repos.versionRepo.create(mvOld)
+      mvNew = mvOld.copy(id = mv.id)
+      serv = Servable(mvNew, "test-servable", Servable.Serving("ok", "here", 90), Nil, Map.empty)
       res <- app.core.repos.servableRepo.upsert(serv)
     } yield {
       println(s"Created: $mv")
       println(s"Created: $res")
-      version = mv
+      version = mvNew
       servable = res
     }
     f.unsafeRunSync()

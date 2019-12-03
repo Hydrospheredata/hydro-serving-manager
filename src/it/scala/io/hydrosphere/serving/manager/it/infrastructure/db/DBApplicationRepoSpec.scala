@@ -33,7 +33,7 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
       predict = signature.some
     ).some
   )
-  var mv1: ModelVersion = _
+  var mv1: ModelVersion.Internal = _
   var servable: Servable.OkServable = _
 
   describe("Queries") {

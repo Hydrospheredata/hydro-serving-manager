@@ -1,12 +1,12 @@
 package io.hydrosphere.serving.manager.domain
 
-import java.time.{Instant, LocalDateTime}
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, ContextShift, IO, Resource, Timer}
+import cats.effect.{Concurrent, IO, Resource, Timer}
 import cats.implicits._
 import fs2.concurrent.Queue
 import io.hydrosphere.serving.contract.model_contract.ModelContract
@@ -19,11 +19,11 @@ import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInst
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableMonitor.MonitoringEntry
 import io.hydrosphere.serving.manager.domain.servable._
-import io.hydrosphere.serving.manager.grpc.entities
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.ApplicationRow
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.util.UUIDGenerator
@@ -37,9 +37,17 @@ import scala.concurrent.duration._
 class ServableSpec extends GenericUnitTest {
   implicit val rng: RNG[IO] = RNG.default[IO].unsafeRunSync()
   implicit val nameGen: NameGenerator[IO] = NameGenerator.haiku[IO]()
-  implicit val uuidGen = UUIDGenerator.default[IO]()
+  implicit val uuidGen: UUIDGenerator[IO] = UUIDGenerator.default[IO]()
   implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
-  val mv = ModelVersion(
+  val externalMv = ModelVersion.External(
+    id = 1,
+    created = Instant.now(),
+    modelVersion = 1,
+    modelContract = ModelContract.defaultInstance,
+    model = Model(1, "name"),
+    metadata = Map.empty
+  )
+  val mv = ModelVersion.Internal(
     id = 10,
     image = DockerImage("name", "tag"),
     created = Instant.now(),
@@ -294,6 +302,68 @@ class ServableSpec extends GenericUnitTest {
   }
 
   describe("CRUD") {
+    it("should not deploy an external ModelVersion") {
+      val cloudDriver = new CloudDriver[IO] {
+        override def instances: IO[List[CloudInstance]] = ???
+        override def instance(name: String): IO[Option[CloudInstance]] = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = {
+          IO.raiseError(new IllegalStateException("Shouldn't reach this"))
+        }
+        override def remove(name: String): IO[Unit] = ???
+        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
+        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+      }
+      val servableRepo = new ServableRepository[IO] {
+        override def all(): IO[List[GenericServable]] = ???
+        override def upsert(servable: GenericServable): IO[GenericServable] = ???
+        override def delete(name: String): IO[Int] = ???
+        override def get(name: String): IO[Option[GenericServable]] = ???
+        override def get(names: Seq[String]): IO[List[GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
+      }
+      val versionRepo = new ModelVersionRepository[IO] {
+        override def create(entity: ModelVersion): IO[ModelVersion] = ???
+        override def get(id: Long): IO[Option[ModelVersion]] = IO(Some(externalMv))
+        override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
+        override def delete(id: Long): IO[Int] = ???
+        override def all(): IO[List[ModelVersion]] = ???
+        override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
+        override def update(entity: ModelVersion): IO[Int] = ???
+        override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]] = ???
+      }
+      val monitor = new ServableMonitor[IO] {
+        override def monitor(s: GenericServable): IO[Deferred[IO, GenericServable]] = IO.raiseError(new IllegalStateException("Shouldn't reach this"))
+      }
+      val dh = new ServableEvents.Publisher[IO] {
+        override def update(item: GenericServable): IO[Unit] = IO.unit
+        override def remove(itemId: String): IO[Unit] = IO.unit
+        override def publish(t: DiscoveryEvent[GenericServable, String]): IO[Unit] = IO.unit
+      }
+      val appRepo = new ApplicationRepository[IO] {
+        override def create(entity: GenericApplication): IO[GenericApplication] = ???
+        override def get(id: Long): IO[Option[GenericApplication]] = ???
+        override def get(name: String): IO[Option[GenericApplication]] = ???
+        override def update(value: GenericApplication): IO[Int] = ???
+        override def updateRow(row: ApplicationRow): IO[Int] = ???
+        override def delete(id: Long): IO[Int] = ???
+        override def all(): IO[List[GenericApplication]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
+        override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
+      }
+
+      val monitoringRepo = new MonitoringRepository[IO] {
+        override def all(): IO[List[CustomModelMetricSpec]] = ???
+        override def get(id: String): IO[Option[CustomModelMetricSpec]] = ???
+        override def forModelVersion(id: Long): IO[List[CustomModelMetricSpec]] = ???
+        override def upsert(spec: CustomModelMetricSpec): IO[Unit] = ???
+        override def delete(id: String): IO[Unit] = ???
+      }
+
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, monitoringRepo)
+      val deployResult = service.findAndDeploy(1, Map.empty).attempt.unsafeRunSync()
+      deployResult.left.value should be (DomainError.invalidRequest(s"Deployment of external model is unavailable. modelVersionId=${externalMv.id} name=${externalMv.fullName}"))
+    }
+
     it("should be able to create Servable") {
 
       val driverState = ListBuffer.empty[CloudInstance]
@@ -377,7 +447,7 @@ class ServableSpec extends GenericUnitTest {
     }
 
     it("should be able to delete Servable") {
-      val mv = ModelVersion(
+      val mv = ModelVersion.Internal(
         id = 10,
         image = DockerImage("name", "tag"),
         created = Instant.now(),
@@ -474,7 +544,7 @@ class ServableSpec extends GenericUnitTest {
     }
 
     it("should reject deletion of used Servable") {
-      val mv = ModelVersion(
+      val mv = ModelVersion.Internal(
         id = 10,
         image = DockerImage("name", "tag"),
         created = Instant.now(),
@@ -571,7 +641,7 @@ class ServableSpec extends GenericUnitTest {
     }
 
     it("should be able to filter servables") {
-      val mv = ModelVersion(
+      val mv = ModelVersion.Internal(
         id = 1,
         image = DockerImage("name", "tag"),
         created = Instant.now(),
@@ -628,7 +698,7 @@ class ServableSpec extends GenericUnitTest {
     }
 
     it("should be able to deploy ModelVersion") {
-      val mv = ModelVersion(
+      val mv = ModelVersion.Internal(
         id = 1,
         image = DockerImage("name", "tag"),
         created = Instant.now(),

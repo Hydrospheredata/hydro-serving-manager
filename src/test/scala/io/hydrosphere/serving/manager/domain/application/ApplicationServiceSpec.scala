@@ -10,13 +10,14 @@ import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
+import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.graph.{Variant, VersionGraphComposer}
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.Servable._
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableGC, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -32,7 +33,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
     Seq(ModelField("out", None, typeOrSubfields = ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)))
   )
   val contract = ModelContract("", Some(signature))
-  val modelVersion = ModelVersion(
+  val modelVersion = ModelVersion.Internal(
     id = 1,
     image = DockerImage("test", "t"),
     created = Instant.now(),
@@ -46,7 +47,56 @@ class ApplicationServiceSpec extends GenericUnitTest {
     installCommand = None,
     metadata = Map.empty
   )
+  val externalMv = ModelVersion.External(
+    id = 1,
+    created = Instant.now(),
+    modelVersion = 1,
+    modelContract = contract,
+    model = Model(1, "model"),
+    metadata = Map.empty
+  )
+
   describe("Application Deployer") {
+
+    it("should reject application with external ModelVersion") {
+
+      val appRepo = mock[ApplicationRepository[IO]]
+      when(appRepo.get("test")).thenReturn(IO(None))
+
+      val versionRepo = mock[ModelVersionRepository[IO]]
+      when(versionRepo.get(1)).thenReturn(IO(Some(externalMv)))
+      val servableService = new ServableService[IO] {
+        def all(): IO[List[Servable.GenericServable]] = ???
+        def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+        def deploy(modelVersion: ModelVersion.Internal, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def stop(name: String): IO[GenericServable] = ???
+        def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def get(name: String): IO[GenericServable] = ???
+      }
+      val graphComposer = VersionGraphComposer.default
+      val discoveryHub = new ApplicationEvents.Publisher[IO] {
+        override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = IO.unit
+      }
+      val appDeployer = ApplicationDeployer.default[IO]()(
+        Concurrent[IO],
+        applicationRepository = appRepo,
+        versionRepository = versionRepo,
+        servableService= servableService,
+        discoveryHub = discoveryHub,
+        graphComposer = graphComposer
+      )
+      val graph = ExecutionGraphRequest(NonEmptyList.of(
+        PipelineStageRequest(NonEmptyList.of(
+          ModelVariantRequest(
+            modelVersionId = 1,
+            weight = 100
+          )
+        ))
+      ))
+      val result = appDeployer.deploy("test", graph, List.empty).attempt.unsafeRunSync()
+      result.left.value.getClass should be (classOf[DomainError.InvalidRequest])
+    }
 
     it("should start application build") {
       ioAssert {
@@ -71,7 +121,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           def all(): IO[List[Servable.GenericServable]] = ???
           def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-          def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = {
+          def deploy(modelVersion: ModelVersion.Internal, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = {
             IO.pure {
               val s = Servable(modelVersion, "hi", Servable.Serving("Ok", "host", 9090), Nil)
               val d = Deferred[IO, GenericServable].unsafeRunSync()
@@ -138,7 +188,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           def all(): IO[List[Servable.GenericServable]] = ???
           def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-          def deploy(mv: ModelVersion, metadata: Map[String, String]): IO[Nothing] = {
+          def deploy(mv: ModelVersion.Internal, metadata: Map[String, String]): IO[Nothing] = {
             IO.raiseError(new RuntimeException("Test error"))
           }
           def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
@@ -200,7 +250,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           def all(): IO[List[Servable.GenericServable]] = ???
           def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-          def deploy(mv: ModelVersion, metadata: Map[String, String]) = {
+          def deploy(mv: ModelVersion.Internal, metadata: Map[String, String]) = {
             val s = Servable(
               modelVersion = mv,
               nameSuffix = "test",
@@ -286,7 +336,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val servableService = new ServableService[IO] {
           def all(): IO[List[Servable.GenericServable]] = ???
           def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-          def deploy(mv: ModelVersion, metadata: Map[String, String]) = {
+          def deploy(mv: ModelVersion.Internal, metadata: Map[String, String]) = {
             DeferredResult.completed(Servable(mv, "test", Servable.Serving("Ok", "host", 9090), Nil, Map.empty))
           }
           def findAndDeploy(name: String, version: Long, metadata: Map[String, String]) = ???

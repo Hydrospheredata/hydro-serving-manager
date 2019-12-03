@@ -74,17 +74,37 @@ class ModelController[F[_]](
       dataTypeClass = classOf[ModelUploadMetadata], paramType = "body")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Model", response = classOf[ModelVersion]),
+    new ApiResponse(code = 200, message = " ModelVersion", response = classOf[ModelVersion.Internal]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def uploadModel = pathPrefix("model" / "upload") {
     post {
-      getFileWithMeta[F, ModelUploadMetadata, ModelVersion] {
+      getFileWithMeta[F, ModelUploadMetadata, ModelVersion.Internal] {
         case (Some(file), Some(meta)) =>
           logger.info(s"Upload request path=$file, metadata=$meta")
           modelManagementService.uploadModel(file, meta).map(x => x.started)
         case (None, _) => Effect[F].raiseError(InvalidRequest("Couldn't find a payload in request"))
         case (_, None) => Effect[F].raiseError(InvalidRequest("Couldn't find a metadata in request"))
+      }
+    }
+  }
+
+  @Path("/register")
+  @ApiOperation(value = "Register an external model", notes = "Register an external model", nickname = "registerModel", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "body", value = "RegisterModelRequest", required = true,
+      dataTypeClass = classOf[RegisterModelRequest], paramType = "body")
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "ModelVersion", response = classOf[ModelVersion.External]),
+    new ApiResponse(code = 500, message = "Internal server error")
+  ))
+  def registerModel = pathPrefix("model" / "register") {
+    post {
+      entity(as[RegisterModelRequest]) { req =>
+        completeF {
+          modelManagementService.registerModel(req)
+        }
       }
     }
   }
@@ -110,7 +130,7 @@ class ModelController[F[_]](
     new ApiImplicitParam(name = "version", required = true, dataType = "long", paramType = "path", value = "modelId")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "ModelVersion", response = classOf[ModelVersion]),
+    new ApiResponse(code = 200, message = "ModelVersion", response = classOf[ModelVersion.Internal]),
     new ApiResponse(code = 404, message = "Not found"),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
@@ -162,5 +182,5 @@ class ModelController[F[_]](
     }
   }
 
-  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions ~ buildLogs
+  val routes: Route = listModels ~ getModel ~ uploadModel ~ allModelVersions ~ deleteModel ~ getModelVersions ~ buildLogs ~ registerModel
 }

@@ -13,7 +13,6 @@ import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.FetcherRes
 case class ModelVersionMetadata(
   modelName: String,
   contract: ModelContract,
-  profileTypes: Map[String, DataProfileType],
   runtime: DockerImage,
   hostSelector: Option[HostSelector],
   installCommand: Option[String],
@@ -31,7 +30,6 @@ object ModelVersionMetadata {
     ModelVersionMetadata(
       modelName = upload.name,
       contract = contract,
-      profileTypes = upload.profileTypes.getOrElse(Map.empty),
       runtime = upload.runtime,
       hostSelector = hs,
       installCommand = upload.installCommand,
@@ -40,8 +38,8 @@ object ModelVersionMetadata {
   }
 
 
-  def validateContract(upload: ModelVersionMetadata): Either[InvalidRequest, Unit] = {
-    upload.contract.predict match {
+  def validateContract(contract: ModelContract): Either[InvalidRequest, Unit] = {
+    contract.predict match {
       case None => Left(InvalidRequest("The model has no prediction signature"))
       case Some(predictSignature) =>
         val inputsNotEmpty = predictSignature.inputs.nonEmpty

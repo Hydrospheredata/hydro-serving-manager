@@ -3,20 +3,23 @@ package io.hydrosphere.serving.manager.domain.model
 import java.nio.file.Path
 
 import cats.data.OptionT
+import cats.effect.Clock
 import cats.implicits._
 import cats.{Monad, MonadError}
-import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
+import io.hydrosphere.serving.manager.api.http.controller.model.{ModelUploadMetadata, RegisterModelRequest}
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.{InvalidRequest, NotFound}
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository}
+import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService}
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.storage.ModelUnpacker
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
 import io.hydrosphere.serving.manager.util.DeferredResult
+import io.hydrosphere.serving.manager.util.InstantClockSyntax._
 import org.apache.logging.log4j.scala.Logging
 
 trait ModelService[F[_]] {
@@ -24,7 +27,9 @@ trait ModelService[F[_]] {
 
   def deleteModel(modelId: Long): F[Model]
 
-  def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion]]
+  def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion.Internal]]
+
+  def registerModel(modelReq: RegisterModelRequest): F[ModelVersion.External]
 
   def checkIfUnique(targetModel: Model, newModelInfo: Model): F[Model]
 
@@ -35,7 +40,9 @@ object ModelService {
   def apply[F[_]]()(
     implicit
     F: MonadError[F, Throwable],
+    clock: Clock[F],
     modelRepository: ModelRepository[F],
+    modelVersionRepository: ModelVersionRepository[F],
     modelVersionService: ModelVersionService[F],
     storageService: ModelUnpacker[F],
     appRepo: ApplicationRepository[F],
@@ -56,7 +63,7 @@ object ModelService {
       } yield model
     }
 
-    def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion]] = {
+    def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion.Internal]] = {
       val maybeHostSelector = meta.hostSelectorName match {
         case Some(value) =>
           OptionT(hostSelectorRepository.get(value))
@@ -71,7 +78,7 @@ object ModelService {
         modelPath <- storageService.unpack(filePath)
         fetchResult <- fetcher.fetch(modelPath.filesPath)
         versionMetadata = ModelVersionMetadata.combineMetadata(fetchResult, meta, hs)
-        _ <- F.fromEither(ModelVersionMetadata.validateContract(versionMetadata))
+        _ <- F.fromEither(ModelVersionMetadata.validateContract(versionMetadata.contract))
         parentModel <- createIfNecessary(versionMetadata.modelName)
         b <- modelVersionBuilder.build(parentModel, versionMetadata, modelPath)
       } yield b
@@ -135,6 +142,25 @@ object ModelService {
       OptionT(modelRepository.get(modelId))
         .getOrElseF(F.raiseError(NotFound(s"Can't find a model with id $modelId"))
         )
+    }
+
+    override def registerModel(modelReq: RegisterModelRequest): F[ModelVersion.External] = {
+      for {
+        _ <- F.fromOption(ModelValidator.name(modelReq.name), DomainError.invalidRequest("Model name contains invalid characters"))
+        _ <- F.fromEither(ModelVersionMetadata.validateContract(modelReq.contract))
+        parentModel <- createIfNecessary(modelReq.name)
+        version <- modelVersionService.getNextModelVersion(parentModel.id)
+        timestamp <- clock.instant()
+        mv = ModelVersion.External(
+          id = 0,
+          created = timestamp,
+          modelVersion = version,
+          modelContract = modelReq.contract,
+          model = parentModel,
+          metadata = modelReq.metadata.getOrElse(Map.empty),
+        )
+        ver <- modelVersionRepository.create(mv)
+      } yield mv.copy(id = ver.id)
     }
   }
 }

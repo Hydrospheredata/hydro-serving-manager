@@ -6,12 +6,12 @@ import cats.data.EitherT
 import cats.effect.IO
 import io.hydrosphere.serving.manager.domain.DomainError
 import org.mockito.Mockito
-import org.scalatest.{Assertion, AsyncFunSpecLike, Matchers}
+import org.scalatest.{Assertion, AsyncFunSpecLike, EitherValues, Matchers}
 import org.scalatestplus.mockito.MockitoSugar
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait GenericUnitTest extends AsyncFunSpecLike with Matchers with MockitoSugar {
+trait GenericUnitTest extends AsyncFunSpecLike with Matchers with EitherValues with MockitoSugar {
   implicit val ec = ExecutionContext.global
   implicit val cs = IO.contextShift(ec)
 

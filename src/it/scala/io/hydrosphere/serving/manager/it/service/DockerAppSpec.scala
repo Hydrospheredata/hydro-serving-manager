@@ -12,6 +12,7 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 import org.scalatest.BeforeAndAfterAll
+
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 
@@ -37,8 +38,8 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
     ))
   )
 
-  var mv1: ModelVersion = _
-  var mv2: ModelVersion = _
+  var mv1: ModelVersion.Internal = _
+  var mv2: ModelVersion.Internal = _
 
   describe("Application and Servable service") {
     it("should delete unused servables after deletion") {

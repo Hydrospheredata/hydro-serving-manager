@@ -43,9 +43,9 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
     ))
   )
 
-  var mv1: ModelVersion = _
-  var mv2: ModelVersion = _
-  var mv3: ModelVersion = _
+  var mv1: ModelVersion.Internal = _
+  var mv2: ModelVersion.Internal = _
+  var mv3: ModelVersion.Internal = _
 
   describe("Application service") {
     it("should create a simple application") {

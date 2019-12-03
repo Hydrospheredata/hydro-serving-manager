@@ -16,7 +16,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor
   val time = Instant.now()
   var model: Model = _
-  var version: ModelVersion = _
+  var version: ModelVersion.Internal = _
 
   describe("Queries") {
     val row = ModelVersionRow(
@@ -35,7 +35,8 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       status = "status",
       profile_types = None,
       install_command = Some("echo 123"),
-      metadata = Some("{}")
+      metadata = Some("{}"),
+      is_external = false
     )
     it("should have valid queries") {
       check(DBModelVersionRepository.allQ)
@@ -59,12 +60,16 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
     it("should update a version") {
       val q = for {
         existing <- OptionT(app.core.repos.versionRepo.get(1)).getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
-        changed <- app.core.repos.versionRepo.update(existing.copy(status = ModelVersionStatus.Assembling))
+        updatedEx = existing match {
+          case x: ModelVersion.Internal => x.copy(status = ModelVersionStatus.Assembling)
+          case x: ModelVersion.External => fail("Unexpected External model")
+        }
+        changed <- app.core.repos.versionRepo.update(updatedEx)
         result <- OptionT(app.core.repos.versionRepo.get(1)).getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
       } yield {
         assert(changed == 1)
         assert(result.id == 1)
-        assert(result.status == ModelVersionStatus.Assembling)
+        assert(result.asInstanceOf[ModelVersion.Internal].status == ModelVersionStatus.Assembling)
       }
       q.unsafeToFuture()
     }
@@ -116,7 +121,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
     } yield {
       println(s"Created: $m")
       model = m
-      version = ModelVersion(
+      version = ModelVersion.Internal(
         id = 0,
         image = dummyImage,
         created = time,

@@ -59,7 +59,37 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val modelFormat         = jsonFormat2(Model)
   implicit val environmentFormat   = jsonFormat3(HostSelector)
   implicit val versionStatusFormat = enumFormat(ModelVersionStatus)
-  implicit val modelVersionFormat  = jsonFormat12(ModelVersion.apply)
+  implicit val internalModelVersionFormat  = jsonFormat12(ModelVersion.Internal.apply)
+  implicit val externalModelVersionFormat  = jsonFormat6(ModelVersion.External.apply)
+  implicit val modelVersionFormat = new RootJsonWriter[ModelVersion] {
+    override def write(obj: ModelVersion): JsValue = {
+      val fields = obj match {
+        case x: ModelVersion.Internal => x.toJson.asJsObject.fields ++ Map("kind" -> JsString("Internal"))
+        case x: ModelVersion.External => x.toJson.asJsObject.fields ++ Map("kind" -> JsString("External"))
+      }
+      JsObject(fields)
+    }
+
+    //    override def read(json: JsValue): ModelVersion = {
+    //      json match {
+    //        case JsObject(fields) =>
+    //          fields.get("kind") match {
+    //            case Some(value) =>
+    //              value match {
+    //                case JsString(value) =>
+    //                  value match {
+    //                    case "Internal" => JsObject(fields.filterKeys(x => x != "kind")).convertTo[ModelVersion.Internal]
+    //                    case "External" => JsObject(fields.filterKeys(x => x != "kind")).convertTo[ModelVersion.External]
+    //                  }
+    //                case x => throw DeserializationException(s"Cannot deserialize ModelVersion with invalid 'kind' field: ${x}")
+    //              }
+    //            case None => throw DeserializationException("Cannot deserialize ModelVersion without 'kind' field")
+    //          }
+    //        case _ => throw DeserializationException("Invalid ModelVersion Json")
+    //      }
+    //    }
+  }
+
   implicit val cloudServableFormat = jsonFormat3(CloudInstance.apply)
 
   implicit def variantFormat[T: JsonFormat] = jsonFormat2(Variant.apply[T])

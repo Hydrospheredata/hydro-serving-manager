@@ -1,0 +1,1 @@
+ALTER TABLE hydro_serving.model_version ADD COLUMN is_external BOOLEAN NOT NULL DEFAULT false;

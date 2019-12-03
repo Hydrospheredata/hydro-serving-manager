@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.util.docker
+package io.hydrosphere.serving.manager.util
 
 import com.spotify.docker.client.ProgressHandler
 import com.spotify.docker.client.messages.ProgressMessage

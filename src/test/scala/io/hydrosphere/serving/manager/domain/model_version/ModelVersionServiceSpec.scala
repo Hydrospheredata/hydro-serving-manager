@@ -6,7 +6,7 @@ import cats.MonadError
 import cats.effect.IO
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.{DiscoveryEvent}
+import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 
@@ -28,7 +28,7 @@ class ModelVersionServiceSpec extends GenericUnitTest {
     it("should calculate second version") {
       val versionRepo = mock[ModelVersionRepository[IO]]
       when(versionRepo.lastModelVersionByModel(1L)).thenReturn(IO(
-        Some(ModelVersion(
+        Some(ModelVersion.Internal(
           id = 1,
           image = DockerImage("asd", "asd"),
           created = Instant.now(),
@@ -54,7 +54,7 @@ class ModelVersionServiceSpec extends GenericUnitTest {
     it("should calculate third version") {
       val versionRepo = mock[ModelVersionRepository[IO]]
       when(versionRepo.lastModelVersionByModel(1L)).thenReturn(IO(
-        Some(ModelVersion(
+        Some(ModelVersion.Internal(
           id = 1,
           image = DockerImage("asd", "asd"),
           created = Instant.now(),
@@ -83,7 +83,7 @@ class ModelVersionServiceSpec extends GenericUnitTest {
 
         override def get(id: Long): IO[Option[ModelVersion]] = IO {
           Some(
-            ModelVersion(
+            ModelVersion.Internal(
               id = 1,
               image = DockerImage("", ""),
               created = Instant.now(),
@@ -150,7 +150,7 @@ class ModelVersionServiceSpec extends GenericUnitTest {
         ioAssert {
           val versionRepo = mock[ModelVersionRepository[IO]]
           when(versionRepo.lastModelVersionByModel(1)).thenReturn(
-            IO(Some(ModelVersion(
+            IO(Some(ModelVersion.Internal(
               id = 1,
               image = DockerImage("", ""),
               created = Instant.now(),
@@ -173,5 +173,4 @@ class ModelVersionServiceSpec extends GenericUnitTest {
       }
     }
   }
-
 }

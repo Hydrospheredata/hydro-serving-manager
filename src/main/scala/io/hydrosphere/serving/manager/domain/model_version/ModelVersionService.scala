@@ -41,7 +41,7 @@ object ModelVersionService {
         usageMap = f.toMap
       } yield {
         allVersions.map { v =>
-          ModelVersionView.fromVersion(v, usageMap.getOrElse(v.id, Seq.empty))
+          ModelVersionView.fromVersion(v, usageMap.getOrElse(v.id, Nil))
         }
       }
     }

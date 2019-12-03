@@ -21,7 +21,7 @@ import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor
 
-  var mv1: ModelVersion = _
+  var mv1: ModelVersion.Internal = _
 
   describe("Queries") {
     it("should have correct queries") {
@@ -66,11 +66,11 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mv = ModelVersion(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
+      mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
       mv <- app.core.repos.versionRepo.create(mv)
     } yield {
       println(s"Created: $mv")
-      mv1 = mv
+      mv1 = mv.asInstanceOf[ModelVersion.Internal]
     }
     f.unsafeRunSync()
   }

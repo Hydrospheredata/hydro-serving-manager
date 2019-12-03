@@ -20,4 +20,6 @@ case class DockerImage(
 
 object DockerImage {
   val NamePattern: Regex = "([a-zA-z0-9-_\\.:]+)/([a-zA-z0-9\\-_]+)".r
+
+  val dummyImage = DockerImage("hydrosphere/serving-runtime-dummy", "latest")
 }

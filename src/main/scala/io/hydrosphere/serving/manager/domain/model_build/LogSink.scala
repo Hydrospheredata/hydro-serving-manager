@@ -15,7 +15,7 @@ import org.apache.logging.log4j.scala.Logging
 import scala.collection.mutable.ListBuffer
 
 trait BuildLoggingService[F[_]] {
-  def makeLogger(modelVersion: ModelVersion): F[ProgressHandler]
+  def makeLogger(modelVersion: ModelVersion.Internal): F[ProgressHandler]
 
   def finishLogging(modelVersion: Long): F[Option[Unit]]
 
@@ -31,7 +31,7 @@ object BuildLoggingService extends Logging {
       state <- Ref.of[F, Map[Long, (Topic[F, String], SignallingRef[F, Boolean], ListBuffer[String])]](Map.empty)
     } yield {
       new BuildLoggingService[F] {
-        override def makeLogger(modelVersion: ModelVersion) = {
+        override def makeLogger(modelVersion: ModelVersion.Internal) = {
           for {
             signal <- SignallingRef[F, Boolean](false)
             topic <- Topic[F, String]("")

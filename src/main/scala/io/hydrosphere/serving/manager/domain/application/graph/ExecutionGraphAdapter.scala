@@ -16,7 +16,7 @@ case class VersionStage(
   signature: ModelSignature
 )
 case class ModelVariant(
-  modelVersion: ModelVersion,
+  modelVersion: ModelVersion.Internal,
   weight: Int
 )
 

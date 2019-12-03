@@ -30,7 +30,7 @@ trait ServableService[F[_]] {
 
   def stop(name: String): F[GenericServable]
 
-  def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
+  def deploy(modelVersion: ModelVersion.Internal, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 }
 
 object ServableService extends Logging {
@@ -75,7 +75,7 @@ object ServableService extends Logging {
       } yield finalFilter(servables)
     }
 
-    override def deploy(modelVersion: ModelVersion, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
+    override def deploy(modelVersion:  ModelVersion.Internal, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
         randomSuffix <- generateUniqueSuffix(modelVersion)
         d <- Deferred[F, GenericServable]
@@ -133,21 +133,37 @@ object ServableService extends Logging {
 
     override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
-        version <- OptionT(versionRepository.get(name, version))
+        abstractVersion <- OptionT(versionRepository.get(name, version))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model $name:$version doesn't exist")))
-        servable <- deploy(version, metadata)
+        internalVersion <- abstractVersion match {
+          case x: ModelVersion.Internal =>
+            x.pure[F]
+          case x: ModelVersion.External =>
+            DomainError
+              .invalidRequest(s"Deployment of external model is unavailable. modelVersionId=${x.id} name=${x.fullName}")
+              .raiseError[F, ModelVersion.Internal]
+        }
+        servable <- deploy(internalVersion, metadata)
       } yield servable
     }
 
     override def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
-        version <- OptionT(versionRepository.get(modelId))
+        abstractVersion <- OptionT(versionRepository.get(modelId))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model id=$modelId doesn't exist")))
-        servable <- deploy(version, metadata)
+        internalVersion <- abstractVersion match {
+          case x: ModelVersion.Internal =>
+            x.pure[F]
+          case x:  ModelVersion.External =>
+            DomainError
+              .invalidRequest(s"Deployment of external model is unavailable. modelVersionId=${x.id} name=${x.fullName}")
+              .raiseError[F, ModelVersion.Internal]
+        }
+        servable <- deploy(internalVersion, metadata)
       } yield servable
     }
 
-    def generateUniqueSuffix(mv: ModelVersion): F[String] = {
+    def generateUniqueSuffix(mv: ModelVersion.Internal): F[String] = {
       def _gen(tries: Long): F[String] = {
         for {
           randomSuffix <- nameGenerator.getName()
