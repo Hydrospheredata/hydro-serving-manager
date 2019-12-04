@@ -11,11 +11,11 @@ object InstantClockSyntax {
 
   implicit final class ClockToInstant[F[_]](private val clock: Clock[F])(implicit F: Functor[F]) {
     /***
-      * Returns the result of `monotonic` wrapped with `java.time.Instant`
+      * Returns the result of `realTime` wrapped with `java.time.Instant`
       * @return
       */
     def instant(): F[Instant] = for {
-      millis <- clock.monotonic(TimeUnit.MILLISECONDS)
+      millis <- clock.realTime(TimeUnit.MILLISECONDS)
     } yield Instant.ofEpochMilli(millis)
   }
 
