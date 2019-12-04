@@ -99,7 +99,7 @@ class ModelController[F[_]](
     new ApiResponse(code = 200, message = "ModelVersion", response = classOf[ModelVersion.External]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
-  def registerModel = pathPrefix("model" / "register") {
+  def registerModel = pathPrefix("externalmodel") {
     post {
       entity(as[RegisterModelRequest]) { req =>
         completeF {
