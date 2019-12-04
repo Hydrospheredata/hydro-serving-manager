@@ -57,6 +57,19 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       }
       q.unsafeToFuture()
     }
+
+    it("should insert a external version") {
+      val ev = ModelVersion.External(0, Instant.now(), 1337, ModelContract.defaultInstance, model, Map.empty)
+      val q = for {
+        result <- app.core.repos.versionRepo.create(ev)
+        got <- app.core.repos.versionRepo.get(result.id)
+      } yield {
+        assert(got.isDefined)
+        assert(got.get.isInstanceOf[ModelVersion.External])
+      }
+      q.unsafeToFuture()
+    }
+
     it("should update a version") {
       val q = for {
         existing <- OptionT(app.core.repos.versionRepo.get(1)).getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
@@ -77,7 +90,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       val q = for {
         all <- app.core.repos.versionRepo.all()
       } yield {
-        assert(all.size == 1)
+        assert(all.size == 2)
       }
       q.unsafeToFuture()
     }

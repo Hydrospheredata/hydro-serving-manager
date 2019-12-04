@@ -211,7 +211,8 @@ object DBModelVersionRepository {
          | runtime_version,
          | status,
          | install_command,
-         | metadata
+         | metadata,
+         | is_external
          | ) VALUES (
          | ${mv.model_id},
          | ${mv.host_selector},
@@ -226,7 +227,8 @@ object DBModelVersionRepository {
          | ${mv.runtime_version},
          | ${mv.status},
          | ${mv.install_command},
-         | ${mv.metadata}
+         | ${mv.metadata},
+         | ${mv.is_external}
          |)""".stripMargin.update
   }
 
