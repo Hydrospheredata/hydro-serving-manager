@@ -110,7 +110,7 @@ object App {
       apiClasses = modelController.getClass ::
         appController.getClass :: hsController.getClass ::
         servableController.getClass:: sseController.getClass ::
-        monitoringController.getClass :: Nil
+        monitoringController.getClass :: externalModelController.getClass :: Nil
       swaggerController = new SwaggerDocController(apiClasses.toSet, "2")
 
       http = HttpServer.akkaBased(
