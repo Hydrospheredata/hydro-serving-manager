@@ -16,7 +16,7 @@ import io.hydrosphere.serving.manager.api.http.controller.{MonitoringController,
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationController
 import io.hydrosphere.serving.manager.api.http.controller.events.SSEController
 import io.hydrosphere.serving.manager.api.http.controller.host_selector.HostSelectorController
-import io.hydrosphere.serving.manager.api.http.controller.model.ModelController
+import io.hydrosphere.serving.manager.api.http.controller.model.{ExternalModelController, ModelController}
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
@@ -93,6 +93,8 @@ object App {
       discoveryService = new GrpcServingDiscovery[F](core.appSub, core.servableSub, core.monitoringSub , core.appService, core.servableService, core.repos.monitoringRepository)
       grpc = GrpcServer.default(config, grpcService, discoveryService)
 
+      externalModelController = new ExternalModelController[F](core.modelService)
+
       modelController = new ModelController[F](
         core.modelService,
         core.repos.modelRepo,
@@ -119,7 +121,8 @@ object App {
         hostSelectorRoutes = hsController.routes,
         servableRoutes = servableController.routes,
         sseRoutes = sseController.routes,
-        monitoringRoutes = monitoringController.routes
+        monitoringRoutes = monitoringController.routes,
+        externalModelRoutes = externalModelController.routes
       )
     } yield App(config, core, grpc, http, tx)
   }

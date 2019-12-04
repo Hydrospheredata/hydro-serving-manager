@@ -15,8 +15,6 @@ import javax.ws.rs.Path
 @Api(produces = "application/json", tags = Array("External Model registration"))
 class ExternalModelController[F[_]](
   modelManagementService: ModelService[F],
-  modelRepo: ModelRepository[F],
-  modelVersionManagementService: ModelVersionService[F],
 )(
   implicit F: ConcurrentEffect[F],
   cs: ContextShift[F],
