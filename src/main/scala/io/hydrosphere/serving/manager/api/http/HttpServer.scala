@@ -51,24 +51,30 @@ object HttpServer extends AkkaHttpControllerDsl {
       }
     }
 
+    val swaggerUiRoutes = pathPrefix("swagger") {
+      pathEndOrSingleSlash {
+        redirect("/swagger/index.html", StatusCodes.TemporaryRedirect)
+      } ~
+        path(Segments) { segs =>
+          val path = segs.mkString("/")
+          getFromResource(s"swagger/$path")
+        }
+    }
+
+    val buildInfoRoute = pathPrefix("buildinfo") {
+      complete(HttpResponse(
+        status = StatusCodes.OK,
+        entity = HttpEntity(ContentTypes.`application/json`, BuildInfo.toJson)
+      ))
+    }
+
     val routes: Route = CorsDirectives.cors(CorsSettings.defaultSettings.copy(allowedMethods = Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))) {
       pathPrefix("health") {
         complete("OK")
       } ~
         pathPrefix("api") {
-          controllerRoutes ~
-            pathPrefix("buildinfo") {
-              complete(HttpResponse(
-                status = StatusCodes.OK,
-                entity = HttpEntity(ContentTypes.`application/json`, BuildInfo.toJson)
-              ))
-            }
-        } ~ pathPrefix("swagger") {
-        path(Segments) { segs =>
-          val path = segs.mkString("/")
-          getFromResource(s"swagger/$path")
-        }
-      }
+          controllerRoutes ~ buildInfoRoute
+        } ~ swaggerUiRoutes
     }
     new HttpServer[F] {
       override def start(): F[Http.ServerBinding] = AsyncUtil.futureAsync {
