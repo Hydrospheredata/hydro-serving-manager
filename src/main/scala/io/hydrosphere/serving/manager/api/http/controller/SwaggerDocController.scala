@@ -14,7 +14,7 @@ class SwaggerDocController(
   implicit val materializer: ActorMaterializer
 ) extends SwaggerHttpService  {
   override val apiDocsPath = "docs"
-//  override def basePath: String = "/api/v2"  // TODO need to shorten controller URLs, so swagger-ui can shorten links
+  override def basePath: String = "/api/v2"
   override val info = Info(
     version = version,
     title = "Hydroserving Manager service",

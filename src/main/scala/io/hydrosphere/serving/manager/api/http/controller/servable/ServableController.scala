@@ -15,7 +15,7 @@ import javax.ws.rs.Path
 
 import scala.concurrent.duration._
 
-@Path("/api/v2/servable")
+@Path("/servable")
 @Api(produces = "application/json", tags = Array("Servable"))
 class ServableController[F[_]: Effect](
   servableService: ServableService[F],
