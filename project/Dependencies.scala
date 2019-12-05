@@ -6,19 +6,14 @@ object Dependencies {
   val log4j2Version = "2.8.2"
   val postgresqlVersion = "42.1.4"
   val scalaTestVersion = "3.0.3"
-  val awsSdkVersion = "1.11.312"
   val servingGrpcScala = "2.2.0"
   val catsV = "1.2.0"
   val envoyDataPlaneApi = "v1.6.0_1"
 
-  lazy val awsDependencies = Seq(
-    "com.amazonaws" % "aws-java-sdk-ecs" % awsSdkVersion,
-    "com.amazonaws" % "aws-java-sdk-ec2" % awsSdkVersion,
-    "com.amazonaws" % "aws-java-sdk-iam" % awsSdkVersion,
-    "com.amazonaws" % "aws-java-sdk-ecr" % awsSdkVersion,
-    "com.amazonaws" % "aws-java-sdk-sqs" % awsSdkVersion,
-    "com.amazonaws" % "aws-java-sdk-s3" % awsSdkVersion,
-    "com.amazonaws" % "aws-java-sdk-route53" % awsSdkVersion
+  val circe = Seq(
+    "io.circe" %% "circe-core" % "0.12.1",
+    "io.circe" %% "circe-generic" % "0.12.1",
+    "io.circe" %% "circe-parser" % "0.12.1"
   )
 
   lazy val kubernetesDependencies = Seq(
@@ -34,7 +29,7 @@ object Dependencies {
   lazy val akkaHttpDependencies = Seq(
     "com.typesafe.akka" %% "akka-http-core" % akkaHttpVersion,
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
+    "de.heikoseeberger" %% "akka-http-circe" % "1.29.1",
     "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.0.0" exclude("javax.ws.rs", "jsr311-api"),
     "ch.megard" %% "akka-http-cors" % "0.2.1"
   )
@@ -68,11 +63,11 @@ object Dependencies {
     "org.tensorflow" % "proto" % "1.10.0"
   )
 
-  lazy val all = logDependencies ++
+  lazy val all = circe ++
+    logDependencies ++
     akkaDependencies ++
     testDependencies ++
     akkaHttpDependencies ++
-    awsDependencies ++
     grpcDependencies ++
     kubernetesDependencies ++
     mlDependencies ++

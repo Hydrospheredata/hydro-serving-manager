@@ -9,22 +9,25 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.FileIO
 import cats.effect.Effect
 import cats.syntax.flatMap._
+import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport
+import io.circe.Decoder
 import io.hydrosphere.serving.manager.domain.DomainError
-import io.hydrosphere.serving.manager.domain.DomainError.{InternalError, InvalidRequest, NotFound}
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import org.apache.logging.log4j.scala.Logging
-import spray.json._
+import io.circe._
+import io.circe.parser._
+import io.circe.generic.auto._
+import io.circe.syntax._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Logging {
+trait AkkaHttpControllerDsl extends ErrorAccumulatingCirceSupport with Directives with Logging {
 
   import AkkaHttpControllerDsl._
 
-  final def getFileWithMeta[F[_] : Effect, T: JsonReader, R: ToResponseMarshaller](callback: (Option[Path], Option[T]) => F[R])
+  final def getFileWithMeta[F[_] : Effect, T: Decoder, R: ToResponseMarshaller](callback: (Option[Path], Option[T]) => F[R])
     (implicit mat: Materializer, ec: ExecutionContext): Route = {
     entity(as[Multipart.FormData]) { formdata =>
       val parts = formdata.parts.mapAsync(2) { part =>
@@ -39,7 +42,9 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Lo
 
           case "metadata" if part.filename.isEmpty =>
             part.toStrict(5.minutes).map { k =>
-              UploadMeta(k.entity.data.utf8String.parseJson)
+              val str = k.entity.data.utf8String
+              val meta = parse(str).getOrElse(throw DomainError.invalidRequest(s"Invalid metadata json: ${str}"))
+              UploadMeta(meta)
             }
 
           case x =>
@@ -56,8 +61,15 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Lo
 
       completeF {
         entitiesF.flatMap { entities =>
-          val file = entities.find(_.isInstanceOf[UploadFile]).map(_.asInstanceOf[UploadFile].path)
-          val metadata = entities.find(_.isInstanceOf[UploadMeta]).map(_.asInstanceOf[UploadMeta].meta.convertTo[T])
+          val file = entities.collectFirst {
+            case UploadFile(path) => path
+          }
+          val metadata = entities.collectFirst {
+            case UploadMeta(meta) => meta.as[T] match {
+              case Left(value) => throw DomainError.invalidRequest(s"Invalid metadata json: ${value}")
+              case Right(value) => value
+            }
+          }
           callback(file, metadata)
         }
       }
@@ -81,37 +93,14 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Lo
       complete(
         HttpResponse(
           status = StatusCodes.NotFound,
-          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].toJson.toString)
+          entity = HttpEntity(ContentTypes.`application/json`, x.asJson.spaces2)
         )
       )
     case x: DomainError.InvalidRequest =>
       complete(
         HttpResponse(
           status = StatusCodes.BadRequest,
-          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].toJson.toString)
-        )
-      )
-    case DeserializationException(msg, _, fields) =>
-      logger.error(msg)
-      complete(
-        HttpResponse(
-          StatusCodes.BadRequest,
-          entity = Map(
-            "error" -> "RequestDeserializationError",
-            "message" -> msg,
-            "fields" -> fields
-          ).asInstanceOf[Map[String, Any]].toJson.toString()
-        )
-      )
-    case p: SerializationException =>
-      logger.error(p.getMessage, p)
-      complete(
-        HttpResponse(
-          StatusCodes.InternalServerError,
-          entity = Map(
-            "error" -> "ResponseSerializationException",
-            "message" -> Option(p.getMessage).getOrElse(s"Unknown error: $p")
-          ).toJson.toString()
+          entity = HttpEntity(ContentTypes.`application/json`, x.asJson.spaces2)
         )
       )
     case p: Throwable =>
@@ -123,7 +112,7 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Lo
           entity = Map(
             "error" -> "InternalException",
             "message" -> Option(p.toString).getOrElse(s"Unknown error: $p")
-          ).toJson.toString()
+          ).asJson.spaces2
         )
       )
   }
@@ -135,7 +124,7 @@ object AkkaHttpControllerDsl {
 
   case class UploadFile(path: Path) extends UploadE
 
-  case class UploadMeta(meta: JsValue) extends UploadE
+  case class UploadMeta(meta: Json) extends UploadE
 
   case class UploadUnknown(key: String, filename: Option[String]) extends UploadE
 
