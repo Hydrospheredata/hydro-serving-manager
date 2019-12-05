@@ -11,7 +11,7 @@ import javax.ws.rs.Path
 import scala.concurrent.duration._
 
 
-@Path("/api/v2/hostSelector")
+@Path("/hostSelector")
 @Api(produces = "application/json", tags = Array("Host Selectors"))
 class HostSelectorController[F[_]: Effect](
   hostSelectorService: HostSelectorService[F],

@@ -14,7 +14,7 @@ import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOper
 import javax.ws.rs.Path
 import org.apache.logging.log4j.scala.Logging
 
-@Path("/api/v2/metricspec")
+@Path("/metricspec")
 @Api(produces = "application/json", tags = Array("Metric Specifications"))
 class MonitoringController[F[_]](
   monitoringService: Monitoring[F],

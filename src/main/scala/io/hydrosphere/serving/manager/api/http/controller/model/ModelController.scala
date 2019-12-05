@@ -23,7 +23,7 @@ import scala.concurrent.duration._
 import scala.util.Try
 
 
-@Path("/api/v2/model")
+@Path("/model")
 @Api(produces = "application/json", tags = Array("Model and Model Versions"))
 class ModelController[F[_]](
   modelManagementService: ModelService[F],

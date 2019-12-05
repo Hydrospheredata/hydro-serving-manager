@@ -9,7 +9,7 @@ import io.hydrosphere.serving.manager.domain.application.requests.{CreateApplica
 import io.swagger.annotations._
 import javax.ws.rs.Path
 
-@Path("/api/v2/application")
+@Path("/application")
 @Api(produces = "application/json", tags = Array("Application"))
 class ApplicationController[F[_]: Effect](
   appService: ApplicationService[F],

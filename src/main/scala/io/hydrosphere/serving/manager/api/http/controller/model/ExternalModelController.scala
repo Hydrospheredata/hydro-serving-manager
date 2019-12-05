@@ -11,7 +11,7 @@ import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelV
 import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOperation, ApiResponse, ApiResponses}
 import javax.ws.rs.Path
 
-@Path("/api/v2/externalmodel")
+@Path("/externalmodel")
 @Api(produces = "application/json", tags = Array("External Model registration"))
 class ExternalModelController[F[_]](
   modelManagementService: ModelService[F],
