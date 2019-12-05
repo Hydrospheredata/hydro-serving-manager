@@ -12,7 +12,7 @@ import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.{AppDBSchemaErrors, ApplicationRow, IncompatibleExecutionGraphError, UsingModelVersionIsMissing}
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
+import io.hydrosphere.serving.manager.infrastructure.codec.CompleteJsonProtocol
 import org.apache.logging.log4j.scala.Logging
 import spray.json._
 

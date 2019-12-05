@@ -8,7 +8,7 @@ import io.hydrosphere.serving.manager.api.http.controller.MonitoringRequests._
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, Monitoring, MonitoringRepository, ThresholdCmpOperator}
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+import io.hydrosphere.serving.manager.infrastructure.codec.CompleteJsonProtocol._
 import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOperation, ApiResponse, ApiResponses}
 import javax.ws.rs.Path
@@ -20,11 +20,6 @@ class MonitoringController[F[_]](
   monitoringService: Monitoring[F],
   monRepo: MonitoringRepository[F]
 )(implicit F: Effect[F], uuid: UUIDGenerator[F]) extends AkkaHttpControllerDsl with Logging {
-  implicit val configReq = jsonFormat3(MetricSpecConfigCreationRequest)
-  implicit val specReq = jsonFormat3(MetricSpecCreationRequest)
-  implicit val configView = jsonFormat4(MetricSpecConfigView)
-  implicit val specView = jsonFormat4(MetricSpecView)
-
   @Path("/")
   @ApiOperation(value = "createMetricSpec", notes = "createMetricSpec", nickname = "createMetricSpec", httpMethod = "POST")
   @ApiImplicitParams(Array(

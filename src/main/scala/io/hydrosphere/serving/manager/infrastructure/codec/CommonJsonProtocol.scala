@@ -1,45 +1,17 @@
-package io.hydrosphere.serving.manager.infrastructure.protocol
+package io.hydrosphere.serving.manager.infrastructure.codec
 
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.NonEmptyList
 import io.hydrosphere.serving.manager.util.DeferredResult
-import org.apache.logging.log4j.scala.Logging
 import scalapb._
-import spray.json._
 
 import scala.language.reflectiveCalls
 import scala.util.Try
 
-trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with Logging {
-
-  implicit object AnyJsonFormat extends JsonFormat[Any] {
-    def write(any: Any): JsValue = any match {
-      case n: Int => JsNumber(n)
-      case n: Long => JsNumber(n)
-      case n: Float => JsNumber(n)
-      case n: Double => JsNumber(n)
-      case n: BigDecimal => JsNumber(n)
-      case s: String => JsString(s)
-      case b: Boolean => JsBoolean(b)
-      case list: List[_] => seqFormat[Any].write(list)
-      case array: Array[_] => seqFormat[Any].write(array.toList)
-      case map: Map[String, _]@unchecked => mapFormat[String, Any] write map
-      case e => throw DeserializationException(e.toString)
-    }
-
-    def read(value: JsValue): Any = value match {
-      case JsNumber(n) => n.toDouble
-      case JsString(s) => s
-      case JsBoolean(b) => b
-      case _: JsArray => listFormat[Any].read(value)
-      case _: JsObject => mapFormat[String, Any].read(value)
-      case e => throw DeserializationException(e.toString)
-    }
-  }
+trait CommonJsonProtocol {
 
   implicit val uuidFormat = new RootJsonFormat[UUID] {
     override def write(obj: UUID): JsValue = JsString(obj.toString)
@@ -50,12 +22,6 @@ trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with 
         case x => throw DeserializationException(s"Invalid JsValue for UUID. Expected string, got $x")
       }
     }
-  }
-
-  implicit val throwableWriter = new RootJsonFormat[Throwable] {
-    override def write(obj: Throwable): JsValue = JsString(obj.getMessage)
-
-    override def read(json: JsValue): Throwable = throw DeserializationException("Can't deserealize exceptions")
   }
 
   implicit def nonEmptyListFormat[T: JsonFormat] = new RootJsonFormat[NonEmptyList[T]] {

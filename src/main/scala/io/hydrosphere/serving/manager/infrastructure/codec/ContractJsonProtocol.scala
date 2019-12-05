@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.infrastructure.protocol
+package io.hydrosphere.serving.manager.infrastructure.codec
 
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
@@ -11,12 +11,6 @@ import spray.json._
 import scala.collection.mutable
 
 trait ContractJsonProtocol extends CommonJsonProtocol {
-  implicit val dataProfileTypeFormat = protoEnumFormat(DataProfileType)
-
-  implicit val dataTypeFormat = protoEnumFormat(DataType)
-
-  implicit val tensorShapeDimFormat = jsonFormat2(TensorShapeProto.Dim.apply)
-  implicit val tensorShapeFormat = jsonFormat2(TensorShapeProto.apply)
 
   implicit val modelFieldFormat = new RootJsonFormat[ModelField] {
 
@@ -90,9 +84,6 @@ trait ContractJsonProtocol extends CommonJsonProtocol {
       JsObject(fields.toMap)
     }
   }
-
-  implicit val modelSignatureFormat = jsonFormat3(ModelSignature.apply)
-  implicit val modelContractFormat = jsonFormat2(ModelContract.apply)
 }
 
 object ContractJsonProtocol extends ContractJsonProtocol

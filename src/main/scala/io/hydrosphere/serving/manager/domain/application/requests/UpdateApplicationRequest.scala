@@ -10,10 +10,3 @@ case class UpdateApplicationRequest(
   kafkaStreaming: Option[List[ApplicationKafkaStream]],
   metadata: Option[Map[String, String]]
 )
-
-object UpdateApplicationRequest {
-
-  import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
-
-  implicit val format = jsonFormat6(UpdateApplicationRequest.apply)
-}

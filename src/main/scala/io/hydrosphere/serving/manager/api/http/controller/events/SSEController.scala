@@ -16,7 +16,7 @@ import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.ServableEvents
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
+import io.hydrosphere.serving.manager.infrastructure.codec.CompleteJsonProtocol
 import spray.json._
 import streamz.converter._
 

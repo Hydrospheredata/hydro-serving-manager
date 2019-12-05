@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark
 
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
+import io.hydrosphere.serving.manager.infrastructure.codec.CompleteJsonProtocol
 
 case class SparkModelMetadata(
   `class`: String,

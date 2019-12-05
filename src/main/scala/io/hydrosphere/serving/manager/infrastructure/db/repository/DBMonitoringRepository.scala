@@ -5,7 +5,7 @@ import cats.implicits._
 import cats.effect.Bracket
 import doobie.implicits._
 import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+import io.hydrosphere.serving.manager.infrastructure.codec.CompleteJsonProtocol._
 import spray.json._
 import io.hydrosphere.serving.manager.domain.monitoring._
 

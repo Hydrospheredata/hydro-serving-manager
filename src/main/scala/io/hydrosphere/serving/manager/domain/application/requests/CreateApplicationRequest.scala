@@ -9,8 +9,3 @@ case class CreateApplicationRequest(
   kafkaStreaming: Option[List[ApplicationKafkaStream]],
   metadata: Option[Map[String, String]]
 )
-
-object CreateApplicationRequest {
-  import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
-  implicit val format = jsonFormat5(CreateApplicationRequest.apply)
-}

@@ -13,7 +13,7 @@ import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+import io.hydrosphere.serving.manager.infrastructure.codec.CompleteJsonProtocol._
 import spray.json._
 import java.time.Instant
 

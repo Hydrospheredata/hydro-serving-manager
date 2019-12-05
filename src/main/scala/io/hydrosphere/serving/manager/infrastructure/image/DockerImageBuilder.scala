@@ -8,7 +8,7 @@ import com.spotify.docker.client.DockerClient.BuildParam
 import com.spotify.docker.client.{DockerClient, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerClientConfig
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder}
-import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
+import io.hydrosphere.serving.manager.infrastructure.codec.CommonJsonProtocol._
 import io.hydrosphere.serving.manager.infrastructure.storage.ModelUnpacker
 import io.hydrosphere.serving.manager.util.ReflectionUtils
 import org.apache.logging.log4j.scala.Logging

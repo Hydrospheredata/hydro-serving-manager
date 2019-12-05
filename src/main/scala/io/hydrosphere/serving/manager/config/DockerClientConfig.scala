@@ -20,7 +20,7 @@ case class DockerClientConfig(
 
 object DockerClientConfig {
 
-  import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
+  import io.hydrosphere.serving.manager.infrastructure.codec.CommonJsonProtocol._
   import spray.json._
 
   implicit val proxyFormat = jsonFormat4(DockerClientProxy.apply)
