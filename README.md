@@ -1,0 +1,4 @@
+# hydro-serving-manager
+|   |   |   |   |
+|---|---|---|---|
+|[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Hydrospheredata_hydro-serving-manager&metric=alert_status)](https://sonarcloud.io/dashboard?id=Hydrospheredata_hydro-serving-manager)|[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=Hydrospheredata_hydro-serving-manager&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=Hydrospheredata_hydro-serving-manager)|[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=Hydrospheredata_hydro-serving-manager&metric=bugs)](https://sonarcloud.io/dashboard?id=Hydrospheredata_hydro-serving-manager)|[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=Hydrospheredata_hydro-serving-manager&metric=code_smells)](https://sonarcloud.io/dashboard?id=Hydrospheredata_hydro-serving-manager)|
