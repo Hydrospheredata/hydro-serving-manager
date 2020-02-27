@@ -8,7 +8,7 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver._
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator}
@@ -77,6 +77,10 @@ object ServableService extends Logging {
 
     override def deploy(modelVersion:  ModelVersion.Internal, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
+        _ <- modelVersion.status match {
+          case ModelVersionStatus.Released => F.unit
+          case x => F.raiseError[Unit](DomainError.invalidRequest(s"Can't create a Servable for a model version with status ${x}. Released status expected."))
+        }
         randomSuffix <- generateUniqueSuffix(modelVersion)
         d <- Deferred[F, GenericServable]
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata)
