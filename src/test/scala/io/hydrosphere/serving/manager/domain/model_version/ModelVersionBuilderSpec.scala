@@ -5,6 +5,7 @@ import java.nio.file.{Path, Paths}
 
 import cats.effect.{Concurrent, IO}
 import com.spotify.docker.client.ProgressHandler
+import com.spotify.docker.client.messages.ProgressMessage
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
@@ -20,9 +21,67 @@ import scala.concurrent.{Await, ExecutionContext, Promise}
 
 class ModelVersionBuilderSpec extends GenericUnitTest {
   describe("ModelVersionBuilder") {
+    it("should convert model name to lowercase [issue #27]") {
+      val builder = ModelVersionBuilder[IO]()(
+        Concurrent[IO],
+        imageBuilder = null,
+        modelVersionRepository = new ModelVersionRepository[IO] {
+          override def create(entity: ModelVersion): IO[ModelVersion] = IO(entity)
+          override def update(entity: ModelVersion): IO[Int] = IO(1)
+          override def get(id: Long): IO[Option[ModelVersion]] = ???
+          override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
+          override def delete(id: Long): IO[Int] = ???
+          override def all(): IO[List[ModelVersion]] = ???
+          override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
+          override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]] = ???
+        },
+        imageRepository = new ImageRepository[IO] {
+          override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): IO[Unit] = IO.unit
+          override def getImage(name: String, tag: String): DockerImage = DockerImage(name, tag)
+        },
+        modelVersionService = new ModelVersionService[IO] {
+          override def all(): IO[List[ModelVersion]] = ???
+          override def get(id: Long): IO[ModelVersion] = ???
+          override def get(name: String, version: Long): IO[ModelVersion] = ???
+          override def getNextModelVersion(modelId: Long): IO[Long] = IO(1)
+          override def list: IO[List[ModelVersionView]] = ???
+          override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
+          override def delete(versionId: Long): IO[Option[ModelVersion]] = ???
+        },
+        storageOps = new StorageOps[IO] {
+          override def getReadableFile(path: Path): IO[Option[File]] = ???
+          override def getAllFiles(folder: Path): IO[Option[List[String]]] = ???
+          override def getSubDirs(path: Path): IO[Option[List[String]]] = ???
+          override def exists(path: Path): IO[Boolean] = ???
+          override def copyFile(src: Path, target: Path): IO[Path] = ???
+          override def moveFolder(src: Path, target: Path): IO[Path] = ???
+          override def removeFolder(path: Path): IO[Option[Unit]] = ???
+          override def getTempDir(prefix: String): IO[Path] = ???
+          override def readText(path: Path): IO[Option[List[String]]] = ???
+          override def readBytes(path: Path): IO[Option[Array[Byte]]] = ???
+          override def writeBytes(path: Path, bytes: Array[Byte]): IO[Path] = IO(path)
+        },
+        modelDiscoveryHub = (t: DiscoveryEvent[ModelVersion, Long]) => IO.unit,
+        buildLoggingService = new BuildLoggingService[IO] {
+          override def makeLogger(modelVersion: ModelVersion.Internal): IO[ProgressHandler] = IO(new ProgressHandler {
+            override def progress(message: ProgressMessage): Unit = ()
+          })
+          override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
+          override def getLogs(modelVersionId: Long, sinceLine: Int): IO[Option[fs2.Stream[IO, String]]] = ???
+        }
+      )
+      val model = Model(1, "Test-Model")
+      val metadata = ModelVersionMetadata(model.name, ModelContract.defaultInstance, DockerImage("runtime", "111"), None, None, Map.empty)
+      val modelFile = ModelFileStructure(Paths.get("root"), Paths.get("model"), Paths.get("files"), Paths.get("contract"), Paths.get("Dockerfile"))
+      val result = builder.build(model, metadata, modelFile).unsafeRunSync()
+      print(result.started.image)
+      assert(result.started.image.name === "test-model")
+      assert(result.started.image.tag === "1")
+      assert(result.completed.get.unsafeRunSync().image.name === "test-model")
+    }
+
     it("should push the built image") {
       ioAssert {
-        implicit val cs = IO.contextShift(implicitly[ExecutionContext])
         val model = Model(1, "push-me")
 
         val versionRepo = new ModelVersionRepository[IO] {

@@ -42,7 +42,7 @@ object ModelVersionBuilder {
     def initialVersion(model: Model, metadata: ModelVersionMetadata) = {
       for {
         version <- modelVersionService.getNextModelVersion(model.id)
-        image = imageRepository.getImage(metadata.modelName, version.toString)
+        image = imageRepository.getImage(metadata.modelName.toLowerCase, version.toString)
         mv = ModelVersion.Internal(
           id = 0,
           image = image,
@@ -75,11 +75,11 @@ object ModelVersionBuilder {
 
       innerCompleted.handleErrorWith { err =>
         for {
-          _ <- Concurrent[F].delay(logger.error(err, err))
+          _ <- Concurrent[F].delay(logger.error("Model version build failed", err))
           failed = mv.copy(status = ModelVersionStatus.Failed, finished = Instant.now().some)
-          _ <- buildLoggingService.finishLogging(mv.id)
-          _ <- modelDiscoveryHub.update(failed)
-          _ <- modelVersionRepository.update(failed)
+          _ <- buildLoggingService.finishLogging(mv.id).attempt
+          _ <- modelDiscoveryHub.update(failed).attempt
+          _ <- modelVersionRepository.update(failed).attempt
         } yield failed
       }
     }
