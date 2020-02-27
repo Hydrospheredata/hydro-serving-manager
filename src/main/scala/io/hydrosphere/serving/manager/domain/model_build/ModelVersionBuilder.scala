@@ -42,7 +42,7 @@ object ModelVersionBuilder {
     def initialVersion(model: Model, metadata: ModelVersionMetadata) = {
       for {
         version <- modelVersionService.getNextModelVersion(model.id)
-        image = imageRepository.getImage(metadata.modelName.toLowerCase, version.toString)
+        image = imageRepository.getImage(metadata.modelName, version.toString)
         mv = ModelVersion.Internal(
           id = 0,
           image = image,
