@@ -57,7 +57,7 @@ class ServableSpec extends GenericUnitTest {
     runtime = DockerImage("runtime", "tag"),
     model = Model(1, "name"),
     hostSelector = None,
-    status = ModelVersionStatus.Assembling,
+    status = ModelVersionStatus.Released,
     installCommand = None,
     metadata = Map.empty
   )
