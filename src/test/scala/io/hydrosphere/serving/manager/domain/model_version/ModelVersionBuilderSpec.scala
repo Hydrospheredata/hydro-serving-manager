@@ -5,6 +5,7 @@ import java.nio.file.{Path, Paths}
 
 import cats.effect.{Concurrent, IO}
 import com.spotify.docker.client.ProgressHandler
+import com.spotify.docker.client.messages.ProgressMessage
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
@@ -22,7 +23,6 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
   describe("ModelVersionBuilder") {
     it("should push the built image") {
       ioAssert {
-        implicit val cs = IO.contextShift(implicitly[ExecutionContext])
         val model = Model(1, "push-me")
 
         val versionRepo = new ModelVersionRepository[IO] {

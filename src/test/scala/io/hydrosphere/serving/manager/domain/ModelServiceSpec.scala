@@ -38,6 +38,11 @@ class ModelServiceSpec extends GenericUnitTest {
   implicit val clock = Clock.create[IO]
 
   describe("Model service") {
+    describe("name validation") {
+      it("should reject uppercase letters") {
+        assert(ModelValidator.name("ClassifierModel").isEmpty)
+      }
+    }
     describe("uploads") {
       it("a new model") {
         val model = Model(
