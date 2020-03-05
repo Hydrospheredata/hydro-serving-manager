@@ -57,7 +57,7 @@ class ServableSpec extends GenericUnitTest {
     runtime = DockerImage("runtime", "tag"),
     model = Model(1, "name"),
     hostSelector = None,
-    status = ModelVersionStatus.Assembling,
+    status = ModelVersionStatus.Released,
     installCommand = None,
     metadata = Map.empty
   )
@@ -708,7 +708,7 @@ class ServableSpec extends GenericUnitTest {
         runtime = DockerImage("runtime", "tag"),
         model = Model(1, "model"),
         hostSelector = None,
-        status = ModelVersionStatus.Assembling,
+        status = ModelVersionStatus.Released,
         installCommand = None,
         metadata = Map.empty
       )
@@ -762,6 +762,71 @@ class ServableSpec extends GenericUnitTest {
       val result = service.findAndDeploy(1, metadata).unsafeRunSync()
       assert(result.started.metadata == metadata)
       assert(result.completed.get.unsafeRunSync().metadata == metadata)
+    }
+
+    it("should not deploy ModelVersion which is not Released") {
+      val mv = ModelVersion.Internal(
+        id = 1,
+        image = DockerImage("name", "tag"),
+        created = Instant.now(),
+        finished = None,
+        modelVersion = 1,
+        modelContract = ModelContract.defaultInstance,
+        runtime = DockerImage("runtime", "tag"),
+        model = Model(1, "model"),
+        hostSelector = None,
+        status = ModelVersionStatus.Assembling,
+        installCommand = None,
+        metadata = Map.empty
+      )
+
+      val servableMonitor = new ServableMonitor[IO] {
+        override def monitor(servable: GenericServable): IO[Deferred[IO, GenericServable]] = {
+          for {
+            d <- Deferred[IO, GenericServable]
+            _ <- d.complete(servable)
+          } yield d
+        }
+      }
+
+      val servablePublisher = new ServableEvents.Publisher[IO] {
+        override def publish(t: DiscoveryEvent[GenericServable, String]): IO[Unit] = IO.unit
+      }
+
+      val cd = new CloudDriver[IO] {
+        override def instances: IO[List[CloudInstance]] = ???
+        override def instance(name: String): IO[Option[CloudInstance]] = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector]): IO[CloudInstance] = {
+          IO(CloudInstance(modelVersionId, name, CloudInstance.Status.Running("localhost", 9090)))
+        }
+        override def remove(name: String): IO[Unit] = ???
+        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
+        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+      }
+
+      val versionRepo = new ModelVersionRepository[IO] {
+        override def create(entity: ModelVersion): IO[ModelVersion] = ???
+        override def update(entity: ModelVersion): IO[Int] = ???
+        override def get(id: Long): IO[Option[ModelVersion]] = IO(mv.some)
+        override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
+        override def delete(id: Long): IO[Int] = ???
+        override def all(): IO[List[ModelVersion]] = ???
+        override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
+        override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]] = ???
+      }
+
+      val servableRepo = new ServableRepository[IO] {
+        def all(): IO[List[Servable.GenericServable]] = IO(Nil)
+        def upsert(servable: Servable.GenericServable): IO[Servable.GenericServable] = IO(servable)
+        def delete(name: String): IO[Int] = ???
+        def get(name: String): IO[Option[Servable.GenericServable]] = IO(None)
+        def get(names: Seq[String]): IO[List[Servable.GenericServable]] = ???
+        override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
+      }
+
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cd, servableRepo, null, versionRepo, servableMonitor, servablePublisher, null)
+      val result = service.findAndDeploy(1, Map.empty).attempt.unsafeRunSync()
+      assert(result.isLeft)
     }
   }
 }
