@@ -25,7 +25,7 @@ class ServableController[F[_]: Effect](
   @Path("/")
   @ApiOperation(value = "servables", notes = "servables", nickname = "servables", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable], responseContainer = "List"),
+    new ApiResponse(code = 200, message = "Servable", response = classOf[ServableView], responseContainer = "List"),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def listServables = path("servable") {
@@ -44,7 +44,7 @@ class ServableController[F[_]: Effect](
     new ApiImplicitParam(name = "name", required = true, dataType = "string", paramType = "path", value = "name")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable]),
+    new ApiResponse(code = 200, message = "Servable", response = classOf[ServableView]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def getServable = path("servable" / Segment) { name =>
@@ -86,7 +86,7 @@ class ServableController[F[_]: Effect](
     new ApiImplicitParam(name = "DeployModelRequest", required = true, dataTypeClass = classOf[DeployModelRequest], paramType = "body")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable]),
+    new ApiResponse(code = 200, message = "Servable", response = classOf[ServableView]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def deployModel = path("servable") {
@@ -106,7 +106,7 @@ class ServableController[F[_]: Effect](
     new ApiImplicitParam(name = "name", required = true, dataType = "string", paramType = "path", value = "name")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Servable", response = classOf[GenericServable]),
+    new ApiResponse(code = 200, message = "Servable", response = classOf[ServableView]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def stopServable = path("servable" / Segment) { name =>
