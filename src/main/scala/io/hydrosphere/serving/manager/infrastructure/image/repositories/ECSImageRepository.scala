@@ -3,30 +3,33 @@ package io.hydrosphere.serving.manager.infrastructure.image.repositories
 import java.util.Collections
 
 import cats.effect.Sync
+import cats.implicits._
 import com.amazonaws.services.ecr.model._
 import com.amazonaws.services.ecr.{AmazonECR, AmazonECRClientBuilder}
-import com.spotify.docker.client.{DockerClient, ProgressHandler}
+import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.manager.config.DockerRepositoryConfiguration
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
-import io.hydrosphere.serving.manager.infrastructure.docker.{DockerClientHelper, DockerRegistryAuth}
+import io.hydrosphere.serving.manager.infrastructure.docker.{DockerRegistryAuth, DockerdClient}
 
 class ECSImageRepository[F[_]: Sync](
-  dockerClient: DockerClient,
-  ecsDockerRepositoryConfiguration: DockerRepositoryConfiguration.Ecs,
-  progressHandler: ProgressHandler)
-  extends ImageRepository[F] {
+  dockerClient: DockerdClient[F],
+  ecsDockerRepositoryConfiguration: DockerRepositoryConfiguration.Ecs
+) extends ImageRepository[F] {
 
   val ecrClient: AmazonECR = AmazonECRClientBuilder.standard()
     .withRegion(ecsDockerRepositoryConfiguration.region)
     .build()
 
-  override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit] = Sync[F].delay {
-    createRepositoryIfNeeded(dockerImage.name)
-    dockerClient.push(
-      dockerImage.fullName,
-      progressHandler,
-      DockerClientHelper.createRegistryAuth(getDockerRegistryAuth)
-    )
+  override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit] = {
+    for {
+      _ <- createRepositoryIfNeeded(dockerImage.name)
+      auth <- getDockerRegistryAuth
+      res <- dockerClient.push(
+        dockerImage.fullName,
+        progressHandler,
+        auth.inderlying
+      )
+    } yield res
   }
 
   override def getImage(modelName: String, modelVersion: String): DockerImage = {
@@ -36,7 +39,7 @@ class ECSImageRepository[F[_]: Sync](
     )
   }
 
-  private def getDockerRegistryAuth: DockerRegistryAuth = {
+  private def getDockerRegistryAuth: F[DockerRegistryAuth] = Sync[F].delay {
     val getAuthorizationTokenRequest = new GetAuthorizationTokenRequest
     getAuthorizationTokenRequest.setRegistryIds(Collections.singletonList(ecsDockerRepositoryConfiguration.accountId))
     val result = ecrClient.getAuthorizationToken(getAuthorizationTokenRequest)
@@ -53,7 +56,7 @@ class ECSImageRepository[F[_]: Sync](
     )
   }
 
-  private def createRepositoryIfNeeded(modelName: String): Unit = {
+  private def createRepositoryIfNeeded(modelName: String): F[Unit] = Sync[F].delay {
     val req = new DescribeRepositoriesRequest
     req.setRepositoryNames(Collections.singletonList(modelName))
     req.setRegistryId(ecsDockerRepositoryConfiguration.accountId)

@@ -12,8 +12,8 @@ import io.hydrosphere.serving.manager.domain.model_build.{BuildLogRepository, Bu
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionEvents, ModelVersionRepository, ModelVersionService}
 import io.hydrosphere.serving.manager.domain.monitoring.{MetricSpecEvents, Monitoring, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable._
+import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
-import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelUnpacker, StorageOps}
 import io.hydrosphere.serving.manager.util.UUIDGenerator
@@ -60,10 +60,10 @@ object Core {
     rng: RNG[F],
     uuid: UUIDGenerator[F],
     storageOps: StorageOps[F],
+    dockerClient: DockerdClient[F],
     cloudDriver: CloudDriver[F],
     predictionCtor: PredictionClient.Factory[F],
     imageRepository: ImageRepository[F],
-    imageBuilder: DockerImageBuilder[F],
     modelRepo: ModelRepository[F],
     modelVersionRepo: ModelVersionRepository[F],
     hostSelectorRepo: HostSelectorRepository[F],

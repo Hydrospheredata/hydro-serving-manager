@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
-import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
@@ -57,20 +56,27 @@ object CloudDriver {
     val ServiceId = "HS_INSTANCE_ID"
   }
 
-  def fromConfig[F[_]: Async](config: CloudDriverConfiguration, dockerRepoConf: DockerRepositoryConfiguration)(implicit ex: ExecutionContext, actorSystem: ActorSystem, materializer: Materializer): CloudDriver[F] = {
-     config match {
-       case dockerConf: CloudDriverConfiguration.Docker =>
-         val client = DockerdClient.create
-         new DockerDriver[F](client, dockerConf)
-       case kubeConf: CloudDriverConfiguration.Kubernetes =>
-         dockerRepoConf match {
-           case drc: DockerRepositoryConfiguration.Remote =>
-             val client = KubernetesClient[F](kubeConf, drc)
-             new KubernetesDriver[F](client)
-           case _ => throw new Exception(s"Docker Repository must be remote for using kubernetes cloud driver")
-         }
-       case x =>
-         throw new Exception(s"Not implemented for $x")
-     }
+  def fromConfig[F[_] : Async](
+    dockerdClient: DockerdClient[F],
+    config: CloudDriverConfiguration,
+    dockerRepoConf: DockerRepositoryConfiguration
+  )(implicit
+    ex: ExecutionContext,
+    actorSystem: ActorSystem,
+    materializer: Materializer)
+  : CloudDriver[F] = {
+    config match {
+      case dockerConf: CloudDriverConfiguration.Docker =>
+        new DockerDriver[F](dockerdClient, dockerConf)
+      case kubeConf: CloudDriverConfiguration.Kubernetes =>
+        dockerRepoConf match {
+          case drc: DockerRepositoryConfiguration.Remote =>
+            val client = KubernetesClient[F](kubeConf, drc)
+            new KubernetesDriver[F](client)
+          case _ => throw new Exception(s"Docker Repository must be remote for using kubernetes cloud driver")
+        }
+      case x =>
+        throw new Exception(s"Not implemented for $x")
+    }
   }
 }
