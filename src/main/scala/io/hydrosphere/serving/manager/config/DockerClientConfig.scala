@@ -34,7 +34,7 @@ object DockerClientConfig {
     fileContent.parseJson.convertTo[DockerClientConfig]
   }
 
-  def empty = {
+  def empty: DockerClientConfig = {
     DockerClientConfig(Map.empty)
   }
 }

@@ -11,6 +11,7 @@ import io.hydrosphere.serving.manager._
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.image.DockerImage
+import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.util.TarGzUtils
 import io.hydrosphere.serving.manager.util.random.RNG
@@ -39,7 +40,8 @@ trait FullIntegrationSpec extends DatabaseAccessIT
   private[this] val originalConfiguration = ManagerConfiguration.load[IO]
   def configuration = originalConfiguration.unsafeRunSync()
 
-  val allocatedApp = App.make[IO](configuration, dockerClient, DockerClientConfig.empty).allocated.unsafeRunSync()
+  val wrappedDockerClient = DockerdClient.create[IO](dockerClient).unsafeRunSync()
+  val allocatedApp = App.make[IO](configuration, wrappedDockerClient).allocated.unsafeRunSync()
   val app: App[IO] = allocatedApp._1
   val appFree: IO[Unit] = allocatedApp._2
   val grpcCtor: GrpcChannel.Factory[IO] = GrpcChannel.plaintextFactory[IO]

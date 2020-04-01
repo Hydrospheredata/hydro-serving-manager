@@ -3,41 +3,30 @@ package io.hydrosphere.serving.manager
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import cats.implicits._
-import cats.effect.implicits._
-import cats.effect.{ConcurrentEffect, ContextShift, Effect, IO, Resource, Sync, Timer}
-import com.spotify.docker.client.DockerClient
+import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
 import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.api.ManagerServiceGrpc
 import io.hydrosphere.serving.manager.api.grpc.{GrpcServer, GrpcServingDiscovery, ManagerGrpcService}
 import io.hydrosphere.serving.manager.api.http.HttpServer
-import io.hydrosphere.serving.manager.api.http.controller.{MonitoringController, SwaggerDocController}
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationController
 import io.hydrosphere.serving.manager.api.http.controller.events.SSEController
 import io.hydrosphere.serving.manager.api.http.controller.host_selector.HostSelectorController
 import io.hydrosphere.serving.manager.api.http.controller.model.{ExternalModelController, ModelController}
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
-import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
-import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
+import io.hydrosphere.serving.manager.api.http.controller.{MonitoringController, SwaggerDocController}
+import io.hydrosphere.serving.manager.config.ManagerConfiguration
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
-import io.hydrosphere.serving.manager.domain.model.ModelRepository
-import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersionRepository
-import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.Database
-import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBBuildLogRepository, DBHostSelectorRepository, DBModelRepository, DBModelVersionRepository, DBMonitoringRepository, DBServableRepository}
+import io.hydrosphere.serving.manager.infrastructure.db.repository._
+import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
-import io.hydrosphere.serving.manager.infrastructure.image.DockerImageBuilder
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.RNG
 
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
-import io.hydrosphere.serving.manager.util.DockerProgress
+import scala.concurrent.duration._
 
 
 case class App[F[_]](
@@ -51,8 +40,7 @@ case class App[F[_]](
 object App {
   def make[F[_] : ConcurrentEffect : ContextShift : Timer](
     config: ManagerConfiguration,
-    dockerClient: DockerClient,
-    dockerClientConfig: DockerClientConfig
+    dockerClient: DockerdClient[F],
   ): Resource[F, App[F]] = {
     implicit val system = ActorSystem("manager")
     implicit val materializer = ActorMaterializer()
@@ -62,17 +50,16 @@ object App {
     implicit val predictionCtor = PredictionClient.clientCtor[F](grpcCtor)
     implicit val storageOps = StorageOps.default[F]
     implicit val uuidGen = UUIDGenerator.default[F]()
-
+    implicit val dc = dockerClient
     for {
       rngF <- Resource.liftF(RNG.default[F])
-      cloudDriver = CloudDriver.fromConfig[F](config.cloudDriver, config.dockerRepository)
+      cloudDriver = CloudDriver.fromConfig[F](dockerClient, config.cloudDriver, config.dockerRepository)
       hk <- Database.makeHikariDataSource[F](config.database)
       connectEc <- ExecutionContexts.fixedThreadPool[F](32)
       transactEc <- ExecutionContexts.cachedThreadPool[F]
       tx <- Resource.liftF(Database.makeTransactor[F](hk, connectEc, transactEc))
       flyway <- Resource.liftF(Database.makeFlyway(tx))
       _ <- Resource.liftF(flyway.migrate())
-      dockerLogger = DockerProgress.makeLogger(println)
       core <- {
         implicit val rng = rngF
         implicit val cd = cloudDriver
@@ -84,8 +71,7 @@ object App {
         implicit val appRepo = DBApplicationRepository.make()
         implicit val buildLogRepo = DBBuildLogRepository.make()
         implicit val monitoringRepo = DBMonitoringRepository.make()
-        implicit val imageRepo = ImageRepository.fromConfig(dockerClient, dockerLogger, config.dockerRepository)
-        implicit val imageBuilder = new DockerImageBuilder(dockerClient, dockerClientConfig)
+        implicit val imageRepo = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
 
         Resource.liftF(Core.make[F]())
       }

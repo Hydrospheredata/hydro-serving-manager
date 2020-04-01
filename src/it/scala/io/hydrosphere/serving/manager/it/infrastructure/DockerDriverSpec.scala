@@ -21,7 +21,7 @@ class DockerDriverSpec extends IsolatedDockerAccessIT {
       .attachStderr(true)
       .build()
     it("should correctly map starting containers to CloudInstances") {
-      val client = DockerdClient.create[IO](dockerClient)
+      val client = DockerdClient.create[IO](dockerClient).unsafeRunSync()
       val config = CloudDriverConfiguration.Docker("local", None)
       val r = client.createContainer(containerConfig, None).unsafeRunSync()
       val driver = new DockerDriver[IO](client, config)
@@ -30,7 +30,7 @@ class DockerDriverSpec extends IsolatedDockerAccessIT {
       assert(list.head.status.isInstanceOf[CloudInstance.Status.Starting.type])
     }
     it("should correctly map running containers to CloudInstances") {
-      val client = DockerdClient.create[IO](dockerClient)
+      val client = DockerdClient.create[IO](dockerClient).unsafeRunSync()
       val config = CloudDriverConfiguration.Docker("local", None)
       val r = client.createContainer(containerConfig, None).unsafeRunSync()
       client.runContainer(r.id()).unsafeRunSync()
@@ -42,7 +42,7 @@ class DockerDriverSpec extends IsolatedDockerAccessIT {
     }
 
     it("should correctly map stopped containers to CloudInstances") {
-      val client = DockerdClient.create[IO](dockerClient)
+      val client = DockerdClient.create[IO](dockerClient).unsafeRunSync()
       val config = CloudDriverConfiguration.Docker("local", None)
       val r = client.createContainer(containerConfig, None).unsafeRunSync()
       client.runContainer(r.id()).unsafeRunSync()
