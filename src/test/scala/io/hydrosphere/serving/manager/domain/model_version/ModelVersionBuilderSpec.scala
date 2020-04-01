@@ -1,15 +1,17 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
 import java.io.File
+import java.lang
 import java.nio.file.{Path, Paths}
+import java.util.Date
 
 import cats.effect.{Concurrent, IO}
+import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DockerClient, LogStream, ProgressHandler}
-import com.spotify.docker.client.messages.{Container, ContainerConfig, ContainerCreation, ImageInfo, ProgressMessage, RegistryAuth}
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
-import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder, ImageRepository}
+import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, ModelVersionBuilder}
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
@@ -18,23 +20,25 @@ import io.hydrosphere.serving.manager.util.DockerProgress
 import org.mockito.Matchers
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Promise}
+import scala.concurrent.{Await, Promise}
+import scala.util.control.NoStackTrace
 
 class ModelVersionBuilderSpec extends GenericUnitTest {
   describe("ModelVersionBuilder") {
-    val dc = new DockerdClient[IO] {
-      override def createContainer(container: ContainerConfig, name: Option[String]): IO[ContainerCreation] = ???
-      override def runContainer(id: String): IO[Unit] = ???
-      override def removeContainer(id: String, params: List[DockerClient.RemoveContainerParam]): IO[Unit] = ???
-      override def listContainers(params: List[DockerClient.ListContainersParam]): IO[List[Container]] = ???
-      override def logs(id: String, follow: Boolean): IO[LogStream] = ???
-      override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[DockerClient.BuildParam]): IO[String] = ???
-      override def push(image: String, progressHandler: ProgressHandler, registryAuth: RegistryAuth): IO[Unit] = ???
-      override def inspectImage(image: String): IO[ImageInfo] = ???
-      override def getHost: IO[String] = ???
-    }
     it("should handle push error") {
       ioAssert {
+        val dc = new DockerdClient[IO] {
+          override def createContainer(container: ContainerConfig, name: Option[String]): IO[ContainerCreation] = ???
+          override def runContainer(id: String): IO[Unit] = ???
+          override def removeContainer(id: String, params: List[DockerClient.RemoveContainerParam]): IO[Unit] = ???
+          override def listContainers(params: List[DockerClient.ListContainersParam]): IO[List[Container]] = ???
+          override def logs(id: String, follow: Boolean): IO[LogStream] = ???
+          override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[DockerClient.BuildParam]): IO[String] = IO("sha:random-sha")
+          override def push(image: String, progressHandler: ProgressHandler, registryAuth: RegistryAuth): IO[Unit] = IO.raiseError(new RuntimeException with NoStackTrace)
+          override def inspectImage(image: String): IO[ImageInfo] = ???
+          override def getHost: IO[String] = ???
+        }
+
         val model = Model(1, "push-me")
 
         val versionRepo = new ModelVersionRepository[IO] {
@@ -55,11 +59,6 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           hostSelector = None,
           installCommand = None,
           metadata = Map.empty
-        )
-
-        val imageBuilder = mock[ImageBuilder[IO]]
-        when(imageBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
-          IO.pure("random-sha")
         )
 
         val imageRepo = new ImageRepository[IO] {
@@ -121,15 +120,9 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         )
         for {
           stateful <- builder.build(model, modelVersionMetadata, mfs)
-          startedBuild = stateful.started
           completedBuild <- stateful.completed.get
         } yield {
-          assert(startedBuild.model.name === "push-me")
-          assert(startedBuild.modelVersion === 1)
-          assert(startedBuild.image === DockerImage("push-me", "1"))
-          assert(startedBuild.model.name === completedBuild.model.name)
-          assert(startedBuild.modelVersion === completedBuild.modelVersion)
-          assert(DockerImage("push-me", "1", Some("random-sha")) === completedBuild.image)
+          assert(completedBuild.status === ModelVersionStatus.Failed)
         }
       }
     }
@@ -157,11 +150,32 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           metadata = Map.empty
         )
 
-        val imageBuilder = mock[ImageBuilder[IO]]
-        when(imageBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
-          IO.pure("random-sha")
-        )
-
+        val dc = new DockerdClient[IO] {
+          override def createContainer(container: ContainerConfig, name: Option[String]): IO[ContainerCreation] = ???
+          override def runContainer(id: String): IO[Unit] = ???
+          override def removeContainer(id: String, params: List[DockerClient.RemoveContainerParam]): IO[Unit] = ???
+          override def listContainers(params: List[DockerClient.ListContainersParam]): IO[List[Container]] = ???
+          override def logs(id: String, follow: Boolean): IO[LogStream] = ???
+          override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[DockerClient.BuildParam]): IO[String] = IO("random-sha")
+          override def push(image: String, progressHandler: ProgressHandler, registryAuth: RegistryAuth): IO[Unit] = IO.unit
+          override def inspectImage(image: String): IO[ImageInfo] = IO(new ImageInfo {
+            override def id(): String = image
+            override def parent(): String = ???
+            override def comment(): String = ???
+            override def created(): Date = ???
+            override def container(): String = ???
+            override def containerConfig(): ContainerConfig = ???
+            override def dockerVersion(): String = ???
+            override def author(): String = ???
+            override def config(): ContainerConfig = ???
+            override def architecture(): String = ???
+            override def os(): String = ???
+            override def size(): lang.Long = ???
+            override def virtualSize(): lang.Long = ???
+            override def rootFs(): RootFs = ???
+          })
+          override def getHost: IO[String] = ???
+        }
         val p = Promise[DockerImage]
         val imageRepo = new ImageRepository[IO] {
           override def getImage(name: String, tag: String): DockerImage = DockerImage(name, tag)

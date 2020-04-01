@@ -13,7 +13,7 @@ class RemoteImageRepository[F[_]: Sync](
   conf: DockerRepositoryConfiguration.Remote
 ) extends ImageRepository[F] {
 
-  override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit] = Sync[F].defer {
+  override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit] = {
     for {
       auth <- if (conf.username.isEmpty && conf.password.isEmpty) {
         Sync[F].delay(RegistryAuth.fromDockerConfig(conf.host).build())
