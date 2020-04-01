@@ -9,7 +9,7 @@ import cats.effect.implicits._
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.BuildParam
 import com.spotify.docker.client.ProgressHandler
-import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageBuilder, ImageRepository}
+import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
