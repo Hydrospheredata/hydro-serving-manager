@@ -11,6 +11,7 @@ import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient, LogStream, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerClientConfig
 import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
+import org.apache.logging.log4j.scala.Logging
 import spray.json._
 
 import scala.collection.JavaConverters._
@@ -40,7 +41,7 @@ trait DockerdClient[F[_]]{
   def getHost: F[String]
 }
 
-object DockerdClient {
+object DockerdClient extends Logging {
 
   case class DockerdClientException(error: String) extends Exception(error)
 
@@ -85,12 +86,14 @@ object DockerdClient {
       }
 
       override def push(image: String, progressHandler: ProgressHandler, registryAuth: RegistryAuth): F[Unit] = F.async { cb =>
+        logger.debug(s"[DockerdClient] push image $image, $registryAuth")
         val internalProgressHandler = DockerdClient.asyncProgressHandler(progressHandler, cb)
         underlying.push(image, internalProgressHandler, registryAuth)
         cb(().asRight)
       }
 
-      override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[BuildParam]): F[String] = F.async { cb =>
+      override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[BuildParam]): F[String] = F.asyncF { cb =>
+        logger.debug(s"[DockerdClient] build image $directory, $name, $dockerfile, $params")
         val internalProgressHandler = DockerdClient.asyncProgressHandler(handler, cb)
         proxyBuildParams.map { proxyParams =>
           val fullParams = proxyParams ++ params
@@ -129,10 +132,13 @@ object DockerdClient {
   }
 
   def asyncProgressHandler[T](childHandler: ProgressHandler, callback: Either[Throwable, T] => Unit): ProgressHandler = {
+    logger.debug("[DockerdClient] Created async progress handler")
     (message: ProgressMessage) => {
+      logger.debug(s"[DockerdClient] handling $message")
       childHandler.progress(message) // call user-provided handler
 
       Option(message.error()).foreach { error => // handle error in logstream
+        logger.debug(s"[DockerdClient] Caught error. Failing...")
         callback(DockerdClientException(error).asLeft)
       }
     }
