@@ -44,9 +44,12 @@ object ModelVersionMetadata {
       case Some(predictSignature) =>
         val inputsNotEmpty = predictSignature.inputs.nonEmpty
         val outputsNotEmpty = predictSignature.outputs.nonEmpty
-        val inputErrors = predictSignature.inputs.map(validateField)
-        val outputErrors = predictSignature.outputs.map(validateField)
-        if (inputsNotEmpty && outputsNotEmpty) {
+        val inputErrors = predictSignature.inputs.flatMap(validateField)
+        val outputErrors = predictSignature.outputs.flatMap(validateField)
+
+        val inputsOk = inputsNotEmpty && inputErrors.isEmpty
+        val outputsOk = outputsNotEmpty && outputErrors.isEmpty
+        if (inputsOk && outputsOk) {
           Right(())
         } else {
           Left(InvalidRequest(s"Error during prediction signature validation. " +
