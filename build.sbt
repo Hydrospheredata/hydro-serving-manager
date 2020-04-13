@@ -59,6 +59,6 @@ dockerfile in docker := {
     cmd("/hydro-serving/app/start.sh")
   }
 }
-resolvers += "krasserm at bintray" at "http://dl.bintray.com/krasserm/maven"
+resolvers += "krasserm at bintray" at "https://dl.bintray.com/krasserm/maven"
   
 libraryDependencies ++= Dependencies.all
