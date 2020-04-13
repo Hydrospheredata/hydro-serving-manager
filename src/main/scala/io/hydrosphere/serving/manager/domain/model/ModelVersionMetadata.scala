@@ -37,44 +37,4 @@ object ModelVersionMetadata {
     )
   }
 
-
-  def validateContract(contract: ModelContract): Either[InvalidRequest, Unit] = {
-    contract.predict match {
-      case None => Left(InvalidRequest("The model has no prediction signature"))
-      case Some(predictSignature) =>
-        val inputsNotEmpty = predictSignature.inputs.nonEmpty
-        val outputsNotEmpty = predictSignature.outputs.nonEmpty
-        val inputErrors = predictSignature.inputs.flatMap(validateField)
-        val outputErrors = predictSignature.outputs.flatMap(validateField)
-
-        val inputsOk = inputsNotEmpty && inputErrors.isEmpty
-        val outputsOk = outputsNotEmpty && outputErrors.isEmpty
-        if (inputsOk && outputsOk) {
-          Right(())
-        } else {
-          Left(InvalidRequest(s"Error during prediction signature validation. " +
-            s"(inputsNotEmpty=$inputsNotEmpty, " +
-            s"outputsNotEmpty=$outputsNotEmpty," +
-            s"inputErrors=$inputErrors, " +
-            s"outputErrors=$outputErrors)"))
-        }
-    }
-  }
-
-  def validateField(modelField: ModelField): List[String] = {
-    modelField.typeOrSubfields match {
-      case ModelField.TypeOrSubfields.Dtype(dtype) =>
-        if (dtype.isDtInvalid || dtype.isUnrecognized) {
-          List(s"${modelField.name}: Invalid Dtype $dtype")
-        } else {
-          List.empty
-        }
-      case ModelField.TypeOrSubfields.Subfields(subfields) =>
-        val results = subfields.data.map(validateField)
-        results.foldLeft(List.empty[String]) {
-          case (a, b) => a ++ b
-        }
-      case ModelField.TypeOrSubfields.Empty => List(s"${modelField.name}: Type cannot be empty.")
-    }
-  }
 }

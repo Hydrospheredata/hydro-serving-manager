@@ -7,15 +7,14 @@ import cats.effect.Clock
 import cats.implicits._
 import cats.{Monad, MonadError}
 import io.hydrosphere.serving.manager.api.http.controller.model.{ModelUploadMetadata, RegisterModelRequest}
-import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.{InvalidRequest, NotFound}
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository}
-import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService}
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
+import io.hydrosphere.serving.manager.domain.{Contract, DomainError}
 import io.hydrosphere.serving.manager.infrastructure.storage.ModelUnpacker
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -78,7 +77,7 @@ object ModelService {
         modelPath <- storageService.unpack(filePath)
         fetchResult <- fetcher.fetch(modelPath.filesPath)
         versionMetadata = ModelVersionMetadata.combineMetadata(fetchResult, meta, hs)
-        _ <- F.fromEither(ModelVersionMetadata.validateContract(versionMetadata.contract))
+        _ <- F.fromValidated(Contract.validateContract(versionMetadata.contract).leftMap(x => InvalidRequest(x.toList.mkString)))
         parentModel <- createIfNecessary(versionMetadata.modelName)
         b <- modelVersionBuilder.build(parentModel, versionMetadata, modelPath)
       } yield b
@@ -147,7 +146,7 @@ object ModelService {
     override def registerModel(modelReq: RegisterModelRequest): F[ModelVersion.External] = {
       for {
         _ <- F.fromOption(ModelValidator.name(modelReq.name), DomainError.invalidRequest("Model name contains invalid characters"))
-        _ <- F.fromEither(ModelVersionMetadata.validateContract(modelReq.contract))
+        _ <- F.fromValidated(Contract.validateContract(modelReq.contract).leftMap(x => InvalidRequest(x.toList.mkString)))
         parentModel <- createIfNecessary(modelReq.name)
         version <- modelVersionService.getNextModelVersion(parentModel.id)
         timestamp <- clock.instant()

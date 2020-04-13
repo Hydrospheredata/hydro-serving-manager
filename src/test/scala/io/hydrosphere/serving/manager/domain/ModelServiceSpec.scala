@@ -43,6 +43,49 @@ class ModelServiceSpec extends GenericUnitTest {
         assert(ModelValidator.name("ClassifierModel").isEmpty)
       }
     }
+    describe("contract validation") {
+      it("should fail if name is empty") {
+        val contract = ModelContract(predict = Some(ModelSignature()))
+        val res = Contract.validateContract(contract)
+        assert(res.isInvalid, res)
+      }
+      it("should fail if input contains invalid dtype") {
+        val inputs = Seq(
+          ModelField("name1", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)),
+          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)),
+        )
+        val outputs = Seq(
+          ModelField("name3", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+        )
+        val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
+        val res = Contract.validateContract(contract)
+        assert(res.isInvalid, res)
+      }
+      it("should fail if output contains invalid dtype") {
+        val inputs = Seq(
+          ModelField("name1", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+        )
+        val outputs = Seq(
+          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)),
+          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+        )
+        val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
+        val res = Contract.validateContract(contract)
+        assert(res.isInvalid, res)
+      }
+      it("should pass if ok") {
+        val inputs = Seq(
+          ModelField("name1", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+        )
+        val outputs = Seq(
+          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_BOOL)),
+          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+        )
+        val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
+        val res = Contract.validateContract(contract)
+        assert(res.isValid, res)
+      }
+    }
     describe("uploads") {
       it("a new model") {
         val model = Model(
