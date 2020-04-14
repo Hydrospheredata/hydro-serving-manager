@@ -113,7 +113,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
         case x: Servable.NotAvailable =>
           x.toJson.asJsObject.fields ++ Map("status" -> JsString("NotAvailable"))
         case x: Servable.Starting =>
-          x.toJson.asJsObject.fields ++ Map("status" -> JsString("Unknown"))
+          x.toJson.asJsObject.fields ++ Map("status" -> JsString("Starting"))
       }
       JsObject(fields)
     }
@@ -125,6 +125,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
             case Some(JsString("Serving"))      => json.convertTo[Servable.Serving]
             case Some(JsString("NotServing"))   => json.convertTo[Servable.NotServing]
             case Some(JsString("NotAvailable")) => json.convertTo[Servable.NotAvailable]
+            case Some(JsString("Starting"))     => json.convertTo[Servable.Starting]
             case Some(JsString("Unknown"))      => json.convertTo[Servable.Starting]
             case x                              => throw DeserializationException(s"Invalid Servable status type: $x")
           }
