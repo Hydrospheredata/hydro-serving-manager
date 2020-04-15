@@ -13,7 +13,7 @@ trait ModelVersionService[F[_]] {
 
   def get(id: Long): F[ModelVersion]
 
-  def get(name: String, version: Long): F[ModelVersion]
+  def get(name: String, version: Long): F[ModelVersionView]
 
   def getNextModelVersion(modelId: Long): F[Long]
 
@@ -61,12 +61,13 @@ object ModelVersionService {
       } yield versions.fold(1L)(_.modelVersion + 1)
     }
 
-    override def get(name: String, version: Long): F[ModelVersion] = {
+    override def get(name: String, version: Long): F[ModelVersionView] = {
       for {
         _ <- F.fromOption(ModelValidator.name(name), DomainError.invalidRequest("Name contains invalid characters."))
         mv <- OptionT(modelVersionRepository.get(name, version))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $name:$version")))
-      } yield mv
+        apps <- applicationRepo.findVersionUsage(mv.id)
+      } yield ModelVersionView.fromVersion(mv, apps)
     }
 
     override def all(): F[List[ModelVersion]] = modelVersionRepository.all()
