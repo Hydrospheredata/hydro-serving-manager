@@ -442,7 +442,7 @@ class ModelServiceSpec extends GenericUnitTest {
         val modelVersionService = new ModelVersionService[IO] {
           override def all(): IO[List[ModelVersion.Internal]] = ???
           override def get(id: Long): IO[ModelVersion.Internal] = ???
-          override def get(name: String, version: Long): IO[ModelVersion.Internal] = ???
+          override def get(name: String, version: Long): IO[ModelVersionView] = ???
           override def getNextModelVersion(modelId: Long): IO[Long] = ???
           override def list: IO[List[ModelVersionView]] = ???
           override def listForModel(modelId: Long): IO[List[ModelVersion.Internal]] = {

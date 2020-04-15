@@ -110,7 +110,7 @@ class ModelController[F[_]](
     new ApiImplicitParam(name = "version", required = true, dataType = "long", paramType = "path", value = "modelId")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "ModelVersion", response = classOf[ModelVersion.Internal]),
+    new ApiResponse(code = 200, message = "ModelVersion", response = classOf[ModelVersionView]),
     new ApiResponse(code = 404, message = "Not found"),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
