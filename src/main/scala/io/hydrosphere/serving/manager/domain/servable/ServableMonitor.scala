@@ -6,7 +6,7 @@ import cats.effect.{Concurrent, Fiber, Timer}
 import cats.implicits._
 import fs2.concurrent.Queue
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 import scala.concurrent.duration._
 
@@ -20,7 +20,7 @@ trait ServableMonitor[F[_]] {
   def monitor(servable: GenericServable): F[Deferred[F, GenericServable]]
 }
 
-object ServableMonitor extends Logging {
+object ServableMonitor extends UnsafeLogging {
   final case class CancellableMonitor[F[_]](mon: ServableMonitor[F], fiber: Fiber[F, Unit])
   type MonitoringEntry[F[_]] = (GenericServable, Deferred[F, GenericServable])
 

@@ -7,34 +7,14 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.api.http.controller.MonitoringRequests._
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
 import io.hydrosphere.serving.manager.domain.DomainError
-import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, Monitoring, MonitoringRepository, ThresholdCmpOperator}
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
-import io.hydrosphere.serving.manager.util.UUIDGenerator
-import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOperation, ApiResponse, ApiResponses}
-import javax.ws.rs.Path
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.domain.monitoring._
+import io.hydrosphere.serving.manager.util.{UUIDGenerator, UnsafeLogging}
 
-@Path("/monitoring/metricspec")
-@Api(produces = "application/json", tags = Array("Metric Specifications"))
 class MonitoringController[F[_]](
   monitoringService: Monitoring[F],
   monRepo: MonitoringRepository[F]
-)(implicit F: Effect[F], uuid: UUIDGenerator[F]) extends AkkaHttpControllerDsl with Logging {
-  implicit val configReq = jsonFormat3(MetricSpecConfigCreationRequest)
-  implicit val specReq = jsonFormat3(MetricSpecCreationRequest)
-  implicit val configView = jsonFormat4(MetricSpecConfigView)
-  implicit val specView = jsonFormat4(MetricSpecView)
+)(implicit F: Effect[F], uuid: UUIDGenerator[F]) extends AkkaHttpControllerDsl with UnsafeLogging {
 
-  @Path("/")
-  @ApiOperation(value = "createMetricSpec", notes = "createMetricSpec", nickname = "createMetricSpec", httpMethod = "POST")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "body", value = "MetricSpecCreationRequest", required = true,
-      dataTypeClass = classOf[MetricSpecCreationRequest], paramType = "body")
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "MetricSpec", response = classOf[MetricSpecView]),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def createSpec: Route = path("metricspec") {
     post {
       entity(as[MetricSpecCreationRequest]) { incomingMS =>
@@ -60,28 +40,12 @@ class MonitoringController[F[_]](
     }
   }
 
-  @Path("/")
-  @ApiOperation(value = "listSpecs", notes = "listSpecs", nickname = "listSpecs", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "MetricSpec", response = classOf[MetricSpecView], responseContainer = "List"),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def listSpecs: Route = path("metricspec") {
     get {
       completeF(monitoringService.all().map(_.map(fromMetricSpec)))
     }
   }
 
-  @Path("/{specId}")
-  @ApiOperation(value = "getSpec", notes = "getSpec", nickname = "getSpec", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "specId", required = true, dataType = "string", paramType = "path", value = "specId"),
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "MetricSpec", response = classOf[MetricSpecView]),
-    new ApiResponse(code = 404, message = "Not found"),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def getSpec: Route = path("metricspec" / Segment) { id =>
     get {
       val flow = OptionT(monRepo.get(id))
@@ -91,31 +55,12 @@ class MonitoringController[F[_]](
     }
   }
 
-  @Path("/modelversion/{versionId}")
-  @ApiOperation(value = "getSpecForModelVersion", notes = "getSpecForModelVersion", nickname = "getSpecForModelVersion", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "versionId", required = true, dataType = "string", paramType = "path", value = "versionId"),
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "MetricSpec", response = classOf[MetricSpecView]),
-    new ApiResponse(code = 404, message = "Not found"),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def getSpecForModelVersion: Route = path("metricspec" / "modelversion" / LongNumber) { id =>
     get {
       completeF(monRepo.forModelVersion(id).map(_.map(fromMetricSpec)))
     }
   }
 
-  @Path("/{specId}")
-  @ApiOperation(value = "deleteMetricSpec", notes = "deleteMetricSpec", nickname = "deleteMetricSpec", httpMethod = "DELETE")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "specId", required = true, dataType = "string", paramType = "path", value = "specId")
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "MetricSpec",  response = classOf[MetricSpecView]),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def deleteSpec: Route = path("metricspec" / Segment) { id =>
     delete {
       completeF(monitoringService.delete(id).map(fromMetricSpec))

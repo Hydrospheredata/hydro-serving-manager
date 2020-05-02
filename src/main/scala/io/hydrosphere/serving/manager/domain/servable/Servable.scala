@@ -1,8 +1,10 @@
 package io.hydrosphere.serving.manager.domain.servable
 
+import io.circe.generic.JsonCodec
+import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
-
+@JsonCodec
 case class Servable[+T <: Servable.Status](
   modelVersion: ModelVersion.Internal,
   nameSuffix: String,
@@ -14,11 +16,17 @@ case class Servable[+T <: Servable.Status](
 }
 
 object Servable {
+  private implicit val config = Configuration.default.withDiscriminator("status")
 
+  @ConfiguredJsonCodec
   sealed trait Status extends Product with Serializable
+  @ConfiguredJsonCodec
   final case class Serving(msg: String, host: String, port: Int)                      extends Status
+  @ConfiguredJsonCodec
   final case class NotServing(msg: String, host: Option[String], port: Option[Int])   extends Status
+  @ConfiguredJsonCodec
   final case class NotAvailable(msg: String, host: Option[String], port: Option[Int]) extends Status
+  @ConfiguredJsonCodec
   final case class Starting(msg: String, host: Option[String], port: Option[Int])     extends Status
 
   def fullName(modelName: String, modelVersion: Long, suffix: String): String =

@@ -6,7 +6,7 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
 import io.hydrosphere.serving.manager.domain.servable.ServableService
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 
 trait Monitoring[F[_]] {
@@ -20,7 +20,7 @@ trait Monitoring[F[_]] {
 }
 
 
-object Monitoring extends Logging {
+object Monitoring extends UnsafeLogging {
 
   final val MetricSpecIdKey = "metric-spec-id"
 

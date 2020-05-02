@@ -5,9 +5,11 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
+import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import cats.effect.{ConcurrentEffect, ContextShift}
+import io.circe.syntax._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
@@ -17,7 +19,6 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.ServableEvents
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
-import spray.json._
 import streamz.converter._
 
 import scala.concurrent.ExecutionContext
@@ -37,7 +38,7 @@ class SSEController[F[_]](
 
   implicit val am = ActorMaterializer.create(actorSystem)
 
-  def subscribe = pathPrefix("events") {
+  def subscribe: Route = pathPrefix("events") {
     get {
       val id = UUID.randomUUID().toString
       complete {
@@ -77,7 +78,7 @@ object SSEController extends CompleteJsonProtocol {
       case DiscoveryEvent.ItemUpdate(items) =>
         items.map { s =>
           ServerSentEvent(
-            data = ServableView.fromServable(s).toJson.compactPrint,
+            data = ServableView.fromServable(s).asJson.spaces2,
             `type` = "ServableUpdate"
           )
         }
@@ -97,7 +98,7 @@ object SSEController extends CompleteJsonProtocol {
       case DiscoveryEvent.ItemUpdate(items) =>
         items.map { mv =>
           ServerSentEvent(
-            data = mv.toJson.compactPrint,
+            data = mv.asJson.spaces2,
             `type` = "ModelUpdate"
           )
         }
@@ -117,14 +118,14 @@ object SSEController extends CompleteJsonProtocol {
       case DiscoveryEvent.ItemUpdate(items) =>
         items.map { app =>
           ServerSentEvent(
-            data = ApplicationView.fromApplication(app).toJson.compactPrint,
+            data = ApplicationView.fromApplication(app).asJson.spaces2,
             `type` = "ApplicationUpdate"
           )
         }
       case DiscoveryEvent.ItemRemove(items) =>
         items.map { i =>
           ServerSentEvent(
-            data = i.toString,
+            data = i,
             `type` = "ApplicationRemove"
           )
         }
@@ -137,7 +138,7 @@ object SSEController extends CompleteJsonProtocol {
       case DiscoveryEvent.ItemUpdate(items) =>
         items.map { ms =>
           ServerSentEvent(
-            data = ms.toJson.compactPrint,
+            data = ms.asJson.spaces2,
             `type` = "MetricSpecUpdate"
           )
         }

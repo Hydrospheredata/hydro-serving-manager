@@ -11,7 +11,7 @@ import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.keras.KerasFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.SparkModelFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.tensorflow.TensorflowModelFetcher
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 case class FetcherResult(
   modelName: String,
@@ -23,7 +23,7 @@ trait ModelFetcher[F[_]] {
   def fetch(path: Path): F[Option[FetcherResult]]
 }
 
-object ModelFetcher extends Logging {
+object ModelFetcher extends UnsafeLogging {
   def default[F[_] : Sync: StorageOps]() = {
     val storageOps = StorageOps[F]
     combine(Seq(

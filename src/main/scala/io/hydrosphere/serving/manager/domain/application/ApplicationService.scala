@@ -3,22 +3,17 @@ package io.hydrosphere.serving.manager.domain.application
 import cats.data._
 import cats.effect.Concurrent
 import cats.implicits._
+import io.circe.Json
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.NotFound
 import io.hydrosphere.serving.manager.domain.application.Application._
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.{ServableGC, ServableService}
-import io.hydrosphere.serving.manager.util.DeferredResult
-import io.hydrosphere.serving.model.api.TensorExampleGenerator
-import io.hydrosphere.serving.model.api.json.TensorJsonLens
-import org.apache.logging.log4j.scala.Logging
-import spray.json.JsObject
+import io.hydrosphere.serving.manager.util.{DeferredResult, UnsafeLogging}
 
 trait ApplicationService[F[_]] {
   def all(): F[List[GenericApplication]]
-
-  def generateInputs(name: String): F[JsObject]
 
   def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]]
 
@@ -29,7 +24,16 @@ trait ApplicationService[F[_]] {
   def get(name: String): F[GenericApplication]
 }
 
-object ApplicationService extends Logging {
+object ApplicationService extends UnsafeLogging {
+
+  def generateInputs[F[_]](name: String): F[Json] = {
+    ???
+//    for {
+//      app <- get(name)
+//      tensorData <- F.delay(TensorExampleGenerator(app.signature).inputs)
+//      jsonData <- F.delay(TensorJsonLens.mapToJson(tensorData))
+//    } yield jsonData
+  }
 
   def apply[F[_]]()(
     implicit
@@ -41,14 +45,6 @@ object ApplicationService extends Logging {
     applicationDeployer: ApplicationDeployer[F],
     servableGC: ServableGC[F]
   ): ApplicationService[F] = new ApplicationService[F] {
-
-    def generateInputs(name: String): F[JsObject] = {
-      for {
-        app <- get(name)
-        tensorData <- F.delay(TensorExampleGenerator(app.signature).inputs)
-        jsonData <- F.delay(TensorJsonLens.mapToJson(tensorData))
-      } yield jsonData
-    }
 
     def create(req: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
       applicationDeployer.deploy(req.name, req.executionGraph, req.kafkaStreaming.getOrElse(List.empty))

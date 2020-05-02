@@ -6,7 +6,7 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.model.ModelValidator
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 trait ModelVersionService[F[_]] {
   def all(): F[List[ModelVersion]]
@@ -24,13 +24,13 @@ trait ModelVersionService[F[_]] {
   def delete(versionId: Long): F[Option[ModelVersion]]
 }
 
-object ModelVersionService {
+object ModelVersionService extends UnsafeLogging {
   def apply[F[_]]()(
     implicit F: MonadError[F, Throwable],
     modelVersionRepository: ModelVersionRepository[F],
     applicationRepo: ApplicationRepository[F],
     modelPublisher: ModelVersionEvents.Publisher[F]
-  ): ModelVersionService[F] = new ModelVersionService[F] with Logging {
+  ): ModelVersionService[F] = new ModelVersionService[F]{
 
     def list: F[List[ModelVersionView]] = {
       for {

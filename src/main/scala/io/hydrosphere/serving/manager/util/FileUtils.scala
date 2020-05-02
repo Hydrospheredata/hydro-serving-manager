@@ -4,12 +4,10 @@ import java.io._
 import java.nio.file.{FileVisitResult, FileVisitor, Files, Path}
 import java.nio.file.attribute.BasicFileAttributes
 
-import org.apache.logging.log4j.scala.Logging
-
 
 object FileUtils {
 
-  class RecursiveRemover extends FileVisitor[Path] with Logging {
+  class RecursiveRemover extends FileVisitor[Path] with UnsafeLogging {
     def visitFileFailed(file: Path, exc: IOException) = {
       logger.warn(s"Error while visiting file: ${exc.getMessage}")
       FileVisitResult.CONTINUE

@@ -14,14 +14,13 @@ import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
-import io.hydrosphere.serving.manager.util.DeferredResult
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.{DeferredResult, UnsafeLogging}
 
 trait ModelVersionBuilder[F[_]]{
   def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion.Internal]]
 }
 
-object ModelVersionBuilder {
+object ModelVersionBuilder extends UnsafeLogging {
   def apply[F[_] : Concurrent]()(
   implicit
     dockerClient: DockerdClient[F],
@@ -31,7 +30,7 @@ object ModelVersionBuilder {
     storageOps: StorageOps[F],
     modelDiscoveryHub: ModelVersionEvents.Publisher[F],
     buildLoggingService: BuildLoggingService[F]
-  ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] with Logging {
+  ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] {
     override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion.Internal]] = {
       for {
         init <- initialVersion(model, metadata)

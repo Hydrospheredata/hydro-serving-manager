@@ -1,16 +1,15 @@
 package io.hydrosphere.serving.manager.domain.model_build
 
 import cats.data.OptionT
-import cats.effect.{ConcurrentEffect, Effect}
 import cats.effect.concurrent.Ref
 import cats.effect.implicits._
+import cats.effect.{ConcurrentEffect, Effect}
 import cats.implicits._
 import com.spotify.docker.client.ProgressHandler
 import com.spotify.docker.client.messages.ProgressMessage
 import fs2.concurrent.{SignallingRef, Topic}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import io.hydrosphere.serving.manager.util.topic.TopicPublisher
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 import scala.collection.mutable.ListBuffer
 
@@ -22,7 +21,7 @@ trait BuildLoggingService[F[_]] {
   def getLogs(modelVersionId: Long, sinceLine: Int = 0): F[Option[fs2.Stream[F, String]]]
 }
 
-object BuildLoggingService extends Logging {
+object BuildLoggingService extends UnsafeLogging {
   def make[F[_]]()(
     implicit F: ConcurrentEffect[F],
     buildLogRepository: BuildLogRepository[F]
@@ -31,7 +30,7 @@ object BuildLoggingService extends Logging {
       state <- Ref.of[F, Map[Long, (Topic[F, String], SignallingRef[F, Boolean], ListBuffer[String])]](Map.empty)
     } yield {
       new BuildLoggingService[F] {
-        override def makeLogger(modelVersion: ModelVersion.Internal) = {
+        override def makeLogger(modelVersion: ModelVersion.Internal): F[ProgressHandler] = {
           for {
             signal <- SignallingRef[F, Boolean](false)
             topic <- Topic[F, String]("")
@@ -67,7 +66,7 @@ object BuildLoggingService extends Logging {
             (_, signal, buf) = row
             _ <- OptionT.liftF(signal.set(true))
             _ <- OptionT.liftF(buildLogRepository.add(modelVersionId, buf.toList))
-            _ <- OptionT.liftF(state.update(x => x.filterKeys(_ != modelVersionId)))
+            _ <- OptionT.liftF(state.update(x => x.filter { case (key, _) => key != modelVersionId }))
           } yield ()
           f.value
         }
@@ -79,7 +78,7 @@ object BuildLoggingService extends Logging {
 object DockerLogger {
   final val ESC_CODE = 0x1B
 
-  def make[F[_] : Effect](topic: Topic[F, String]) = {
+  def make[F[_] : Effect](topic: Topic[F, String]): ProgressHandler = {
     new ProgressHandler {
 
       override def progress(message: ProgressMessage): Unit = {

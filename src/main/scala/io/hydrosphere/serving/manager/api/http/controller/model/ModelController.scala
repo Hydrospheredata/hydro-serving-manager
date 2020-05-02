@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.server.Route
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, Effect}
@@ -15,7 +15,6 @@ import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository, ModelService}
 import io.hydrosphere.serving.manager.domain.model_build.BuildLoggingService
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionService, ModelVersionView}
-import io.swagger.annotations._
 import javax.ws.rs.Path
 import streamz.converter._
 
@@ -23,8 +22,6 @@ import scala.concurrent.duration._
 import scala.util.Try
 
 
-@Path("/model")
-@Api(produces = "application/json", tags = Array("Model and Model Versions"))
 class ModelController[F[_]](
   modelManagementService: ModelService[F],
   modelRepo: ModelRepository[F],
@@ -34,31 +31,16 @@ class ModelController[F[_]](
   implicit F: ConcurrentEffect[F],
   cs: ContextShift[F],
   system: ActorSystem,
-  materializer: ActorMaterializer,
+  materializer: Materializer,
 ) extends AkkaHttpControllerDsl {
   implicit val ec = system.dispatcher
 
-  @Path("/")
-  @ApiOperation(value = "listModels", notes = "listModels", nickname = "listModels", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Model", response = classOf[Model], responseContainer = "List"),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def listModels = path("model") {
     get {
       completeF(modelRepo.all())
     }
   }
 
-  @Path("/{modelId}")
-  @ApiOperation(value = "getModel", notes = "getModel", nickname = "getModel", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "modelId", required = true, dataType = "long", paramType = "path", value = "modelId")
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Model", response = classOf[Model]),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def getModel = pathPrefix("model" / LongNumber) { id =>
     get {
       completeF {
@@ -67,16 +49,6 @@ class ModelController[F[_]](
     }
   }
 
-  @Path("/upload")
-  @ApiOperation(value = "Upload and release a model", notes = "Send POST multipart with 'payload'-tar.gz and 'metadata'-json parts", nickname = "uploadModel", httpMethod = "POST")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "body", value = "ModelUploadMetadata", required = true,
-      dataTypeClass = classOf[ModelUploadMetadata], paramType = "body")
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = " ModelVersion", response = classOf[ModelVersion.Internal]),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def uploadModel = pathPrefix("model" / "upload") {
     post {
       getFileWithMeta[F, ModelUploadMetadata, ModelVersion.Internal] {
@@ -89,12 +61,6 @@ class ModelController[F[_]](
     }
   }
 
-  @Path("/version")
-  @ApiOperation(value = "All ModelVersion", notes = "All ModelVersion", nickname = "allModelVersions", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "ModelVersion", response = classOf[ModelVersionView], responseContainer = "List"),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def allModelVersions = path("model" / "version") {
     get {
       completeF(
@@ -103,17 +69,6 @@ class ModelController[F[_]](
     }
   }
 
-  @Path("/version/{versionName}/{version}")
-  @ApiOperation(value = "Get ModelVersion", notes = "Get ModelVersion", nickname = "getModelVersion", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "versionName", required = true, dataType = "string", paramType = "path", value = "modelId"),
-    new ApiImplicitParam(name = "version", required = true, dataType = "long", paramType = "path", value = "modelId")
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "ModelVersion", response = classOf[ModelVersionView]),
-    new ApiResponse(code = 404, message = "Not found"),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def getModelVersions = path("model" / "version" / Segment / LongNumber) { (name, version) =>
     get {
       completeF(
@@ -122,15 +77,6 @@ class ModelController[F[_]](
     }
   }
 
-  @Path("/{modelId}")
-  @ApiOperation(value = "Delete model if not in app", notes = "Fails if any version of the model is deployed", nickname = "deleteModel", httpMethod = "DELETE")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "modelId", required = true, dataType = "long", paramType = "path", value = "modelId")
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Model", response = classOf[Model]),
-    new ApiResponse(code = 500, message = "Internal server error")
-  ))
   def deleteModel = pathPrefix("model" / LongNumber) { modelId =>
     delete {
       completeF {

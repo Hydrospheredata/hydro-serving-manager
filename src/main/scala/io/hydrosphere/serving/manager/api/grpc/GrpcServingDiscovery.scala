@@ -15,8 +15,8 @@ import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationEvents, ApplicationService}
 import io.hydrosphere.serving.manager.domain.monitoring.{MetricSpecEvents, Monitoring, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableService}
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 import io.hydrosphere.serving.manager.util.grpc.Converters
-import org.apache.logging.log4j.scala.Logging
 
 
 class GrpcServingDiscovery[F[_]](
@@ -26,7 +26,7 @@ class GrpcServingDiscovery[F[_]](
   appService: ApplicationService[F],
   servableService: ServableService[F],
   monitoringService: MonitoringRepository[F]
-)(implicit F: ConcurrentEffect[F]) extends ServingDiscovery with Logging {
+)(implicit F: ConcurrentEffect[F]) extends ServingDiscovery with UnsafeLogging {
 
   private def runSync[A](f: => F[A]): A = f.toIO.unsafeRunSync()
 

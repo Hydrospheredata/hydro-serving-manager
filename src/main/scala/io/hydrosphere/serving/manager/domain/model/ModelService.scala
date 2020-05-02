@@ -17,9 +17,8 @@ import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.domain.{Contract, DomainError}
 import io.hydrosphere.serving.manager.infrastructure.storage.ModelUnpacker
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
-import io.hydrosphere.serving.manager.util.DeferredResult
+import io.hydrosphere.serving.manager.util.{DeferredResult, UnsafeLogging}
 import io.hydrosphere.serving.manager.util.InstantClockSyntax._
-import org.apache.logging.log4j.scala.Logging
 
 trait ModelService[F[_]] {
   def get(modelId: Long): F[Model]
@@ -35,7 +34,7 @@ trait ModelService[F[_]] {
   def checkIfNoApps(versions: Seq[ModelVersion]): F[Unit]
 }
 
-object ModelService {
+object ModelService extends UnsafeLogging {
   def apply[F[_]]()(
     implicit
     F: MonadError[F, Throwable],
@@ -49,7 +48,7 @@ object ModelService {
     servableRepo: ServableRepository[F],
     fetcher: ModelFetcher[F],
     modelVersionBuilder: ModelVersionBuilder[F]
-  ): ModelService[F] = new ModelService[F] with Logging {
+  ): ModelService[F] = new ModelService[F] {
 
     def deleteModel(modelId: Long): F[Model] = {
       for {
@@ -97,7 +96,7 @@ object ModelService {
 
         case Some(model) => // it's other model - not ok
           val errMsg = InvalidRequest(s"There is already a model with same name: ${model.name}(${model.id}) -> ${newModelInfo.name}(${newModelInfo.id})")
-          logger.error(errMsg)
+          logger.error(errMsg.message)
           F.raiseError(errMsg)
 
         case None => // name is unique - ok

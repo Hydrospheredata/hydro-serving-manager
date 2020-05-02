@@ -11,13 +11,11 @@ import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableReposit
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import io.hydrosphere.serving.manager.util.CollectionOps._
 import cats.data.NonEmptyList
 import cats.data.OptionT
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import spray.json._
 
 
 object DBServableRepository {

@@ -10,12 +10,12 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.mappers.SparkMlTypeMapper
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{FetcherResult, ModelFetcher}
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 import scala.util.Try
 
 
-class SparkModelFetcher[F[_]: Monad](storageOps: StorageOps[F]) extends ModelFetcher[F] with Logging {
+class SparkModelFetcher[F[_]: Monad](storageOps: StorageOps[F]) extends ModelFetcher[F] with UnsafeLogging {
   private def getStageMetadata(stagesPath: Path, stage: String) = {
     getMetadata(stagesPath.resolve(stage))
   }

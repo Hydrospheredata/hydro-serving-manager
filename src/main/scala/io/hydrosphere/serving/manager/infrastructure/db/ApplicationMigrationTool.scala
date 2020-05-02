@@ -13,14 +13,13 @@ import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.{AppDBSchemaErrors, ApplicationRow, IncompatibleExecutionGraphError, UsingModelVersionIsMissing}
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
-import org.apache.logging.log4j.scala.Logging
-import spray.json._
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 trait ApplicationMigrationTool[F[_]] {
   def getAndRevive(): F[Unit]
 }
 
-object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
+object ApplicationMigrationTool extends UnsafeLogging with CompleteJsonProtocol {
   def default[F[_]](
     appsRepo: ApplicationRepository[F],
     cloudDriver: CloudDriver[F],

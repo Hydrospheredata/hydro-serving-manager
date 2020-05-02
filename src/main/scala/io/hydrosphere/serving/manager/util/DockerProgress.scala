@@ -2,9 +2,8 @@ package io.hydrosphere.serving.manager.util
 
 import com.spotify.docker.client.ProgressHandler
 import com.spotify.docker.client.messages.ProgressMessage
-import org.apache.logging.log4j.scala.Logging
 
-object DockerProgress extends Logging {
+object DockerProgress extends UnsafeLogging {
   def extractMessage(message: ProgressMessage): Option[String] = {
     Option(message.error())
           .orElse(Option(message.stream()))

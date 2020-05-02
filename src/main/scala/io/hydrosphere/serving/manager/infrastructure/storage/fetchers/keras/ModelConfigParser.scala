@@ -10,9 +10,8 @@ import cats.syntax.functor._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.FetcherResult
-import io.hydrosphere.serving.manager.util.HDF5File
+import io.hydrosphere.serving.manager.util.{HDF5File, UnsafeLogging}
 import org.apache.commons.io.FilenameUtils
-import org.apache.logging.log4j.scala.Logging
 
 import scala.util.Try
 
@@ -20,7 +19,7 @@ private[keras] trait ModelConfigParser[F[_]] {
   def importModel: F[Option[FetcherResult]]
 }
 
-private[keras] object ModelConfigParser extends Logging {
+private[keras] object ModelConfigParser extends UnsafeLogging {
   def importer[F[_] : Sync](source: StorageOps[F], directory: Path): F[Option[ModelConfigParser[F]]] = {
     val f = for {
       h5Path <- findH5file(source, directory)

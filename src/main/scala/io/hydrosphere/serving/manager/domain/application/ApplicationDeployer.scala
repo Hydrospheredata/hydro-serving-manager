@@ -13,8 +13,7 @@ import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraph
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
-import io.hydrosphere.serving.manager.util.DeferredResult
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.{DeferredResult, UnsafeLogging}
 
 trait ApplicationDeployer[F[_]] {
   def deploy(
@@ -24,7 +23,7 @@ trait ApplicationDeployer[F[_]] {
   ): F[DeferredResult[F, GenericApplication]]
 }
 
-object ApplicationDeployer extends Logging {
+object ApplicationDeployer extends UnsafeLogging {
   def default[F[_]]()(
     implicit
     F: Concurrent[F],

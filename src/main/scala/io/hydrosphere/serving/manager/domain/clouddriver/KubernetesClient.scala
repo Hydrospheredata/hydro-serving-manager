@@ -9,8 +9,7 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.util.AsyncUtil
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.{AsyncUtil, UnsafeLogging}
 import skuber.Container.PullPolicy
 import skuber._
 import skuber.apps.v1.{Deployment, DeploymentList}
@@ -33,7 +32,7 @@ trait KubernetesClient[F[_]] {
   def getPod(name: String): F[Pod]
 }
 
-object KubernetesClient {
+object KubernetesClient extends UnsafeLogging {
   
   def apply[F[_]: Async](config: CloudDriverConfiguration.Kubernetes, dockerRepoConf: DockerRepositoryConfiguration.Remote)(implicit ex: ExecutionContext, actorSystem: ActorSystem, materializer: Materializer): KubernetesClient[F] = 
     KubernetesClient[F](
@@ -42,7 +41,7 @@ object KubernetesClient {
       k8sInit(K8SConfiguration.useProxyAt(s"http://${config.proxyHost}:${config.proxyPort}")).usingNamespace(config.kubeNamespace)
     )
 
-  def apply[F[_]: Async](config: CloudDriverConfiguration.Kubernetes, dockerRepoConf: DockerRepositoryConfiguration.Remote, underlying: K8SRequestContext)(implicit ex: ExecutionContext): KubernetesClient[F] = new KubernetesClient[F] with Logging {
+  def apply[F[_]: Async](config: CloudDriverConfiguration.Kubernetes, dockerRepoConf: DockerRepositoryConfiguration.Remote, underlying: K8SRequestContext)(implicit ex: ExecutionContext): KubernetesClient[F] = new KubernetesClient[F] {
     override def services: F[List[Service]] = {
       AsyncUtil.futureAsync(underlying.list[ServiceList]()).map(_.toList)
     }

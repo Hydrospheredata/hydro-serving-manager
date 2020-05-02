@@ -4,8 +4,6 @@ import cats.syntax.either._
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import io.hydrosphere.serving.model.api.MergeError
-import io.hydrosphere.serving.model.api.ops.ModelSignatureOps
 
 object ApplicationValidator {
 

@@ -17,7 +17,6 @@ import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import io.hydrosphere.serving.manager.util.CollectionOps._
-import spray.json._
 
 import scala.util.{Failure, Success, Try}
 import cats.data.NonEmptyList

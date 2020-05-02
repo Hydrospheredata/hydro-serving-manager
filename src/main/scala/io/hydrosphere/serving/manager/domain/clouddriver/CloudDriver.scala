@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import cats.effect._
+import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -12,21 +13,17 @@ import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import scala.concurrent.ExecutionContext
 
 object CloudInstance {
-
   sealed trait Status
 
   object Status {
-
     case object Starting extends Status
-
     final case class Running(host: String, port: Int) extends Status
-
     case object Stopped extends Status
-
   }
 
 }
 
+@JsonCodec
 case class CloudInstance(
   modelVersionId: Long,
   name: String,

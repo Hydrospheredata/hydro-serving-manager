@@ -1,10 +1,13 @@
 package io.hydrosphere.serving.manager.domain.application
 
 import cats.data.NonEmptyList
+import io.circe.generic.JsonCodec
+import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.application.graph.ExecutionNode
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 
+@JsonCodec
 case class Application[+T <: Application.Status](
   id: Long,
   name: String,
@@ -17,12 +20,12 @@ case class Application[+T <: Application.Status](
 )
 
 object Application {
+  private implicit val config = Configuration.default.withDiscriminator("status")
+
+  @ConfiguredJsonCodec
   sealed trait Status extends Product with Serializable
-
   case object Assembling extends Status
-
   case class Failed(reason: Option[String]) extends Status
-
   case class Ready(stages: NonEmptyList[ExecutionNode]) extends Status
 
   type GenericApplication = Application[Status]

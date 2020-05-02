@@ -11,9 +11,8 @@ import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator}
+import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator, UnsafeLogging}
 import io.hydrosphere.serving.manager.util.random.NameGenerator
-import org.apache.logging.log4j.scala.Logging
 
 import scala.util.control.NonFatal
 
@@ -33,7 +32,7 @@ trait ServableService[F[_]] {
   def deploy(modelVersion: ModelVersion.Internal, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 }
 
-object ServableService extends Logging {
+object ServableService extends UnsafeLogging {
   def filterByName(name: String) = { (x: List[GenericServable]) =>
     x.filter(_.fullName == name)
   }

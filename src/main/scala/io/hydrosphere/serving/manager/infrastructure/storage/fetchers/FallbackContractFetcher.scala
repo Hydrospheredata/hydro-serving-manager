@@ -6,13 +6,13 @@ import cats.Monad
 import cats.data.OptionT
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 import scala.util.Try
 
 class FallbackContractFetcher[F[_]: Monad](
   source: StorageOps[F]
-) extends ModelFetcher[F] with Logging {
+) extends ModelFetcher[F] with UnsafeLogging {
   override def fetch(directory: Path): F[Option[FetcherResult]] = {
     OptionT(getContract(directory)).map { contract =>
       FetcherResult(

@@ -1,4 +1,5 @@
 package io.hydrosphere.serving.manager.infrastructure.storage.fetchers
+
 import java.nio.file.{Files, Path}
 
 import cats.Monad
@@ -16,7 +17,7 @@ import org.apache.commons.io.FilenameUtils
 
 import scala.util.Try
 
-class ONNXFetcher[F[_]: Monad](
+class ONNXFetcher[F[_] : Monad](
   storageOps: StorageOps[F]
 ) extends ModelFetcher[F] {
   def findFile(directory: Path): OptionT[F, Path] = {
@@ -34,7 +35,7 @@ class ONNXFetcher[F[_]: Monad](
       "onnx.irVersion" -> model.irVersion.toString,
       "onnx.modelVersion" -> model.modelVersion.toString,
       "onnx.docString" -> model.docString,
-    ).mapValues(_.trim)
+    ).map { case (k, v) => k -> v.trim }
       .filter { // filter proto default strings
         case (_, s) => s.nonEmpty
       }
@@ -103,8 +104,8 @@ object ONNXFetcher {
     ModelField(
       x.name,
       convertShape(x.getType.getTensorType.shape),
-      DataProfileType.NONE,
-      convertType(x.getType.getTensorType.elemType)
+      convertType(x.getType.getTensorType.elemType),
+      DataProfileType.NONE
     )
   }
 

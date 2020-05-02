@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import cats.effect.Async
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
@@ -35,7 +35,7 @@ object HttpServer extends AkkaHttpControllerDsl {
     externalModelRoutes: Route
   )(implicit
     as: ActorSystem,
-    am: ActorMaterializer,
+    am: Materializer,
     ec: ExecutionContext
   ): HttpServer[F] = {
     val controllerRoutes: Route = pathPrefix("v2") {
@@ -68,7 +68,9 @@ object HttpServer extends AkkaHttpControllerDsl {
       ))
     }
 
-    val routes: Route = CorsDirectives.cors(CorsSettings.defaultSettings.copy(allowedMethods = Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))) {
+    val corsSettings = CorsSettings.defaultSettings.withAllowedMethods(Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))
+
+    val routes: Route = CorsDirectives.cors(corsSettings) {
       pathPrefix("health") {
         complete("OK")
       } ~

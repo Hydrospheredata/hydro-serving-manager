@@ -5,10 +5,9 @@ import cats.implicits._
 import com.spotify.docker.client.DefaultDockerClient
 import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
-import io.hydrosphere.serving.manager.util.ReflectionUtils
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.{ReflectionUtils, UnsafeLogging}
 
-object Boot extends IOApp with Logging {
+object Boot extends IOApp with UnsafeLogging {
   override def run(args: List[String]): IO[ExitCode] = IO.suspend {
     for {
       configuration <- ManagerConfiguration.load[IO]

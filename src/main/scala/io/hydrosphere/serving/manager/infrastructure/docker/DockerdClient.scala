@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager.infrastructure.docker
 
-
 import java.net.URLEncoder
 import java.nio.file.Path
 
@@ -10,12 +9,9 @@ import com.spotify.docker.client.DockerClient.{BuildParam, ListContainersParam, 
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient, LogStream, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerClientConfig
-import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
-import org.apache.logging.log4j.scala.Logging
-import spray.json._
-
-import scala.collection.JavaConverters._
-import scala.util.control.NoStackTrace
+import io.hydrosphere.serving.manager.util.UnsafeLogging
+import scala.jdk.CollectionConverters._
+import io.circe.syntax._
 
 trait DockerdClient[F[_]]{
   
@@ -41,7 +37,7 @@ trait DockerdClient[F[_]]{
   def getHost: F[String]
 }
 
-object DockerdClient extends Logging {
+object DockerdClient extends UnsafeLogging {
 
   case class DockerdClientException(error: String) extends Exception(error)
 
@@ -123,7 +119,7 @@ object DockerdClient extends Logging {
                 config.noProxy.map(x => "NO_PROXY" -> x),
                 config.ftpProxy.map(x => "FTP_PROXY" -> x),
               ).flatten.toMap
-              BuildParam.create("buildargs", URLEncoder.encode(paramMap.toJson.compactPrint, "UTF-8"))
+              BuildParam.create("buildargs", URLEncoder.encode(paramMap.asJson.spaces2, "UTF-8"))
             }.toList
         }
       }

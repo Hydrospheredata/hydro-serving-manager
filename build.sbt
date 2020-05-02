@@ -1,9 +1,9 @@
-name := "serving-manager"
+name := "manager"
 version := sys.props.getOrElse("appVersion", IO.read(file("version")).trim)
 organization := "io.hydrosphere.serving"
 homepage := Some(url("https://hydrosphere.io/serving-docs"))
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.13.2"
 scalacOptions ++= Seq(
   "-unchecked",
   "-deprecation",
@@ -11,8 +11,7 @@ scalacOptions ++= Seq(
   "-language:existentials",
   "-language:higherKinds",
   "-language:implicitConversions",
-  "-language:postfixOps",
-  "-Ypartial-unification"
+  "-Ymacro-annotations"
 )
 
 publishArtifact := false
@@ -25,7 +24,6 @@ fork in(IntegrationTest, test) := true
 fork in(IntegrationTest, testOnly) := true
 
 enablePlugins(BuildInfoPlugin, sbtdocker.DockerPlugin)
-addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
 configs(IntegrationTest)
 ManagerDev.settings
@@ -59,6 +57,6 @@ dockerfile in docker := {
     cmd("/hydro-serving/app/start.sh")
   }
 }
-resolvers += "krasserm at bintray" at "https://dl.bintray.com/krasserm/maven"
+resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
   
 libraryDependencies ++= Dependencies.all
