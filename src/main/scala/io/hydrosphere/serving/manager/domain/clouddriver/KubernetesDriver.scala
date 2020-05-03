@@ -5,6 +5,7 @@ import cats.effect.Async
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
+import io.hydrosphere.serving.manager.infrastructure.kubernetes.KubernetesClient
 
 import scala.util.Try
 

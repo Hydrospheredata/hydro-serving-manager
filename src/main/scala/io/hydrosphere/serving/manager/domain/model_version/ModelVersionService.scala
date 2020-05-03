@@ -5,7 +5,7 @@ import cats.data.OptionT
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
-import io.hydrosphere.serving.manager.domain.model.{Model, ModelValidator}
+import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 trait ModelVersionService[F[_]] {

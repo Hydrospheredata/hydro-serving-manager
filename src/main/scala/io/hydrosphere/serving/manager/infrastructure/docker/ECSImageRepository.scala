@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.infrastructure.image.repositories
+package io.hydrosphere.serving.manager.infrastructure.docker
 
 import java.util.Collections
 
@@ -9,20 +9,20 @@ import com.amazonaws.services.ecr.{AmazonECR, AmazonECRClientBuilder}
 import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.manager.config.DockerRepositoryConfiguration
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
-import io.hydrosphere.serving.manager.infrastructure.docker.{DockerRegistryAuth, DockerdClient}
 
 class ECSImageRepository[F[_]: Sync](
-  dockerClient: DockerdClient[F],
-  ecsDockerRepositoryConfiguration: DockerRepositoryConfiguration.Ecs
+    dockerClient: DockerdClient[F],
+    ecsDockerRepositoryConfiguration: DockerRepositoryConfiguration.Ecs
 ) extends ImageRepository[F] {
 
-  val ecrClient: AmazonECR = AmazonECRClientBuilder.standard()
+  val ecrClient: AmazonECR = AmazonECRClientBuilder
+    .standard()
     .withRegion(ecsDockerRepositoryConfiguration.region)
     .build()
 
   override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit] = {
     for {
-      _ <- createRepositoryIfNeeded(dockerImage.name)
+      _    <- createRepositoryIfNeeded(dockerImage.name)
       auth <- getDockerRegistryAuth
       res <- dockerClient.push(
         dockerImage.fullName,
@@ -34,15 +34,19 @@ class ECSImageRepository[F[_]: Sync](
 
   override def getImageForModelVersion(modelName: String, modelVersion: String): DockerImage = {
     DockerImage(
-      user = Some(s"${ecsDockerRepositoryConfiguration.accountId}.dkr.ecr.${ecsDockerRepositoryConfiguration.region.getName}.amazonaws.com"),
+      user = Some(
+        s"${ecsDockerRepositoryConfiguration.accountId}.dkr.ecr.${ecsDockerRepositoryConfiguration.region.getName}.amazonaws.com"
+      ),
       name = modelName,
-      tag = DockerImage.tag(modelVersion)
+      tag = modelVersion
     )
   }
 
   private def getDockerRegistryAuth: F[DockerRegistryAuth] = Sync[F].delay {
     val getAuthorizationTokenRequest = new GetAuthorizationTokenRequest
-    getAuthorizationTokenRequest.setRegistryIds(Collections.singletonList(ecsDockerRepositoryConfiguration.accountId))
+    getAuthorizationTokenRequest.setRegistryIds(
+      Collections.singletonList(ecsDockerRepositoryConfiguration.accountId)
+    )
     val result = ecrClient.getAuthorizationToken(getAuthorizationTokenRequest)
 
     val authorizationData = result.getAuthorizationData.get(0)

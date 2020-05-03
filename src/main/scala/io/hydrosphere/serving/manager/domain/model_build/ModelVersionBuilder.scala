@@ -9,6 +9,7 @@ import cats.effect.implicits._
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.BuildParam
 import com.spotify.docker.client.ProgressHandler
+import io.hydrosphere.serving.manager.domain.contract.Contract
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
@@ -91,9 +92,7 @@ object ModelVersionBuilder extends UnsafeLogging {
       val innerCompleted = for {
         buildPath <- prepare(mv, modelFileStructure)
         imageSha  <- buildImage(buildPath.root, mv.image, handler)
-        newDockerImage = mv.image.resolve(imageSha)
         finishedVersion = mv.copy(
-          image = newDockerImage,
           finished = Instant.now().some,
           status = ModelVersionStatus.Released
         )
@@ -122,7 +121,10 @@ object ModelVersionBuilder extends UnsafeLogging {
         _ <- storageOps
           .writeBytes(modelFileStructure.dockerfile, BuildScript.generate(modelVersion).getBytes)
         _ <- storageOps
-          .writeBytes(modelFileStructure.contractPath, modelVersion.modelContract.toByteArray)
+          .writeBytes(
+            modelFileStructure.contractPath,
+            Contract.toProto(modelVersion.modelContract).toByteArray
+          )
       } yield modelFileStructure
     }
   }

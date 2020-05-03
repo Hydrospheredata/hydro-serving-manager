@@ -1,5 +1,4 @@
-package io.hydrosphere.serving.manager.domain.clouddriver
-import java.util.concurrent.Executors
+package io.hydrosphere.serving.manager.infrastructure.kubernetes
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
@@ -9,6 +8,11 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.config.{
   CloudDriverConfiguration,
   DockerRepositoryConfiguration
+}
+import io.hydrosphere.serving.manager.domain.clouddriver.{
+  CloudDriver,
+  CloudInstance,
+  DefaultConstants
 }
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage

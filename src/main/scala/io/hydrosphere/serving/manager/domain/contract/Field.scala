@@ -18,6 +18,6 @@ object Field {
   ) extends Field
 
   @JsonCodec
-  final case class Map(name: String, subfields: Field, shape: TensorShape) extends Field
+  final case class Map(name: String, subfields: List[Field], shape: TensorShape) extends Field
 
 }

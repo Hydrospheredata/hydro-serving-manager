@@ -1,16 +1,15 @@
-package io.hydrosphere.serving.manager.infrastructure.image.repositories
+package io.hydrosphere.serving.manager.infrastructure.docker
 
 import cats.effect.Sync
 import cats.implicits._
+import com.spotify.docker.client.ProgressHandler
 import com.spotify.docker.client.messages.RegistryAuth
-import com.spotify.docker.client.{DockerClient, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerRepositoryConfiguration
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
-import io.hydrosphere.serving.manager.infrastructure.docker.{DockerRegistryAuth, DockerdClient}
 
 class RemoteImageRepository[F[_]: Sync](
-  dockerClient: DockerdClient[F],
-  conf: DockerRepositoryConfiguration.Remote
+    dockerClient: DockerdClient[F],
+    conf: DockerRepositoryConfiguration.Remote
 ) extends ImageRepository[F] {
 
   override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): F[Unit] = {
@@ -37,7 +36,7 @@ class RemoteImageRepository[F[_]: Sync](
     DockerImage(
       user = Some(conf.host),
       name = s"${conf.imagePrefix.getOrElse("")}$name",
-      tag = DockerImage.tag(tag)
+      tag = tag
     )
   }
 }

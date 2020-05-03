@@ -1,5 +1,8 @@
 package io.hydrosphere.serving.manager.domain
 
+import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
+
+@ConfiguredJsonCodec
 sealed trait DomainError extends Throwable {
   def message: String
 
@@ -7,6 +10,7 @@ sealed trait DomainError extends Throwable {
 }
 
 object DomainError {
+  implicit val config = Configuration.default.withDiscriminator("error")
 
   final case class NotFound(message: String) extends DomainError
 

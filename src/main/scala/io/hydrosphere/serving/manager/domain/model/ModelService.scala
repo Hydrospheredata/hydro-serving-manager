@@ -6,20 +6,13 @@ import cats.data.OptionT
 import cats.effect.Clock
 import cats.implicits._
 import cats.{Monad, MonadError}
-import io.hydrosphere.serving.manager.api.http.controller.model.{
-  ModelUploadMetadata,
-  RegisterModelRequest
-}
+import io.hydrosphere.serving.manager.api.http.controller.model._
 import io.hydrosphere.serving.manager.domain.DomainError.{InvalidRequest, NotFound}
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository}
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
-import io.hydrosphere.serving.manager.domain.model_version.{
-  ModelVersion,
-  ModelVersionRepository,
-  ModelVersionService
-}
+import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.contract.Contract
@@ -94,7 +87,10 @@ object ModelService extends UnsafeLogging {
         hs          <- maybeHostSelector
         modelPath   <- storageService.unpack(filePath)
         fetchResult <- fetcher.fetch(modelPath.filesPath)
-        versionMetadata = ModelVersionMetadata.combineMetadata(fetchResult, meta, hs)
+        versionMetadata <- F.fromOption(
+          ModelVersionMetadata.combineMetadata(fetchResult, meta, hs),
+          DomainError.invalidRequest(s"No contract provided for a model  ${meta.name}")
+        )
         _ <- F.fromValidated(
           Contract
             .validateContract(versionMetadata.contract)

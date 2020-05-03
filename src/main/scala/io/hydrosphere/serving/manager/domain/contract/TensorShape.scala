@@ -1,17 +1,19 @@
 package io.hydrosphere.serving.manager.domain.contract
 
+import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.tensorflow.tensor_shape.TensorShapeProto
 
 /**
   * If Some, then acts like a numpy ndarray shape
   * If None, then there is no static shape. Checks disabled.
   */
+@JsonCodec
 sealed trait TensorShape extends Product with Serializable
 
 case object TensorShape {
-
+  @JsonCodec
   case class Static(dims: List[Long]) extends TensorShape
-
+  @JsonCodec
   case object Dynamic extends TensorShape
 
   final val infiniteDim = -1

@@ -12,6 +12,7 @@ import io.hydrosphere.serving.manager.config.{
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
+import io.hydrosphere.serving.manager.infrastructure.kubernetes.KubernetesClient
 
 import scala.concurrent.ExecutionContext
 
