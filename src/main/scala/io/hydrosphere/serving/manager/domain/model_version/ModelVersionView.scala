@@ -5,25 +5,26 @@ import java.time.Instant
 import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
+import io.hydrosphere.serving.manager.domain.contract.Contract
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 
 @JsonCodec
 case class ModelVersionView(
-  id: Long,
-  created: Instant,
-  finished: Option[Instant],
-  modelVersion: Long,
-  modelContract: ModelContract,
-  model: Model,
-  status: String,
-  metadata: Map[String, String],
-  applications: List[String],
-  image: Option[DockerImage],
-  runtime: Option[DockerImage],
-  hostSelector: Option[HostSelector],
-  isExternal: Boolean
+    id: Long,
+    created: Instant,
+    finished: Option[Instant],
+    modelVersion: Long,
+    modelContract: Contract,
+    model: Model,
+    status: String,
+    metadata: Map[String, String],
+    applications: List[String],
+    image: Option[DockerImage],
+    runtime: Option[DockerImage],
+    hostSelector: Option[HostSelector],
+    isExternal: Boolean
 )
 
 object ModelVersionView {

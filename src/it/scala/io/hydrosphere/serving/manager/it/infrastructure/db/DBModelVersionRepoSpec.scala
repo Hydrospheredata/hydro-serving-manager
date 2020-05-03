@@ -29,7 +29,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       model_contract = "contract",
       image_name = dummyImage.name,
       image_tag = dummyImage.tag,
-      image_sha256 = dummyImage.sha256,
+      image_sha256 = dummyImage.digest,
       runtime_name = dummyImage.name,
       runtime_version = dummyImage.tag,
       status = "status",

@@ -15,7 +15,6 @@ import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphCompo
 import io.hydrosphere.serving.manager.domain.application.graph._
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import io.hydrosphere.serving.manager.util.CollectionOps._
 
 import scala.util.{Failure, Success, Try}

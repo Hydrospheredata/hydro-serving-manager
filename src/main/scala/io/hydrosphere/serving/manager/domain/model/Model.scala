@@ -5,11 +5,22 @@ import io.hydrosphere.serving.manager.grpc.entities.{Model => GModel}
 
 @JsonCodec
 case class Model(
-  id: Long,
-  name: String
+    id: Long,
+    name: String
 ) {
   def toGrpc = GModel(
     id = id,
     name = name
   )
+}
+
+object Model {
+  def validate(name: String) = {
+    val validName = raw"^[a-z\-_\d]+$$".r
+    if (validName.pattern.matcher(name).matches()) {
+      Some(name)
+    } else {
+      None
+    }
+  }
 }

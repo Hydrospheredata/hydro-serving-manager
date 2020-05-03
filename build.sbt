@@ -58,5 +58,5 @@ dockerfile in docker := {
   }
 }
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven"
-  
+addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 libraryDependencies ++= Dependencies.all

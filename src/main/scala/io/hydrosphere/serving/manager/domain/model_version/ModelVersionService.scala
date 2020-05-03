@@ -5,7 +5,7 @@ import cats.data.OptionT
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
-import io.hydrosphere.serving.manager.domain.model.ModelValidator
+import io.hydrosphere.serving.manager.domain.model.{Model, ModelValidator}
 import io.hydrosphere.serving.manager.util.UnsafeLogging
 
 trait ModelVersionService[F[_]] {
@@ -26,31 +26,27 @@ trait ModelVersionService[F[_]] {
 
 object ModelVersionService extends UnsafeLogging {
   def apply[F[_]]()(
-    implicit F: MonadError[F, Throwable],
-    modelVersionRepository: ModelVersionRepository[F],
-    applicationRepo: ApplicationRepository[F],
-    modelPublisher: ModelVersionEvents.Publisher[F]
-  ): ModelVersionService[F] = new ModelVersionService[F]{
+      implicit F: MonadError[F, Throwable],
+      modelVersionRepository: ModelVersionRepository[F],
+      applicationRepo: ApplicationRepository[F],
+      modelPublisher: ModelVersionEvents.Publisher[F]
+  ): ModelVersionService[F] = new ModelVersionService[F] {
 
     def list: F[List[ModelVersionView]] = {
       for {
         allVersions <- modelVersionRepository.all()
-        f <- allVersions.map(_.id).traverse { x =>
-          applicationRepo.findVersionUsage(x).map(x -> _)
-        }
+        f           <- allVersions.map(_.id).traverse { x => applicationRepo.findVersionUsage(x).map(x -> _) }
         usageMap = f.toMap
       } yield {
-        allVersions.map { v =>
-          ModelVersionView.fromVersion(v, usageMap.getOrElse(v.id, Nil))
-        }
+        allVersions.map { v => ModelVersionView.fromVersion(v, usageMap.getOrElse(v.id, Nil)) }
       }
     }
 
     def delete(versionId: Long): F[Option[ModelVersion]] = {
       val f = for {
         version <- OptionT(modelVersionRepository.get(versionId))
-        _ <- OptionT.liftF(modelVersionRepository.delete(versionId))
-        _ <- OptionT.liftF(modelPublisher.remove(versionId))
+        _       <- OptionT.liftF(modelVersionRepository.delete(versionId))
+        _       <- OptionT.liftF(modelPublisher.remove(versionId))
       } yield version
       f.value
     }
@@ -63,9 +59,14 @@ object ModelVersionService extends UnsafeLogging {
 
     override def get(name: String, version: Long): F[ModelVersionView] = {
       for {
-        _ <- F.fromOption(ModelValidator.name(name), DomainError.invalidRequest("Name contains invalid characters."))
+        _ <- F.fromOption(
+          Model.validate(name),
+          DomainError.invalidRequest("Name contains invalid characters.")
+        )
         mv <- OptionT(modelVersionRepository.get(name, version))
-          .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $name:$version")))
+          .getOrElseF(
+            F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $name:$version"))
+          )
         apps <- applicationRepo.findVersionUsage(mv.id)
       } yield ModelVersionView.fromVersion(mv, apps)
     }

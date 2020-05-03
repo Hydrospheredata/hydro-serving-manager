@@ -62,7 +62,7 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         )
 
         val imageRepo = new ImageRepository[IO] {
-          override def getImage(name: String, tag: String): DockerImage = DockerImage(name, tag)
+          override def getImageForModelVersion(name: String, tag: String): DockerImage = DockerImage(name, DockerImage.tag(tag))
 
           override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): IO[Unit] = {
             IO.raiseError(new Exception())
@@ -178,7 +178,7 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         }
         val p = Promise[DockerImage]
         val imageRepo = new ImageRepository[IO] {
-          override def getImage(name: String, tag: String): DockerImage = DockerImage(name, tag)
+          override def getImageForModelVersion(name: String, tag: String): DockerImage = DockerImage(name, tag)
 
           override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): IO[Unit] = {
               IO(p.success(dockerImage))

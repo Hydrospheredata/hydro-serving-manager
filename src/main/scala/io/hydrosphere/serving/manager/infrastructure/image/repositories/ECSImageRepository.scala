@@ -32,10 +32,11 @@ class ECSImageRepository[F[_]: Sync](
     } yield res
   }
 
-  override def getImage(modelName: String, modelVersion: String): DockerImage = {
+  override def getImageForModelVersion(modelName: String, modelVersion: String): DockerImage = {
     DockerImage(
-      name = s"${ecsDockerRepositoryConfiguration.accountId}.dkr.ecr.${ecsDockerRepositoryConfiguration.region.getName}.amazonaws.com/$modelName",
-      tag = modelVersion.toString
+      user = Some(s"${ecsDockerRepositoryConfiguration.accountId}.dkr.ecr.${ecsDockerRepositoryConfiguration.region.getName}.amazonaws.com"),
+      name = modelName,
+      tag = DockerImage.tag(modelVersion)
     )
   }
 

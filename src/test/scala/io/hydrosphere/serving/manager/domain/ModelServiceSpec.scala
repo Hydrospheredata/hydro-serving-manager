@@ -18,6 +18,7 @@ import io.hydrosphere.serving.manager.domain.application.Application.GenericAppl
 import io.hydrosphere.serving.manager.domain.application.graph.Variant
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
+import io.hydrosphere.serving.manager.domain.contract.Contract
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model._
@@ -40,7 +41,7 @@ class ModelServiceSpec extends GenericUnitTest {
   describe("Model service") {
     describe("name validation") {
       it("should reject uppercase letters") {
-        assert(ModelValidator.name("ClassifierModel").isEmpty)
+        assert(Model.validate("ClassifierModel").isEmpty)
       }
     }
     describe("contract validation") {

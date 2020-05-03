@@ -11,6 +11,7 @@ object Dependencies {
   val catsV = "2.1.3"
   val doobieV = "0.8.8"
   val circeVersion = "0.13.0"
+  val enumeratumV = "1.6.0"
 
 
   lazy val aws = Seq(
@@ -99,6 +100,8 @@ object Dependencies {
       "co.fs2" %% "fs2-io" % "2.3.0",
       "com.github.krasserm" %% "streamz-converter" % "0.11-RC1",
       "org.typelevel" %% "simulacrum" % "1.0.0",
-      "com.github.pureconfig" %% "pureconfig" % "0.12.3"
+      "com.github.pureconfig" %% "pureconfig" % "0.12.3",
+      "com.beachape" %% "enumeratum" % enumeratumV,
+      "com.beachape" %% "enumeratum-circe" % enumeratumV
     )
 }

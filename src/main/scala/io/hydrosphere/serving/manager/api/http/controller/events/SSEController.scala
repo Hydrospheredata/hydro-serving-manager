@@ -18,7 +18,6 @@ import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.ServableEvents
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import streamz.converter._
 
 import scala.concurrent.ExecutionContext
@@ -71,7 +70,7 @@ class SSEController[F[_]](
 
 }
 
-object SSEController extends CompleteJsonProtocol {
+object SSEController {
   def fromServableDiscovery(x: ServableEvents.Event): List[ServerSentEvent] = {
     x match {
       case DiscoveryEvent.Initial => Nil

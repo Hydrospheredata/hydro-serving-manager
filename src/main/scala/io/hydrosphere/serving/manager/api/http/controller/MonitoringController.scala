@@ -4,6 +4,7 @@ import akka.http.scaladsl.server.Route
 import cats.data.OptionT
 import cats.effect.Effect
 import cats.implicits._
+import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.api.http.controller.MonitoringRequests._
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
 import io.hydrosphere.serving.manager.domain.DomainError
@@ -73,16 +74,21 @@ class MonitoringController[F[_]](
 }
 
 object MonitoringRequests {
+  @JsonCodec
   final case class MetricSpecConfigCreationRequest(modelVersionId: Long, threshold: Double, thresholdCmpOperator: ThresholdCmpOperator)
+  @JsonCodec
   final case class MetricSpecCreationRequest(name: String, modelVersionId: Long, config: MetricSpecConfigCreationRequest)
 
+  @JsonCodec
   final case class MetricSpecConfigView(
     modelVersionId: Long,
     threshold: Double,
     thresholdCmpOperator: ThresholdCmpOperator,
     servable: Option[ServableView]
   )
-  final case class MetricSpecView(  name: String,
+  @JsonCodec
+  final case class MetricSpecView(
+    name: String,
     modelVersionId: Long,
     config: MetricSpecConfigView,
     id: String

@@ -33,10 +33,11 @@ class RemoteImageRepository[F[_]: Sync](
     } yield res
   }
 
-  override def getImage(name: String, tag: String): DockerImage = {
+  override def getImageForModelVersion(name: String, tag: String): DockerImage = {
     DockerImage(
-      name = s"${conf.host}/${conf.imagePrefix.getOrElse("")}$name",
-      tag = tag
+      user = Some(conf.host),
+      name = s"${conf.imagePrefix.getOrElse("")}$name",
+      tag = DockerImage.tag(tag)
     )
   }
 }

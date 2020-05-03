@@ -1,11 +1,10 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
-import cats.implicits._
-import io.circe.{Decoder, Encoder}
+import enumeratum.{CirceEnum, Enum, EnumEntry}
 
-sealed trait ModelVersionStatus extends Product with Serializable
+sealed trait ModelVersionStatus extends EnumEntry
 
-object ModelVersionStatus {
+case object ModelVersionStatus extends Enum[ModelVersionStatus] with CirceEnum[ModelVersionStatus] {
 
   final case object Assembling extends ModelVersionStatus
 
@@ -13,11 +12,5 @@ object ModelVersionStatus {
 
   final case object Failed extends ModelVersionStatus
 
-  implicit val decoder: Decoder[ModelVersionStatus] = Decoder.decodeString.emap {
-    case "Assembling" => Assembling.asRight
-    case "Released" => Released.asRight
-    case "Failed" => Failed.asRight
-    case x => s"Unknown status ${x}".asLeft
-  }
-  implicit val encoder: Encoder[ModelVersionStatus] = Encoder.encodeString.contramap(_.productPrefix)
+  override def values: IndexedSeq[ModelVersionStatus] = findValues
 }

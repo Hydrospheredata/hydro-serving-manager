@@ -68,7 +68,7 @@ class ApplicationController[F[_]: Effect](
   def generateInputsForApp = pathPrefix("application" / "generateInputs" / Segment) { appName =>
     get {
       completeF(
-        appService.generateInputs(appName)
+        ApplicationService.generateInputs[F](appName)
       )
     }
   }

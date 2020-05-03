@@ -10,9 +10,9 @@ import simulacrum._
 trait StorageOps[F[_]] {
   def getReadableFile(path: Path): F[Option[File]]
 
-  def getAllFiles(folder: Path): F[Option[List[String]]]
+  def getAllFiles(folder: Path): F[List[String]]
 
-  def getSubDirs(path: Path): F[Option[List[String]]]
+  def getSubDirs(path: Path): F[List[String]]
 
   def exists(path: Path): F[Boolean]
 
@@ -20,13 +20,13 @@ trait StorageOps[F[_]] {
 
   def moveFolder(src: Path, target: Path): F[Path]
 
-  def removeFolder(path: Path): F[Option[Unit]]
+  def removeFolder(path: Path): F[Unit]
 
   def getTempDir(prefix: String): F[Path]
-  
-  def readText(path: Path): F[Option[List[String]]]
 
-  def readBytes(path: Path): F[Option[Array[Byte]]]
+  def readText(path: Path): F[List[String]]
+
+  def readBytes(path: Path): F[Array[Byte]]
 
   def writeBytes(path: Path, bytes: Array[Byte]): F[Path]
 }

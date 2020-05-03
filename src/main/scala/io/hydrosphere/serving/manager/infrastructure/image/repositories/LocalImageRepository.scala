@@ -5,10 +5,10 @@ import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 
 class LocalImageRepository[F[_]: Applicative] extends ImageRepository[F] {
-  override def getImage(name: String, tag: String): DockerImage = {
+  override def getImageForModelVersion(name: String, tag: String): DockerImage = {
     DockerImage(
       name = name,
-      tag = tag
+      tag = DockerImage.tag(tag)
     )
   }
 

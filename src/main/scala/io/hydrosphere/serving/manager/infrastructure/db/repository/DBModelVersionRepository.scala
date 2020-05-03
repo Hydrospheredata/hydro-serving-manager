@@ -13,8 +13,6 @@ import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
-import spray.json._
 import java.time.Instant
 
 import cats.data.NonEmptyList
@@ -46,7 +44,7 @@ object DBModelVersionRepository {
     val image = DockerImage(
       name = mvr.image_name,
       tag = mvr.image_tag,
-      sha256 = mvr.image_sha256
+      digest = mvr.image_sha256
     )
     val model = Model(
       id = mr.model_id,
@@ -104,7 +102,7 @@ object DBModelVersionRepository {
           model_contract = mv.modelContract.toJson.compactPrint,
           image_name = mv.image.name,
           image_tag = mv.image.tag,
-          image_sha256 = mv.image.sha256,
+          image_sha256 = mv.image.digest,
           runtime_name = mv.runtime.name,
           runtime_version = mv.runtime.tag,
           status = mv.status.toString,

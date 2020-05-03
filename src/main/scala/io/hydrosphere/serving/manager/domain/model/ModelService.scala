@@ -6,15 +6,23 @@ import cats.data.OptionT
 import cats.effect.Clock
 import cats.implicits._
 import cats.{Monad, MonadError}
-import io.hydrosphere.serving.manager.api.http.controller.model.{ModelUploadMetadata, RegisterModelRequest}
+import io.hydrosphere.serving.manager.api.http.controller.model.{
+  ModelUploadMetadata,
+  RegisterModelRequest
+}
 import io.hydrosphere.serving.manager.domain.DomainError.{InvalidRequest, NotFound}
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository}
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionService}
+import io.hydrosphere.serving.manager.domain.model_version.{
+  ModelVersion,
+  ModelVersionRepository,
+  ModelVersionService
+}
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
-import io.hydrosphere.serving.manager.domain.{Contract, DomainError}
+import io.hydrosphere.serving.manager.domain.DomainError
+import io.hydrosphere.serving.manager.domain.contract.Contract
 import io.hydrosphere.serving.manager.infrastructure.storage.ModelUnpacker
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
 import io.hydrosphere.serving.manager.util.{DeferredResult, UnsafeLogging}
@@ -25,7 +33,10 @@ trait ModelService[F[_]] {
 
   def deleteModel(modelId: Long): F[Model]
 
-  def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion.Internal]]
+  def uploadModel(
+      filePath: Path,
+      meta: ModelUploadMetadata
+  ): F[DeferredResult[F, ModelVersion.Internal]]
 
   def registerModel(modelReq: RegisterModelRequest): F[ModelVersion.External]
 
@@ -36,56 +47,68 @@ trait ModelService[F[_]] {
 
 object ModelService extends UnsafeLogging {
   def apply[F[_]]()(
-    implicit
-    F: MonadError[F, Throwable],
-    clock: Clock[F],
-    modelRepository: ModelRepository[F],
-    modelVersionRepository: ModelVersionRepository[F],
-    modelVersionService: ModelVersionService[F],
-    storageService: ModelUnpacker[F],
-    appRepo: ApplicationRepository[F],
-    hostSelectorRepository: HostSelectorRepository[F],
-    servableRepo: ServableRepository[F],
-    fetcher: ModelFetcher[F],
-    modelVersionBuilder: ModelVersionBuilder[F]
+      implicit
+      F: MonadError[F, Throwable],
+      clock: Clock[F],
+      modelRepository: ModelRepository[F],
+      modelVersionRepository: ModelVersionRepository[F],
+      modelVersionService: ModelVersionService[F],
+      storageService: ModelUnpacker[F],
+      appRepo: ApplicationRepository[F],
+      hostSelectorRepository: HostSelectorRepository[F],
+      servableRepo: ServableRepository[F],
+      fetcher: ModelFetcher[F],
+      modelVersionBuilder: ModelVersionBuilder[F]
   ): ModelService[F] = new ModelService[F] {
 
     def deleteModel(modelId: Long): F[Model] = {
       for {
-        model <- get(modelId)
+        model    <- get(modelId)
         versions <- modelVersionService.listForModel(model.id)
-        _ <- checkIfNoApps(versions)
-        _ <- checkIfNoServables(versions)
-        _ <- versions.traverse(x => modelVersionService.delete(x.id))
-        _ <- modelRepository.delete(model.id)
+        _        <- checkIfNoApps(versions)
+        _        <- checkIfNoServables(versions)
+        _        <- versions.traverse(x => modelVersionService.delete(x.id))
+        _        <- modelRepository.delete(model.id)
       } yield model
     }
 
-    def uploadModel(filePath: Path, meta: ModelUploadMetadata): F[DeferredResult[F, ModelVersion.Internal]] = {
+    def uploadModel(
+        filePath: Path,
+        meta: ModelUploadMetadata
+    ): F[DeferredResult[F, ModelVersion.Internal]] = {
       val maybeHostSelector = meta.hostSelectorName match {
         case Some(value) =>
           OptionT(hostSelectorRepository.get(value))
             .map(_.some)
-            .getOrElseF(F.raiseError(DomainError.invalidRequest(s"Can't find host selector named $value")))
+            .getOrElseF(
+              F.raiseError(DomainError.invalidRequest(s"Can't find host selector named $value"))
+            )
         case None => F.pure(none[HostSelector])
       }
 
       for {
-        _ <- F.fromOption(ModelValidator.name(meta.name), DomainError.invalidRequest("Model name contains invalid characters"))
-        hs <- maybeHostSelector
-        modelPath <- storageService.unpack(filePath)
+        _ <- F.fromOption(
+          Model.validate(meta.name),
+          DomainError.invalidRequest("Model name contains invalid characters")
+        )
+        hs          <- maybeHostSelector
+        modelPath   <- storageService.unpack(filePath)
         fetchResult <- fetcher.fetch(modelPath.filesPath)
         versionMetadata = ModelVersionMetadata.combineMetadata(fetchResult, meta, hs)
-        _ <- F.fromValidated(Contract.validateContract(versionMetadata.contract).leftMap(x => InvalidRequest(x.toList.mkString)))
+        _ <- F.fromValidated(
+          Contract
+            .validateContract(versionMetadata.contract)
+            .leftMap(x => InvalidRequest(x.toList.mkString))
+        )
         parentModel <- createIfNecessary(versionMetadata.modelName)
-        b <- modelVersionBuilder.build(parentModel, versionMetadata, modelPath)
+        b           <- modelVersionBuilder.build(parentModel, versionMetadata, modelPath)
       } yield b
     }
 
     def createIfNecessary(modelName: String): F[Model] = {
       modelRepository.get(modelName).flatMap {
         case Some(x) => Monad[F].pure(x)
-        case None => modelRepository.create(Model(0, modelName))
+        case None    => modelRepository.create(Model(0, modelName))
       }
     }
 
@@ -95,7 +118,9 @@ object ModelService extends UnsafeLogging {
           F.pure(targetModel)
 
         case Some(model) => // it's other model - not ok
-          val errMsg = InvalidRequest(s"There is already a model with same name: ${model.name}(${model.id}) -> ${newModelInfo.name}(${newModelInfo.id})")
+          val errMsg = InvalidRequest(
+            s"There is already a model with same name: ${model.name}(${model.id}) -> ${newModelInfo.name}(${newModelInfo.id})"
+          )
           logger.error(errMsg.message)
           F.raiseError(errMsg)
 
@@ -118,7 +143,7 @@ object ModelService extends UnsafeLogging {
 
       for {
         usedApps <- versions.map(_.id).toList.traverse(appRepo.findVersionUsage)
-        _ <- F.fromEither(_checkApps(usedApps))
+        _        <- F.fromEither(_checkApps(usedApps))
       } yield ()
     }
 
@@ -128,9 +153,12 @@ object ModelService extends UnsafeLogging {
           servables <- servableRepo.findForModelVersion(version.id)
           _ <- servables match {
             case Nil => F.unit
-            case x => DomainError
-              .invalidRequest(s"Can't delete the model. ${version.fullName} is used in ${x.map(_.fullName)}")
-              .raiseError[F, Unit]
+            case x =>
+              DomainError
+                .invalidRequest(
+                  s"Can't delete the model. ${version.fullName} is used in ${x.map(_.fullName)}"
+                )
+                .raiseError[F, Unit]
           }
         } yield ()
       }.void
@@ -138,24 +166,30 @@ object ModelService extends UnsafeLogging {
 
     override def get(modelId: Long): F[Model] = {
       OptionT(modelRepository.get(modelId))
-        .getOrElseF(F.raiseError(NotFound(s"Can't find a model with id $modelId"))
-        )
+        .getOrElseF(F.raiseError(NotFound(s"Can't find a model with id $modelId")))
     }
 
     override def registerModel(modelReq: RegisterModelRequest): F[ModelVersion.External] = {
       for {
-        _ <- F.fromOption(ModelValidator.name(modelReq.name), DomainError.invalidRequest("Model name contains invalid characters"))
-        _ <- F.fromValidated(Contract.validateContract(modelReq.contract).leftMap(x => InvalidRequest(x.toList.mkString)))
+        _ <- F.fromOption(
+          Model.validate(modelReq.name),
+          DomainError.invalidRequest("Model name contains invalid characters")
+        )
+        _ <- F.fromValidated(
+          Contract
+            .validateContract(modelReq.contract)
+            .leftMap(x => InvalidRequest(x.toList.mkString))
+        )
         parentModel <- createIfNecessary(modelReq.name)
-        version <- modelVersionService.getNextModelVersion(parentModel.id)
-        timestamp <- clock.instant()
+        version     <- modelVersionService.getNextModelVersion(parentModel.id)
+        timestamp   <- clock.instant()
         mv = ModelVersion.External(
           id = 0,
           created = timestamp,
           modelVersion = version,
           modelContract = modelReq.contract,
           model = parentModel,
-          metadata = modelReq.metadata.getOrElse(Map.empty),
+          metadata = modelReq.metadata.getOrElse(Map.empty)
         )
         ver <- modelVersionRepository.create(mv)
       } yield mv.copy(id = ver.id)

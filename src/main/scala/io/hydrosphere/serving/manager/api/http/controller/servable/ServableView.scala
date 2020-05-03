@@ -4,7 +4,6 @@ import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 
 @JsonCodec
 case class ServableView(
@@ -14,7 +13,7 @@ case class ServableView(
   metadata: Map[String, String]
 )
 
-object ServableView extends CompleteJsonProtocol {
+object ServableView {
   def fromServable(s: GenericServable): ServableView = {
     ServableView(
       modelVersion = s.modelVersion,

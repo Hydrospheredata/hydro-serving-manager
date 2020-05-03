@@ -16,35 +16,43 @@ import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.{DeferredResult, UnsafeLogging}
 
-trait ModelVersionBuilder[F[_]]{
-  def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion.Internal]]
+trait ModelVersionBuilder[F[_]] {
+  def build(
+      model: Model,
+      metadata: ModelVersionMetadata,
+      modelFileStructure: ModelFileStructure
+  ): F[DeferredResult[F, ModelVersion.Internal]]
 }
 
 object ModelVersionBuilder extends UnsafeLogging {
-  def apply[F[_] : Concurrent]()(
-  implicit
-    dockerClient: DockerdClient[F],
-    modelVersionRepository: ModelVersionRepository[F],
-    imageRepository: ImageRepository[F],
-    modelVersionService: ModelVersionService[F],
-    storageOps: StorageOps[F],
-    modelDiscoveryHub: ModelVersionEvents.Publisher[F],
-    buildLoggingService: BuildLoggingService[F]
+  def apply[F[_]: Concurrent]()(
+      implicit
+      dockerClient: DockerdClient[F],
+      modelVersionRepository: ModelVersionRepository[F],
+      imageRepository: ImageRepository[F],
+      modelVersionService: ModelVersionService[F],
+      storageOps: StorageOps[F],
+      modelDiscoveryHub: ModelVersionEvents.Publisher[F],
+      buildLoggingService: BuildLoggingService[F]
   ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] {
-    override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion.Internal]] = {
+    override def build(
+        model: Model,
+        metadata: ModelVersionMetadata,
+        modelFileStructure: ModelFileStructure
+    ): F[DeferredResult[F, ModelVersion.Internal]] = {
       for {
-        init <- initialVersion(model, metadata)
-        handler <- buildLoggingService.makeLogger(init)
-        _ <- modelDiscoveryHub.update(init)
+        init     <- initialVersion(model, metadata)
+        handler  <- buildLoggingService.makeLogger(init)
+        _        <- modelDiscoveryHub.update(init)
         deferred <- Deferred[F, ModelVersion.Internal]
-        _ <- handleBuild(init, modelFileStructure, handler).flatMap(deferred.complete).start
+        _        <- handleBuild(init, modelFileStructure, handler).flatMap(deferred.complete).start
       } yield DeferredResult(init, deferred)
     }
 
-    def initialVersion(model: Model, metadata: ModelVersionMetadata) = {
+    def initialVersion(model: Model, metadata: ModelVersionMetadata): F[ModelVersion.Internal] = {
       for {
         version <- modelVersionService.getNextModelVersion(model.id)
-        image = imageRepository.getImage(metadata.modelName, version.toString)
+        image = imageRepository.getImageForModelVersion(metadata.modelName, version.toString)
         mv = ModelVersion.Internal(
           id = 0,
           image = image,
@@ -57,29 +65,38 @@ object ModelVersionBuilder extends UnsafeLogging {
           hostSelector = metadata.hostSelector,
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
-          metadata = metadata.metadata,
+          metadata = metadata.metadata
         )
         modelVersion <- modelVersionRepository.create(mv)
       } yield mv.copy(id = modelVersion.id)
     }
 
-    def buildImage(buildPath: Path, image: DockerImage, handler: ProgressHandler) = for {
-      imageId <- dockerClient.build(
-        buildPath,
-        image.fullName,
-        "Dockerfile",
-        handler,
-        List(BuildParam.noCache())
-      )
-      res <- dockerClient.inspectImage(imageId)
-    } yield res.id().stripPrefix("sha256:")
+    def buildImage(buildPath: Path, image: DockerImage, handler: ProgressHandler): F[String] =
+      for {
+        imageId <- dockerClient.build(
+          buildPath,
+          image.fullName,
+          "Dockerfile",
+          handler,
+          List(BuildParam.noCache())
+        )
+        res <- dockerClient.inspectImage(imageId)
+      } yield res.id().stripPrefix("sha256:")
 
-    def handleBuild(mv: ModelVersion.Internal, modelFileStructure: ModelFileStructure, handler: ProgressHandler) = {
+    def handleBuild(
+        mv: ModelVersion.Internal,
+        modelFileStructure: ModelFileStructure,
+        handler: ProgressHandler
+    ): F[ModelVersion.Internal] = {
       val innerCompleted = for {
         buildPath <- prepare(mv, modelFileStructure)
-        imageSha <- buildImage(buildPath.root, mv.image, handler)
-        newDockerImage = mv.image.copy(sha256 = Some(imageSha))
-        finishedVersion = mv.copy(image = newDockerImage, finished = Instant.now().some, status = ModelVersionStatus.Released)
+        imageSha  <- buildImage(buildPath.root, mv.image, handler)
+        newDockerImage = mv.image.resolve(imageSha)
+        finishedVersion = mv.copy(
+          image = newDockerImage,
+          finished = Instant.now().some,
+          status = ModelVersionStatus.Released
+        )
         _ <- imageRepository.push(finishedVersion.image, handler)
         _ <- buildLoggingService.finishLogging(mv.id)
         _ <- modelVersionRepository.update(finishedVersion)
@@ -97,10 +114,15 @@ object ModelVersionBuilder extends UnsafeLogging {
       }
     }
 
-    def prepare(modelVersion: ModelVersion.Internal, modelFileStructure: ModelFileStructure): F[ModelFileStructure] = {
+    def prepare(
+        modelVersion: ModelVersion.Internal,
+        modelFileStructure: ModelFileStructure
+    ): F[ModelFileStructure] = {
       for {
-        _ <- storageOps.writeBytes(modelFileStructure.dockerfile, BuildScript.generate(modelVersion).getBytes)
-        _ <- storageOps.writeBytes(modelFileStructure.contractPath, modelVersion.modelContract.toByteArray)
+        _ <- storageOps
+          .writeBytes(modelFileStructure.dockerfile, BuildScript.generate(modelVersion).getBytes)
+        _ <- storageOps
+          .writeBytes(modelFileStructure.contractPath, modelVersion.modelContract.toByteArray)
       } yield modelFileStructure
     }
   }

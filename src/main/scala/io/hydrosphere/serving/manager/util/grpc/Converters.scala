@@ -12,8 +12,10 @@ import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
 import io.hydrosphere.serving.manager.grpc.entities.Servable.ServableStatus
 import io.hydrosphere.serving.manager.grpc.entities.{CustomModelMetric, ServingApp, ThresholdConfig, Servable => GServable, Stage => GStage}
 import io.hydrosphere.serving.manager.{domain, grpc}
+import scalapb.GeneratedEnum
 
 object Converters {
+
   def mapThresholdOperator(thresholdCmpOperator: ThresholdCmpOperator): ThresholdConfig.CmpOp = {
     thresholdCmpOperator match {
       case ThresholdCmpOperator.Eq => ThresholdConfig.CmpOp.EQ
@@ -55,7 +57,7 @@ object Converters {
           model = Some(grpc.entities.Model(imv.model.id, imv.model.name)),
           contract = Some(imv.modelContract),
           image = Some(grpc.entities.DockerImage(imv.image.name, imv.image.tag)),
-          imageSha = imv.image.sha256.getOrElse(""),
+          imageSha = imv.image.digest.getOrElse(""),
           runtime = Some(grpc.entities.DockerImage(imv.runtime.name, imv.runtime.tag)),
           metadata = imv.metadata
         )
