@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.infrastructure.db
 
-import cats.data.OptionT
+import cats.data.{NonEmptyList, OptionT}
 import cats.effect.Bracket
 import cats.implicits._
 import doobie.implicits._
@@ -26,7 +26,7 @@ object ApplicationMigrationTool extends UnsafeLogging {
       servableRepository: ServableRepository[F]
   )(implicit F: Bracket[F, Throwable]): ApplicationMigrationTool[F] =
     new ApplicationMigrationTool[F] {
-      override def getAndRevive() = {
+      override def getAndRevive() =
         for {
           maybeApps <- appsRepo.all().attempt
           _ <- maybeApps match {
@@ -49,7 +49,6 @@ object ApplicationMigrationTool extends UnsafeLogging {
               F.unit
           }
         } yield ()
-      }
 
       def restoreVersions(
           rawApp: ApplicationRow,
@@ -61,7 +60,10 @@ object ApplicationMigrationTool extends UnsafeLogging {
             rawApp.copy(used_model_versions = usedVersions).pure[F]
 
           case Right(value) =>
-            val servableNames = value.stages.flatMap(_.modelVariants.map(_.item)).toList
+            val servableNames = NonEmptyList
+              .fromList(value.stages.flatMap(_.modelVariants.map(_.item)).toList)
+              .get
+              .toNes // TODO fix
             for {
               servables <- servableRepository.get(servableNames)
               versions = servables.map(_.modelVersion.id)
@@ -74,7 +76,7 @@ object ApplicationMigrationTool extends UnsafeLogging {
         } yield newApp
       }
 
-      def restoreServables(rawApp: ApplicationRow): F[ApplicationRow] = {
+      def restoreServables(rawApp: ApplicationRow): F[ApplicationRow] =
         for {
           oldGraph <- F.fromEither(parse(rawApp.execution_graph).flatMap(_.as[VersionGraphAdapter]))
           _ <- oldGraph.stages.traverse { stage =>
@@ -101,14 +103,14 @@ object ApplicationMigrationTool extends UnsafeLogging {
               )
             }
           )
-          streaming = rawApp.kafka_streams
-            .map(p => parse(p).flatMap(_.as[ApplicationKafkaStream]))
-            .collect {
-              case Right(value) => value
-            }
+          streaming =
+            rawApp.kafka_streams
+              .map(p => parse(p).flatMap(_.as[ApplicationKafkaStream]))
+              .collect {
+                case Right(value) => value
+              }
           _ = logger.debug(s"Restoring ${rawApp.application_name}")
           newApp <- appDeployer.deploy(rawApp.application_name, graph, streaming)
         } yield rawApp
-      }
     }
 }

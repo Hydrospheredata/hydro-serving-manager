@@ -9,7 +9,7 @@ object Dependencies {
   lazy val awsSdkVersion     = "1.11.312"
   lazy val servingGrpcScala  = "2.3.0-dev1"
   lazy val catsV             = "2.1.3"
-  lazy val doobieV           = "0.8.8"
+  lazy val doobieV           = "0.9.0"
   lazy val circeVersion      = "0.13.0"
   lazy val enumeratumV       = "1.6.0"
   lazy val mockitoV          = "1.14.0"
@@ -25,7 +25,7 @@ object Dependencies {
   )
 
   lazy val infrastructure = Seq(
-    "io.skuber"   %% "skuber"       % "2.4.0",
+    "io.skuber"  %% "skuber"        % "2.4.0",
     "com.spotify" % "docker-client" % "8.16.0" exclude ("ch.qos.logback", "logback-classic")
   )
 
@@ -53,7 +53,7 @@ object Dependencies {
   lazy val grpc = Seq(
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     "io.hydrosphere"       %% "serving-grpc-scala"   % servingGrpcScala,
-    "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion
+    "io.grpc"               % "grpc-netty"           % scalapb.compiler.Version.grpcJavaVersion
   ).map(_ exclude ("com.google.api.grpc", "proto-google-common-protos"))
 
   lazy val test = Seq(
@@ -78,12 +78,12 @@ object Dependencies {
   )
 
   lazy val db = Seq(
-    "org.tpolecat"   %% "doobie-core"      % doobieV,
-    "org.tpolecat"   %% "doobie-postgres"  % doobieV,
-    "com.zaxxer"     % "HikariCP"          % "2.6.3", // doobie-hikari depends on hikari 3.3.1 which has weird pool retries.
-    "org.tpolecat"   %% "doobie-scalatest" % doobieV % "test, it",
-    "org.postgresql" % "postgresql"        % postgresqlVersion,
-    "org.flywaydb"   % "flyway-core"       % "4.2.0"
+    "org.tpolecat"  %% "doobie-core"      % doobieV,
+    "org.tpolecat"  %% "doobie-postgres"  % doobieV,
+    "com.zaxxer"     % "HikariCP"         % "2.6.3", // doobie-hikari depends on hikari 3.3.1 which has weird pool retries.
+    "org.tpolecat"  %% "doobie-scalatest" % doobieV % "test, it",
+    "org.postgresql" % "postgresql"       % postgresqlVersion,
+    "org.flywaydb"   % "flyway-core"      % "4.2.0"
   )
 
   lazy val all = logs ++

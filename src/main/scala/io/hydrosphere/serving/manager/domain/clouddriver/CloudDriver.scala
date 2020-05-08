@@ -18,6 +18,7 @@ import scala.concurrent.ExecutionContext
 
 object CloudInstance {
 
+  @JsonCodec
   sealed trait Status
 
   object Status {
@@ -71,12 +72,11 @@ object CloudDriver {
       dockerdClient: DockerdClient[F],
       config: CloudDriverConfiguration,
       dockerRepoConf: DockerRepositoryConfiguration
-  )(
-      implicit
+  )(implicit
       ex: ExecutionContext,
       actorSystem: ActorSystem,
       materializer: Materializer
-  ): CloudDriver[F] = {
+  ): CloudDriver[F] =
     config match {
       case dockerConf: CloudDriverConfiguration.Docker =>
         new DockerDriver[F](dockerdClient, dockerConf)
@@ -93,5 +93,4 @@ object CloudDriver {
       case x =>
         throw new Exception(s"Not implemented for $x")
     }
-  }
 }

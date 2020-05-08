@@ -11,10 +11,8 @@ import io.hydrosphere.serving.tensorflow.tensor_shape.TensorShapeProto
 sealed trait TensorShape extends Product with Serializable
 
 case object TensorShape {
-  @JsonCodec
   case class Static(dims: List[Long]) extends TensorShape
-  @JsonCodec
-  case object Dynamic extends TensorShape
+  case object Dynamic                 extends TensorShape
 
   final val infiniteDim = -1
 
@@ -24,10 +22,9 @@ case object TensorShape {
 
   def varVector: Static = Static(List(infiniteDim))
 
-  def toProto(tensorShape: TensorShape): Option[TensorShapeProto] = {
+  def toProto(tensorShape: TensorShape): Option[TensorShapeProto] =
     tensorShape match {
       case Static(dims) => Some(TensorShapeProto(dim = dims.map(d => TensorShapeProto.Dim(d))))
       case Dynamic      => None
     }
-  }
 }

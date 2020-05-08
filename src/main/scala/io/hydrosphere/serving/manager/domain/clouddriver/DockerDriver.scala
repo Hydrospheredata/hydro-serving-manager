@@ -15,21 +15,20 @@ import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-class DockerDriver[F[_]](client: DockerdClient[F], config: CloudDriverConfiguration.Docker)(
-    implicit F: MonadError[F, Throwable]
+class DockerDriver[F[_]](client: DockerdClient[F], config: CloudDriverConfiguration.Docker)(implicit
+    F: MonadError[F, Throwable]
 ) extends CloudDriver[F] {
 
   import DockerDriver._
 
-  override def instances: F[List[CloudInstance]] = {
-    client.listAllContainers.map(all => {
+  override def instances: F[List[CloudInstance]] =
+    client.listAllContainers.map { all =>
       all.map(containerToInstance).collect({ case Some(v) => v })
-    })
-  }
+    }
 
   private def containerOf(name: String): F[Option[Container]] = {
     val query = List(
@@ -67,7 +66,7 @@ class DockerDriver[F[_]](client: DockerdClient[F], config: CloudDriverConfigurat
     } yield out
   }
 
-  override def remove(name: String): F[Unit] = {
+  override def remove(name: String): F[Unit] =
     for {
       maybeC <- containerOf(name)
       _ <- maybeC match {
@@ -80,7 +79,6 @@ class DockerDriver[F[_]](client: DockerdClient[F], config: CloudDriverConfigurat
         case None => F.raiseError[Unit](new Exception(s"Could not find container for $name"))
       }
     } yield ()
-  }
 
   private def containerToInstance(c: Container): Option[CloudInstance] = {
     val labels = c.labels().asScala
@@ -159,63 +157,51 @@ object DockerDriver {
     sealed trait ContainerState
     object ContainerState {
       final case object Created extends ContainerState {
-        def unapply(arg: String): Option[Created.type] = {
-          if (arg == "created") {
+        def unapply(arg: String): Option[Created.type] =
+          if (arg == "created")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Restarting extends ContainerState {
-        def unapply(arg: String): Option[Restarting.type] = {
-          if (arg == "restarting") {
+        def unapply(arg: String): Option[Restarting.type] =
+          if (arg == "restarting")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Running extends ContainerState {
-        def unapply(arg: String): Option[Running.type] = {
-          if (arg == "running") {
+        def unapply(arg: String): Option[Running.type] =
+          if (arg == "running")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Paused extends ContainerState {
-        def unapply(arg: String): Option[Paused.type] = {
-          if (arg == "paused") {
+        def unapply(arg: String): Option[Paused.type] =
+          if (arg == "paused")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Exited extends ContainerState {
-        def unapply(arg: String): Option[Exited.type] = {
-          if (arg == "exited") {
+        def unapply(arg: String): Option[Exited.type] =
+          if (arg == "exited")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Dead extends ContainerState {
-        def unapply(arg: String): Option[Dead.type] = {
-          if (arg == "dead") {
+        def unapply(arg: String): Option[Dead.type] =
+          if (arg == "dead")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
     }

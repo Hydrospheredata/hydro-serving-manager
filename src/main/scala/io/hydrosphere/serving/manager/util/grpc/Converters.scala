@@ -10,52 +10,56 @@ import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.monitoring._
 import io.hydrosphere.serving.manager.domain.servable.Servable
-import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
-import io.hydrosphere.serving.manager.grpc.entities.Servable.ServableStatus
-import io.hydrosphere.serving.manager.grpc.entities.{
-  CustomModelMetric,
-  ServingApp,
-  ThresholdConfig,
-  DockerImage => GDockerImage,
-  Servable => GServable,
-  Stage => GStage
-}
+import io.hydrosphere.serving.manager.util.BiMap
 import io.hydrosphere.serving.manager.{domain, grpc}
 
 object Converters {
 
-  def mapThresholdOperator(thresholdCmpOperator: ThresholdCmpOperator): ThresholdConfig.CmpOp = {
+  final val statusMap: BiMap[Servable.Status, grpc.entities.Servable.ServableStatus.Recognized] =
+    BiMap(
+      Servable.Status.Serving      -> grpc.entities.Servable.ServableStatus.SERVING,
+      Servable.Status.NotServing   -> grpc.entities.Servable.ServableStatus.NOT_SERVING,
+      Servable.Status.NotAvailable -> grpc.entities.Servable.ServableStatus.NOT_AVAILABlE,
+      Servable.Status.Starting     -> grpc.entities.Servable.ServableStatus.STARTING
+    )
+
+  def mapThresholdOperator(
+      thresholdCmpOperator: ThresholdCmpOperator
+  ): grpc.entities.ThresholdConfig.CmpOp =
     thresholdCmpOperator match {
-      case ThresholdCmpOperator.Eq        => ThresholdConfig.CmpOp.EQ
-      case ThresholdCmpOperator.NotEq     => ThresholdConfig.CmpOp.NOT_EQ
-      case ThresholdCmpOperator.Greater   => ThresholdConfig.CmpOp.GREATER
-      case ThresholdCmpOperator.Less      => ThresholdConfig.CmpOp.LESS
-      case ThresholdCmpOperator.GreaterEq => ThresholdConfig.CmpOp.GREATER_EQ
-      case ThresholdCmpOperator.LessEq    => ThresholdConfig.CmpOp.LESS_EQ
+      case ThresholdCmpOperator.Eq        => grpc.entities.ThresholdConfig.CmpOp.EQ
+      case ThresholdCmpOperator.NotEq     => grpc.entities.ThresholdConfig.CmpOp.NOT_EQ
+      case ThresholdCmpOperator.Greater   => grpc.entities.ThresholdConfig.CmpOp.GREATER
+      case ThresholdCmpOperator.Less      => grpc.entities.ThresholdConfig.CmpOp.LESS
+      case ThresholdCmpOperator.GreaterEq => grpc.entities.ThresholdConfig.CmpOp.GREATER_EQ
+      case ThresholdCmpOperator.LessEq    => grpc.entities.ThresholdConfig.CmpOp.LESS_EQ
     }
-  }
 
-  def fromMetricSpecConfig(specConfig: CustomModelMetricSpecConfiguration): CustomModelMetric = {
+  def fromMetricSpecConfig(
+      specConfig: CustomModelMetricSpecConfiguration
+  ): grpc.entities.CustomModelMetric = {
     val threshold =
-      ThresholdConfig(specConfig.threshold, mapThresholdOperator(specConfig.thresholdCmpOperator))
+      grpc.entities.ThresholdConfig(
+        specConfig.threshold,
+        mapThresholdOperator(specConfig.thresholdCmpOperator)
+      )
 
-    CustomModelMetric(
+    grpc.entities.CustomModelMetric(
       monitorModelId = specConfig.modelVersionId,
       threshold = Some(threshold),
       servable = specConfig.servable.map(fromServable)
     )
   }
 
-  def fromMetricSpec(metricSpec: CustomModelMetricSpec): grpc.entities.MetricSpec = {
+  def fromMetricSpec(metricSpec: CustomModelMetricSpec): grpc.entities.MetricSpec =
     grpc.entities.MetricSpec(
       id = metricSpec.id,
       name = metricSpec.name,
       modelVersionId = metricSpec.modelVersionId,
       customModelConfig = fromMetricSpecConfig(metricSpec.config).some
     )
-  }
 
-  def fromModelVersion(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion = {
+  def fromModelVersion(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion =
     mv match {
       case imv: ModelVersion.Internal =>
         val (image, sha) = toGDocker(imv.image)
@@ -82,20 +86,13 @@ object Converters {
           metadata = emv.metadata
         )
     }
-  }
 
-  def fromServable(s: domain.servable.Servable.GenericServable): grpc.entities.Servable = {
-    val (status, host, port) = s.status match {
-      case Servable.Serving(_, h, p) => (ServableStatus.SERVING, h, p)
-      case Servable.NotServing(_, h, p) =>
-        (ServableStatus.NOT_SERVING, h.getOrElse(""), p.getOrElse(0))
-      case Servable.NotAvailable(_, h, p) =>
-        (ServableStatus.NOT_AVAILABlE, h.getOrElse(""), p.getOrElse(0))
-      case Servable.Starting(_, h, p) => (ServableStatus.STARTING, h.getOrElse(""), p.getOrElse(0))
-    }
+  def fromServable(s: domain.servable.Servable): grpc.entities.Servable = {
+    val status =
+      statusMap.forward.getOrElse(s.status, grpc.entities.Servable.ServableStatus.NOT_AVAILABlE)
     grpc.entities.Servable(
-      host = host,
-      port = port,
+      host = s.host.getOrElse(""),
+      port = s.port.getOrElse(0),
       modelVersion = fromModelVersion(s.modelVersion).some,
       name = s.fullName,
       status = status,
@@ -103,11 +100,11 @@ object Converters {
     )
   }
 
-  def fromApp(app: ReadyApp): ServingApp = {
+  def fromApp(app: ReadyApp): grpc.entities.ServingApp = {
     val stages = toGStages(app)
     val contract =
       ModelContract(modelName = app.name, predict = Signature.toProto(app.signature).some)
-    ServingApp(
+    grpc.entities.ServingApp(
       id = app.id.toString,
       name = app.name,
       contract = contract.some,
@@ -116,26 +113,23 @@ object Converters {
     )
   }
 
-  def toGServable(mv: Variant[OkServable]): GServable = {
-    GServable(
-      host = mv.item.status.host,
-      port = mv.item.status.port,
+  def toGServable(mv: Variant[Servable]): grpc.entities.Servable =
+    grpc.entities.Servable(
+      host = mv.item.host.getOrElse(""),
+      port = mv.item.port.getOrElse(0),
       weight = mv.weight,
       modelVersion = fromModelVersion(mv.item.modelVersion).some,
       name = mv.item.fullName,
       metadata = mv.item.metadata
     )
-  }
 
-  def toGStages(app: ReadyApp): NonEmptyList[GStage] = {
+  def toGStages(app: ReadyApp): NonEmptyList[grpc.entities.Stage] =
     app.status.stages.zipWithIndex.map {
       case (st, i) =>
         val mapped = st.variants.map(toGServable)
-        GStage(i.toString, st.signature.some, mapped.toList)
+        grpc.entities.Stage(i.toString, Signature.toProto(st.signature).some, mapped.toList)
     }
-  }
 
-  def toGDocker(image: DockerImage): (GDockerImage, Option[String]) = {
-    GDockerImage(image.name, image.tag) -> None
-  }
+  def toGDocker(image: DockerImage): (grpc.entities.DockerImage, Option[String]) =
+    grpc.entities.DockerImage(image.name, image.tag) -> None
 }

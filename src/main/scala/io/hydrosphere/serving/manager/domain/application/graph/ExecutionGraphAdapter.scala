@@ -2,7 +2,6 @@ package io.hydrosphere.serving.manager.domain.application.graph
 
 import cats.data.NonEmptyList
 import io.circe.generic.JsonCodec
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
@@ -38,7 +37,7 @@ case class ServableStage(
 )
 
 object ExecutionGraphAdapter {
-  def fromVersionPipeline(pipeline: NonEmptyList[PipelineStage]) = {
+  def fromVersionPipeline(pipeline: NonEmptyList[PipelineStage]) =
     VersionGraphAdapter(
       pipeline.map { s =>
         VersionStage(
@@ -47,9 +46,8 @@ object ExecutionGraphAdapter {
         )
       }
     )
-  }
 
-  def fromServablePipeline(pipeline: NonEmptyList[ExecutionNode]) = {
+  def fromServablePipeline(pipeline: NonEmptyList[ExecutionNode]) =
     ServableGraphAdapter(
       pipeline.map { s =>
         ServableStage(
@@ -58,5 +56,4 @@ object ExecutionGraphAdapter {
         )
       }
     )
-  }
 }

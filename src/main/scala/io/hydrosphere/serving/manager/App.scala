@@ -1,7 +1,7 @@
 package io.hydrosphere.serving.manager
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Resource, Timer}
 import doobie.util.ExecutionContexts
@@ -49,7 +49,7 @@ object App {
       dockerClient: DockerdClient[F]
   ): Resource[F, App[F]] = {
     implicit val system                  = ActorSystem("manager")
-    implicit val materializer            = ActorMaterializer()
+    implicit val materializer            = Materializer.createMaterializer(system)
     implicit val timeout                 = Timeout(5.minute)
     implicit val serviceExecutionContext = ExecutionContext.global
     implicit val grpcCtor                = GrpcChannel.plaintextFactory[F]
@@ -65,7 +65,7 @@ object App {
 
       hk         <- Database.makeHikariDataSource[F](config.database)
       connectEc  <- ExecutionContexts.fixedThreadPool[F](32)
-      transactEc <- ExecutionContexts.cachedThreadPool[F].map(Blocker.liftExecutionContext)
+      transactEc <- Blocker[F]
       implicit0(tx: Transactor[F]) <- Resource.liftF(
         Database.makeTransactor[F](hk, connectEc, transactEc)
       )

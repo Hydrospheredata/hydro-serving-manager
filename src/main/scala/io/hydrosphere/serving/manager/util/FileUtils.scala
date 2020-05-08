@@ -4,7 +4,6 @@ import java.io._
 import java.nio.file.{FileVisitResult, FileVisitor, Files, Path}
 import java.nio.file.attribute.BasicFileAttributes
 
-
 object FileUtils {
 
   class RecursiveRemover extends FileVisitor[Path] with UnsafeLogging {
@@ -30,33 +29,27 @@ object FileUtils {
   }
 
   implicit class PumpedFile(file: File) {
-    def getSubDirectories: Seq[File] = {
-      Option(file.listFiles())
-        .getOrElse(Array.empty)
+    def getSubDirectories: Seq[File] =
+      Option(file.listFiles().toVector)
+        .getOrElse(Vector.empty)
         .filter(_.isDirectory)
-    }
 
     def listFilesRecursively: Seq[File] = {
-      def _listChildFiles(f: File): Seq[File] = {
+      def _listChildFiles(f: File): Seq[File] =
         if (f.isFile)
           Seq(f)
-        else {
+        else
           f.listFiles().flatMap(_listChildFiles).toList
-        }
-      }
 
-      if (file.isDirectory) {
+      if (file.isDirectory)
         _listChildFiles(file)
-      } else {
+      else
         Seq.empty
-      }
     }
   }
 
-
-  def getResourcePath(resPath: String): String = {
+  def getResourcePath(resPath: String): String =
     Option(getClass.getClassLoader.getResource(resPath))
       .map(_.getPath)
       .getOrElse(throw new FileNotFoundException(s"$resPath not found in resources"))
-  }
 }

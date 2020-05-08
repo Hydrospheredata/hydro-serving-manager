@@ -6,7 +6,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.server.Route
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.Source
 import cats.effect.{ConcurrentEffect, ContextShift}
 import io.circe.syntax._
@@ -24,54 +24,52 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class SSEController[F[_]](
-  applicationSubscriber: ApplicationEvents.Subscriber[F],
-  modelSubscriber: ModelVersionEvents.Subscriber[F],
-  servableSubscriber: ServableEvents.Subscriber[F],
-  metricSpecSubscriber: MetricSpecEvents.Subscriber[F]
-)(
-  implicit F: ConcurrentEffect[F],
-  cs: ContextShift[F],
-  ec: ExecutionContext,
-  actorSystem: ActorSystem,
+    applicationSubscriber: ApplicationEvents.Subscriber[F],
+    modelSubscriber: ModelVersionEvents.Subscriber[F],
+    servableSubscriber: ServableEvents.Subscriber[F],
+    metricSpecSubscriber: MetricSpecEvents.Subscriber[F]
+)(implicit
+    F: ConcurrentEffect[F],
+    cs: ContextShift[F],
+    ec: ExecutionContext,
+    actorSystem: ActorSystem
 ) extends AkkaHttpControllerDsl {
 
-  implicit val am = ActorMaterializer.create(actorSystem)
+  implicit val am = Materializer.createMaterializer(actorSystem)
 
-  def subscribe: Route = pathPrefix("events") {
-    get {
-      val id = UUID.randomUUID().toString
-      complete {
-        val appsSSE = applicationSubscriber.subscribe
-          .flatMap(x => fs2.Stream.emits(SSEController.fromAppDiscovery(x)))
+  def subscribe: Route =
+    pathPrefix("events") {
+      get {
+        val id = UUID.randomUUID().toString
+        complete {
+          val appsSSE = applicationSubscriber.subscribe
+            .flatMap(x => fs2.Stream.emits(SSEController.fromAppDiscovery(x)))
 
-        val modelSSE = modelSubscriber.subscribe
-          .flatMap(x => fs2.Stream.emits(SSEController.fromModelDiscovery(x)))
+          val modelSSE = modelSubscriber.subscribe
+            .flatMap(x => fs2.Stream.emits(SSEController.fromModelDiscovery(x)))
 
-        val servableSSE = servableSubscriber.subscribe
-          .flatMap(x => fs2.Stream.emits(SSEController.fromServableDiscovery(x)))
+          val servableSSE = servableSubscriber.subscribe
+            .flatMap(x => fs2.Stream.emits(SSEController.fromServableDiscovery(x)))
 
-        val msSSE = metricSpecSubscriber.subscribe
-          .flatMap(x => fs2.Stream.emits(SSEController.fromMetricSpecDiscovery(x)))
+          val msSSE = metricSpecSubscriber.subscribe
+            .flatMap(x => fs2.Stream.emits(SSEController.fromMetricSpecDiscovery(x)))
 
-        val joined = appsSSE merge modelSSE merge servableSSE merge msSSE
+          val joined = appsSSE merge modelSSE merge servableSSE merge msSSE
 
-        Source.fromGraph(joined.toSource)
-          .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
-          .watchTermination() { (_, b) =>
-            b.foreach { _ =>
-              logger.debug(s"SSE $id terminated")
-            }
-          }
+          Source
+            .fromGraph(joined.toSource)
+            .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
+            .watchTermination()((_, b) => b.foreach(_ => logger.debug(s"SSE $id terminated")))
+        }
       }
     }
-  }
 
   val routes = subscribe
 
 }
 
 object SSEController {
-  def fromServableDiscovery(x: ServableEvents.Event): List[ServerSentEvent] = {
+  def fromServableDiscovery(x: ServableEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -89,9 +87,8 @@ object SSEController {
           )
         }
     }
-  }
 
-  def fromModelDiscovery(x: ModelVersionEvents.Event): List[ServerSentEvent] = {
+  def fromModelDiscovery(x: ModelVersionEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -109,9 +106,8 @@ object SSEController {
           )
         }
     }
-  }
 
-  def fromAppDiscovery(x: ApplicationEvents.Event): List[ServerSentEvent] = {
+  def fromAppDiscovery(x: ApplicationEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -129,9 +125,8 @@ object SSEController {
           )
         }
     }
-  }
 
-  def fromMetricSpecDiscovery(x: MetricSpecEvents.Event): List[ServerSentEvent] = {
+  def fromMetricSpecDiscovery(x: MetricSpecEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -149,5 +144,4 @@ object SSEController {
           )
         }
     }
-  }
 }

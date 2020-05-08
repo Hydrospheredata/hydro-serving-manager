@@ -3,6 +3,7 @@
 .idea
 .metals
 .bloop
+metals.sbt
 
 ### Maven template
 target/

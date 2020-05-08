@@ -9,6 +9,7 @@ import io.circe.generic.JsonCodec
 import io.circe.parser._
 import io.circe.syntax._
 import io.hydrosphere.serving.manager.domain.monitoring._
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository.JoinedServableRow
 
 object DBMonitoringRepository {
 
@@ -33,7 +34,7 @@ object DBMonitoringRepository {
       servableName: Option[String]
   )
 
-  def parseConfig(row: MetricSpecRow) = {
+  def parseConfig(row: MetricSpecRow) =
     row.kind match {
       case "CustomModelMetricSpec" =>
         for {
@@ -42,7 +43,6 @@ object DBMonitoringRepository {
         } yield parsedConfig
       case _ => Left(InvalidMetricSpecConfig(row))
     }
-  }
 
   def toRowConfig(spec: CustomModelMetricSpec) = {
     val config = CustomModelConfigRow(
@@ -98,12 +98,11 @@ object DBMonitoringRepository {
 
   def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): MonitoringRepository[F] =
     new MonitoringRepository[F]() {
-      override def all(): F[List[CustomModelMetricSpec]] = {
+      override def all(): F[List[CustomModelMetricSpec]] =
         for {
           rawSpecs    <- allQ.to[List].transact(tx)
           parsedSpecs <- rawSpecs.traverse(getFullMetricSpec)
         } yield parsedSpecs
-      }
 
       override def get(id: String): F[Option[CustomModelMetricSpec]] = {
         val flow = for {
@@ -113,31 +112,32 @@ object DBMonitoringRepository {
         flow.value
       }
 
-      override def upsert(spec: CustomModelMetricSpec): F[Unit] = {
+      override def upsert(spec: CustomModelMetricSpec): F[Unit] =
         for {
           _ <- upsertQ(toRowConfig(spec)).run.transact(tx)
         } yield ()
-      }
 
-      override def delete(id: String): F[Unit] = {
+      override def delete(id: String): F[Unit] =
         deleteQ(id).run.transact(tx).void
-      }
 
-      override def forModelVersion(id: Long): F[List[CustomModelMetricSpec]] = {
+      override def forModelVersion(id: Long): F[List[CustomModelMetricSpec]] =
         for {
           raw <- selectByVersionIdQ(id).to[List].transact(tx)
           res <- raw.traverse(getFullMetricSpec)
         } yield res
-      }
 
-      def getFullMetricSpec(rawSpec: MetricSpecRow): F[CustomModelMetricSpec] = {
+      def getFullMetricSpec(rawSpec: MetricSpecRow): F[CustomModelMetricSpec] =
         for {
           parsedConfig <- F.fromEither(parseConfig(rawSpec))
-          servableRow <- parsedConfig.servableName match {
-            case Some(value) => DBServableRepository.getQ(value).option.transact(tx)
-            case None        => F.pure(None)
-          }
-          servable <- servableRow.traverse(x => F.fromEither(DBServableRepository.toServableT(x)))
+          servable <-
+            parsedConfig.servableName
+              .map { name =>
+                (for {
+                  row      <- OptionT(DBServableRepository.getQ(name).option.transact(tx))
+                  servable <- OptionT.liftF(F.fromEither(DBServableRepository.toServableT(row)))
+                } yield servable).value
+              }
+              .getOrElse(F.pure(None))
         } yield {
           val config = CustomModelMetricSpecConfiguration(
             modelVersionId = parsedConfig.modelVersionId,
@@ -152,6 +152,5 @@ object DBMonitoringRepository {
             id = rawSpec.id
           )
         }
-      }
     }
 }

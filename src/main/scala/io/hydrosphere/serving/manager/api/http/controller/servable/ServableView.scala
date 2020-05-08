@@ -3,23 +3,21 @@ package io.hydrosphere.serving.manager.api.http.controller.servable
 import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 
 @JsonCodec
 case class ServableView(
-  modelVersion: ModelVersion.Internal,
-  status: Servable.Status,
-  fullName: String,
-  metadata: Map[String, String]
+    modelVersion: ModelVersion.Internal,
+    status: Servable.Status,
+    fullName: String,
+    metadata: Map[String, String]
 )
 
 object ServableView {
-  def fromServable(s: GenericServable): ServableView = {
+  def fromServable(s: Servable): ServableView =
     ServableView(
       modelVersion = s.modelVersion,
       status = s.status,
       fullName = s.fullName,
       metadata = s.metadata
     )
-  }
 }

@@ -1,8 +1,9 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import cats.syntax.either._
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
+import cats.data.Validated.Valid
+import cats.data.{NonEmptyList, Validated}
 import io.hydrosphere.serving.manager.domain.DomainError
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
 object ApplicationValidator {
@@ -15,11 +16,10 @@ object ApplicationValidator {
     */
   def name(name: String): Option[String] = {
     val validName = """^[a-zA-Z\-_\d]+$$""".r
-    if (validName.pattern.matcher(name).matches()) {
+    if (validName.pattern.matcher(name).matches())
       Some(name)
-    } else {
+    else
       None
-    }
   }
 
   /**
@@ -28,27 +28,30 @@ object ApplicationValidator {
     * @param modelVariants modelVariants
     * @return
     */
-  def inferStageSignature(modelVariants: Seq[ModelVersion.Internal]): Either[DomainError, ModelSignature] = {
-    if (modelVariants.isEmpty) {
-      Left(DomainError.invalidRequest("Invalid application: no stages in the graph."))
-    } else {
-      val signatures    = modelVariants.map(_.modelContract.predict.get) // FIXME predict signature must be in the contract
-      val signatureName = signatures.head.signatureName
-      val isSameName    = signatures.forall(_.signatureName == signatureName)
-      if (isSameName) {
-        val res = signatures.foldRight(Either.right[Seq[MergeError], ModelSignature](ModelSignature.defaultInstance)) {
-          case (sig, Right(acc)) => ModelSignatureOps.merge(sig, acc)
-          case (_, x)            => x
+  def inferStageSignature(
+      modelVariants: NonEmptyList[ModelVersion.Internal]
+  ): Either[DomainError, Signature] = {
+    val signatures    = modelVariants.map(_.modelContract.predict)
+    val signatureName = signatures.head.signatureName
+    val isSameName    = signatures.forall(_.signatureName == signatureName)
+    if (isSameName) {
+      val res =
+        signatures.tail.foldRight(Validated.validNel[DomainError, Signature](signatures.head)) {
+          case (acc, Valid(sig)) =>
+            ??? // ModelSignatureOps.merge(sig, acc) // TODO migrate from lib
+          case (_, x) => x
         }
-        res.right
-          .map(_.withSignatureName(signatureName))
-          .left
-          .map(x => DomainError.invalidRequest(s"Errors while merging signatures: $x"))
-      } else {
-        Left(
-          DomainError.invalidRequest(s"Model Versions ${modelVariants.map(_.fullName)} have different signature names")
+      res
+        .bimap(
+          error => DomainError.invalidRequest(s"Errors while merging signatures: $error"),
+          res => res.copy(signatureName = signatureName)
         )
-      }
-    }
+        .toEither
+    } else
+      Left(
+        DomainError.invalidRequest(
+          s"Model Versions ${modelVariants.map(_.fullName)} have different signature names"
+        )
+      )
   }
 }

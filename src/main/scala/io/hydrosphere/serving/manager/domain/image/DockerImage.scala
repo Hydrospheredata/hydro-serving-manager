@@ -9,7 +9,8 @@ import scala.util.matching.Regex
 case class DockerImage(
     name: String,
     tag: String,
-    user: Option[String] = None
+    user: Option[String] = None,
+    digest: Option[String] = None
 ) {
 
   lazy val fullName: String = {
@@ -34,7 +35,7 @@ object DockerImage {
     tag = "latest"
   )
 
-  def parse(image: String): Either[InvalidDockerImageName, DockerImage] = {
+  def parse(image: String): Either[InvalidDockerImageName, DockerImage] =
     for {
       (user, rest) <- parseUser(image)
       (name, ref)  <- parseName(rest)
@@ -43,21 +44,18 @@ object DockerImage {
       name = name,
       tag = ref
     )
-  }
 
-  def parseName(str: String): Either[InvalidDockerImageName, (String, String)] = {
+  def parseName(str: String): Either[InvalidDockerImageName, (String, String)] =
     str match {
       case TagPattern(name, tag) => (name -> tag).asRight
       case x                     => InvalidDockerImageName(s"Invalid docker tag specifier: $str").asLeft
     }
-  }
 
-  def parseUser(input: String): Either[InvalidDockerImageName, (Option[String], String)] = {
+  def parseUser(input: String): Either[InvalidDockerImageName, (Option[String], String)] =
     input.split("/").toList match {
       case user :: rest :: Nil if user.nonEmpty && rest.nonEmpty => (Some(user) -> rest).asRight
-      case rest :: Nil                                           => (None -> rest).asRight
+      case rest :: Nil                                           => (None       -> rest).asRight
       case _                                                     => InvalidDockerImageName(s"Image name is invalid: $input").asLeft
       case Nil                                                   => InvalidDockerImageName(s"Image name cannot be empty").asLeft
     }
-  }
 }
