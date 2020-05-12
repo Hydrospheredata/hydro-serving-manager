@@ -1,35 +1,52 @@
 package io.hydrosphere.serving.manager.domain.application
 
 import cats.data.NonEmptyList
+import enumeratum.{CirceEnum, Enum, EnumEntry}
 import io.circe.generic.JsonCodec
-import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
-import io.hydrosphere.serving.manager.domain.application.graph.ExecutionNode
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.contract.Signature
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.manager.domain.servable.Servable
 
 @JsonCodec
-case class Application[+T <: Application.Status](
+case class Variant(
+    modelVersion: ModelVersion.Internal,
+    servable: Option[Servable],
+    weight: Int
+)
+
+@JsonCodec
+case class WeightedNode(variants: NonEmptyList[Variant], signature: Signature)
+
+@JsonCodec
+case class ApplicationGraph(
+    nodes: NonEmptyList[WeightedNode],
+    signature: Signature
+)
+
+@JsonCodec
+case class Application(
     id: Long,
     name: String,
     namespace: Option[String],
-    status: T,
+    status: Application.Status,
     signature: Signature,
     kafkaStreaming: List[ApplicationKafkaStream],
-    versionGraph: NonEmptyList[PipelineStage],
+    executionGraph: ApplicationGraph,
+    message: String,
     metadata: Map[String, String] = Map.empty
 )
 
 object Application {
-  private implicit val config = Configuration.default.withDiscriminator("status")
+  sealed trait Status extends EnumEntry
 
-  @ConfiguredJsonCodec
-  sealed trait Status                                   extends Product with Serializable
-  case object Assembling                                extends Status
-  case class Failed(reason: Option[String])             extends Status
-  case class Ready(stages: NonEmptyList[ExecutionNode]) extends Status
+  case object Status extends Enum[Status] with CirceEnum[Status] {
 
-  type GenericApplication = Application[Status]
-  type AssemblingApp      = Application[Assembling.type]
-  type FailedApp          = Application[Failed]
-  type ReadyApp           = Application[Ready]
+    case object Assembling extends Status
+
+    case object Failed extends Status
+
+    case object Ready extends Status
+
+    override def values: IndexedSeq[Status] = findValues
+  }
 }

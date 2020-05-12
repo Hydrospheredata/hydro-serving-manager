@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.domain.application.graph
+package io.hydrosphere.serving.manager.domain.application.compat
 
 import cats.data.NonEmptyList
 import io.circe.generic.JsonCodec

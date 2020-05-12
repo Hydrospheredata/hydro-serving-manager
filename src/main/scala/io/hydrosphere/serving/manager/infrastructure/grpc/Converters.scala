@@ -1,14 +1,17 @@
-package io.hydrosphere.serving.manager.util.grpc
+package io.hydrosphere.serving.manager.infrastructure.grpc
 
 import cats.data.NonEmptyList
 import cats.implicits._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
-import io.hydrosphere.serving.manager.domain.application.graph.Variant
+import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.contract.{Contract, Signature}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.monitoring._
+import io.hydrosphere.serving.manager.domain.monitoring.{
+  CustomModelMetricSpec,
+  CustomModelMetricSpecConfiguration,
+  ThresholdCmpOperator
+}
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.util.BiMap
 import io.hydrosphere.serving.manager.{domain, grpc}
@@ -100,7 +103,7 @@ object Converters {
     )
   }
 
-  def fromApp(app: ReadyApp): grpc.entities.ServingApp = {
+  def fromApp(app: Application): grpc.entities.ServingApp = {
     val stages = toGStages(app)
     val contract =
       ModelContract(modelName = app.name, predict = Signature.toProto(app.signature).some)
@@ -113,21 +116,26 @@ object Converters {
     )
   }
 
-  def toGServable(mv: Variant[Servable]): grpc.entities.Servable =
+  def toGServable(mv: Servable, weight: Int): grpc.entities.Servable =
     grpc.entities.Servable(
-      host = mv.item.host.getOrElse(""),
-      port = mv.item.port.getOrElse(0),
-      weight = mv.weight,
-      modelVersion = fromModelVersion(mv.item.modelVersion).some,
-      name = mv.item.fullName,
-      metadata = mv.item.metadata
+      host = mv.host.getOrElse(""),
+      port = mv.port.getOrElse(0),
+      weight = weight,
+      modelVersion = fromModelVersion(mv.modelVersion).some,
+      name = mv.fullName,
+      metadata = mv.metadata
     )
 
-  def toGStages(app: ReadyApp): NonEmptyList[grpc.entities.Stage] =
-    app.status.stages.zipWithIndex.map {
+  def toGStages(app: Application): NonEmptyList[grpc.entities.Stage] =
+    app.executionGraph.nodes.zipWithIndex.map {
       case (st, i) =>
-        val mapped = st.variants.map(toGServable)
-        grpc.entities.Stage(i.toString, Signature.toProto(st.signature).some, mapped.toList)
+        val mapped =
+          st.variants
+            .map(x => x.servable.map(servable => toGServable(servable, x.weight)))
+            .collect {
+              case Some(converted) => converted
+            } // NB(bulat) weird situation when some servables are absent
+        grpc.entities.Stage(i.toString, Signature.toProto(st.signature).some, mapped)
     }
 
   def toGDocker(image: DockerImage): (grpc.entities.DockerImage, Option[String]) =

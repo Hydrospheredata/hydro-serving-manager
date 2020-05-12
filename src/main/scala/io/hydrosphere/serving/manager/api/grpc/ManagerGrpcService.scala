@@ -13,10 +13,10 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersionService
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.grpc
 import io.hydrosphere.serving.manager.util.DeferredResult
-import io.hydrosphere.serving.manager.util.grpc.Converters
 
 import scala.concurrent.Future
 import io.hydrosphere.serving.manager.api.GetServablesRequest
+import io.hydrosphere.serving.manager.infrastructure.grpc.Converters
 
 class ManagerGrpcService[F[_]](
     versionService: ModelVersionService[F],

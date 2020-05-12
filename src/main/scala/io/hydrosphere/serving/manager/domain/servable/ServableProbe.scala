@@ -57,11 +57,9 @@ trait ServableProbe[F[_]] {
 }
 
 object ServableProbe {
-  def default[F[_]]()(implicit
+  def default[F[_]](clientCtor: PredictionClient.Factory[F], cloudDriver: CloudDriver[F])(implicit
       F: Concurrent[F],
-      timer: Timer[F],
-      clientCtor: PredictionClient.Factory[F],
-      cloudDriver: CloudDriver[F]
+      timer: Timer[F]
   ): ServableProbe[F] =
     new ServableProbe[F] {
       def ping(host: String, port: Int, client: PredictionClient[F]): F[ProbeResponse] =

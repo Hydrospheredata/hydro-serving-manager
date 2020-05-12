@@ -17,36 +17,45 @@ trait HostSelectorService[F[_]] {
 }
 
 object HostSelectorService {
-  def apply[F[_] : Monad](hsRepo: HostSelectorRepository[F]): HostSelectorService[F] = new HostSelectorService[F] {
+  def apply[F[_]](hsRepo: HostSelectorRepository[F])(implicit F: Monad[F]): HostSelectorService[F] =
+    new HostSelectorService[F] {
+      def create(
+          name: String,
+          nodeSelector: Map[String, String]
+      ): F[Either[DomainError, HostSelector]] =
+        hsRepo.get(name).flatMap {
+          case Some(_) =>
+            Monad[F].pure(Left(DomainError.invalidRequest(s"HostSelector $name already exists")))
+          case None =>
+            val environment = HostSelector(
+              name = name,
+              nodeSelector = nodeSelector,
+              id = 0L
+            )
+            hsRepo.create(environment).map(Right(_))
+        }
 
-    def create(name: String, nodeSelector: Map[String, String]): F[Either[DomainError, HostSelector]] = {
-      hsRepo.get(name).flatMap {
-        case Some(_) => Monad[F].pure(Left(DomainError.invalidRequest(s"HostSelector $name already exists")))
-        case None =>
-          val environment = HostSelector(
-            name = name,
-            nodeSelector = nodeSelector,
-            id = 0L
+      override def get(name: String): F[Either[DomainError, HostSelector]] = {
+        val f = for {
+          hs <- EitherT.fromOptionF(
+            hsRepo.get(name),
+            DomainError.notFound(s"Can't find HostSelector with name $name")
           )
-          hsRepo.create(environment).map(Right(_))
+        } yield hs
+        f.value
       }
-    }
 
-    override def get(name: String): F[Either[DomainError, HostSelector]] = {
-      val f = for {
-        hs <- EitherT.fromOptionF(hsRepo.get(name), DomainError.notFound(s"Can't find HostSelector with name $name"))
-      } yield hs
-      f.value
-    }
+      override def delete(name: String): F[Either[DomainError, HostSelector]] = {
+        val f = for {
+          hs <- EitherT.fromOptionF[F, DomainError, HostSelector](
+            hsRepo.get(name),
+            DomainError.notFound(s"Can't find HostSelector with name $name")
+          )
+          _ <- EitherT.liftF[F, DomainError, Int](hsRepo.delete(hs.id))
+        } yield hs
+        f.value
+      }
 
-    override def delete(name: String): F[Either[DomainError, HostSelector]] = {
-      val f = for {
-        hs <- EitherT.fromOptionF[F, DomainError, HostSelector](hsRepo.get(name), DomainError.notFound(s"Can't find HostSelector with name $name"))
-        _ <- EitherT.liftF[F, DomainError, Int](hsRepo.delete(hs.id))
-      } yield hs
-      f.value
+      override def all(): F[List[HostSelector]] = hsRepo.all()
     }
-
-    override def all(): F[List[HostSelector]] = hsRepo.all()
-  }
 }

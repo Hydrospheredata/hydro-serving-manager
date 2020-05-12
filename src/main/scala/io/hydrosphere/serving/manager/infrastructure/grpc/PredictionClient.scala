@@ -3,7 +3,10 @@ package io.hydrosphere.serving.manager.infrastructure.grpc
 import cats.effect.{Async, Resource}
 import com.google.protobuf.empty.Empty
 import io.hydrosphere.serving.manager.util.AsyncUtil
-import io.hydrosphere.serving.tensorflow.api.prediction_service.{PredictionServiceGrpc, StatusResponse}
+import io.hydrosphere.serving.tensorflow.api.prediction_service.{
+  PredictionServiceGrpc,
+  StatusResponse
+}
 
 import scala.concurrent.ExecutionContext
 
@@ -17,13 +20,17 @@ object PredictionClient {
     def make(host: String, port: Int): Resource[F, PredictionClient[F]]
   }
 
-  def clientCtor[F[_] : Async](channelCtor: GrpcChannel.Factory[F])(implicit ec: ExecutionContext): Factory[F] =
-    (host: String, port: Int) => {
-    for {
-      channel <- channelCtor.make(host, port)
-      stub = PredictionServiceGrpc.stub(channel)
-    } yield new PredictionClient[F] {
-      override def status(): F[StatusResponse] = AsyncUtil.futureAsync(stub.status(Empty()))
-    }
+  class DefaultFactory[F[_]](channelCtor: GrpcChannel.Factory[F])(implicit
+      F: Async[F],
+      ec: ExecutionContext
+  ) extends Factory[F] {
+    override def make(host: String, port: Int): Resource[F, PredictionClient[F]] =
+      for {
+        channel <- channelCtor.make(host, port)
+        stub = PredictionServiceGrpc.stub(channel)
+      } yield new PredictionClient[F] {
+        override def status(): F[StatusResponse] = AsyncUtil.futureAsync(stub.status(Empty()))
+      }
   }
+
 }

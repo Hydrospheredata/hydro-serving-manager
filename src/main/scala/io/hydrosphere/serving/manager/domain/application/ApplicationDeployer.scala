@@ -7,22 +7,9 @@ import cats.effect.implicits._
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
-import io.hydrosphere.serving.manager.domain.application.Application.{
-  AssemblingApp,
-  GenericApplication
-}
-import io.hydrosphere.serving.manager.domain.application.graph.{
-  ExecutionNode,
-  Node,
-  Variant,
-  VersionGraphComposer
-}
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
-import io.hydrosphere.serving.manager.domain.model_version.{
-  ModelVersion,
-  ModelVersionRepository,
-  ModelVersionStatus
-}
+import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.util.{DeferredResult, UnsafeLogging}
 
@@ -31,30 +18,30 @@ trait ApplicationDeployer[F[_]] {
       name: String,
       executionGraph: ExecutionGraphRequest,
       kafkaStreaming: List[ApplicationKafkaStream]
-  ): F[DeferredResult[F, GenericApplication]]
+  ): F[DeferredResult[F, Application]]
 }
 
 object ApplicationDeployer extends UnsafeLogging {
-  def default[F[_]]()(implicit
-      F: Concurrent[F],
+  def default[F[_]](
       servableService: ServableService[F],
       versionRepository: ModelVersionRepository[F],
       applicationRepository: ApplicationRepository[F],
-      graphComposer: VersionGraphComposer,
       discoveryHub: ApplicationEvents.Publisher[F]
+  )(implicit
+      F: Concurrent[F]
   ): ApplicationDeployer[F] = {
     new ApplicationDeployer[F] {
       override def deploy(
           name: String,
           executionGraph: ExecutionGraphRequest,
           kafkaStreaming: List[ApplicationKafkaStream]
-      ): F[DeferredResult[F, GenericApplication]] =
+      ): F[DeferredResult[F, Application]] =
         for {
           composedApp <- composeApp(name, None, executionGraph, kafkaStreaming)
           repoApp     <- applicationRepository.create(composedApp)
           _           <- discoveryHub.update(repoApp)
           app = composedApp.copy(id = repoApp.id)
-          df <- Deferred[F, GenericApplication]
+          df <- Deferred[F, Application]
           _ <- (for {
               genericApp <- startServices(app)
               _          <- F.delay(logger.debug("App services started. All ok."))
@@ -62,7 +49,10 @@ object ApplicationDeployer extends UnsafeLogging {
               _          <- discoveryHub.update(genericApp)
               _          <- df.complete(genericApp)
             } yield ()).handleErrorWith { x =>
-            val failedApp = app.copy(status = Application.Failed(Option(x.getMessage)))
+            val failedApp = app.copy(
+              status = Application.Status.Failed,
+              message = Option(x.getMessage).getOrElse(s"No exception message for ${x.getClass}")
+            )
             F.delay(logger.error(s"Error while buidling application $failedApp", x)) >>
               applicationRepository.update(failedApp) >>
               df.complete(failedApp).attempt.void
@@ -74,7 +64,7 @@ object ApplicationDeployer extends UnsafeLogging {
           namespace: Option[String],
           executionGraph: ExecutionGraphRequest,
           kafkaStreaming: List[ApplicationKafkaStream]
-      ): F[AssemblingApp] =
+      ): F[Application] =
         for {
           _ <- checkApplicationName(name)
           versions <- executionGraph.stages.traverse { f =>
@@ -82,39 +72,39 @@ object ApplicationDeployer extends UnsafeLogging {
               variants <- f.modelVariants.traverse { m =>
                 for {
                   version <- OptionT(versionRepository.get(m.modelVersionId))
-                    .map(Variant(_, m.weight))
                     .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find modelversion $m")))
-                  internalVersion <- version.item match {
+                  internalVersion <- version match {
                     case imv: ModelVersion.Internal =>
-                      imv.pure[F]
+                      Variant(imv, None, m.weight).pure[F]
                     case emv: ModelVersion.External =>
                       DomainError
                         .invalidRequest(s"Can't deploy external ModelVersion ${emv.fullName}")
-                        .raiseError[F, ModelVersion.Internal]
+                        .raiseError[F, Variant]
                   }
-                  _ <- internalVersion.status match {
-                    case ModelVersionStatus.Released => F.unit
+                  _ <- internalVersion.modelVersion.status match {
+                    case ModelVersionStatus.Released =>
+                      F.unit
                     case x =>
-                      F.raiseError[Unit](
-                        DomainError.invalidRequest(
-                          s"Can't deploy non-released ModelVersion: ${version.item.fullName} - $x"
+                      DomainError
+                        .invalidRequest(
+                          s"Can't deploy non-released ModelVersion: ${internalVersion.modelVersion.fullName} - $x"
                         )
-                      )
+                        .raiseError[F, Unit]
                   }
-                } yield version.copy(item = internalVersion)
+                } yield internalVersion
               }
-            } yield Node(variants)
+            } yield variants
           }
-          graphOrError = graphComposer.compose(versions)
-          graph <- F.fromEither(graphOrError)
+          graph <- F.fromEither(VersionGraphComposer.compose(versions))
         } yield Application(
           id = 0,
           name = name,
           namespace = namespace,
-          signature = graph.pipelineSignature,
+          signature = graph.signature,
           kafkaStreaming = kafkaStreaming,
-          status = Application.Assembling,
-          versionGraph = graph.stages
+          status = Application.Status.Assembling,
+          executionGraph = graph,
+          message = "Application is waiting for underlying Servables"
         )
 
       def checkApplicationName(name: String): F[String] =
@@ -136,16 +126,19 @@ object ApplicationDeployer extends UnsafeLogging {
           }
         } yield name
 
-      private def startServices(app: AssemblingApp) =
+      private def startServices(app: Application) =
         for {
-          deployedServables <- app.versionGraph.traverse { stage =>
+          deployedServables <- app.executionGraph.nodes.traverse { stage =>
             for {
-              variants <- stage.modelVariants.traverse { i =>
+              variants <- stage.variants.traverse { i =>
                 for {
-                  _ <- F.delay(logger.debug(s"Deploying ${i.item.fullName}"))
+                  _ <- F.delay(logger.debug(s"Deploying ${i.modelVersion.fullName}"))
                   result <-
                     servableService
-                      .deploy(i.item, Map.empty) // NOTE maybe infer some app-specific labels?
+                      .deploy(
+                        i.modelVersion,
+                        Map.empty
+                      ) // NOTE maybe infer some app-specific labels?
                   servable <- result.completed.get
                   okServable <- servable.status match {
                     case Servable.Status.Serving => servable.pure[F]
@@ -171,11 +164,14 @@ object ApplicationDeployer extends UnsafeLogging {
                           )
                       )
                   }
-                } yield Variant(okServable, i.weight)
+                } yield Variant(i.modelVersion, okServable.some, i.weight)
               }
-            } yield ExecutionNode(variants, stage.signature)
+            } yield WeightedNode(variants, stage.signature)
           }
-          finishedApp = app.copy(status = Application.Ready(deployedServables))
+          finishedApp = app.copy(
+            status = Application.Status.Ready,
+            executionGraph = ApplicationGraph(deployedServables, app.executionGraph.signature)
+          )
         } yield finishedApp
     }
   }

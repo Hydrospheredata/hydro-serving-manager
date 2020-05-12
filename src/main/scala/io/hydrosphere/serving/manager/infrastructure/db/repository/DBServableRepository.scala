@@ -18,6 +18,42 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelecto
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.util.CollectionOps._
+import DBServableRepository._
+
+class DBServableRepository[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable])
+    extends ServableRepository[F] {
+  override def findForModelVersion(versionId: Long): F[List[Servable]] =
+    for {
+      rows   <- findForModelVersionQ(versionId).to[List].transact(tx)
+      mapped <- F.fromEither(rows.traverse(toServableT))
+    } yield mapped
+
+  override def all(): F[List[Servable]] =
+    for {
+      rows   <- allQ.to[List].transact(tx)
+      mapped <- F.fromEither(rows.traverse(toServableT))
+    } yield mapped
+
+  override def upsert(servable: Servable): F[Servable] = {
+    val row = fromServable(servable)
+    upsertQ(row).run.transact(tx).as(servable)
+  }
+
+  override def delete(name: String): F[Int] =
+    deleteQ(name).run.transact(tx)
+
+  override def get(name: String): F[Option[Servable]] =
+    for {
+      row    <- getQ(name).option.transact(tx)
+      mapped <- F.fromEither(row.traverse(toServableT))
+    } yield mapped
+
+  override def get(names: NonEmptySet[String]): F[List[Servable]] =
+    for {
+      rows   <- getManyQ(names.toNonEmptyList).to[List].transact(tx)
+      mapped <- F.fromEither(rows.traverse(toServableT))
+    } yield mapped
+}
 
 object DBServableRepository {
 
@@ -139,39 +175,4 @@ object DBServableRepository {
          | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |   WHERE hydro_serving.servable.model_version_id = $versionId
       """.stripMargin.query[JoinedServableRow]
-
-  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]) =
-    new ServableRepository[F] {
-      override def findForModelVersion(versionId: Long): F[List[Servable]] =
-        for {
-          rows   <- findForModelVersionQ(versionId).to[List].transact(tx)
-          mapped <- F.fromEither(rows.traverse(toServableT))
-        } yield mapped
-
-      override def all(): F[List[Servable]] =
-        for {
-          rows   <- allQ.to[List].transact(tx)
-          mapped <- F.fromEither(rows.traverse(toServableT))
-        } yield mapped
-
-      override def upsert(servable: Servable): F[Servable] = {
-        val row = fromServable(servable)
-        upsertQ(row).run.transact(tx).as(servable)
-      }
-
-      override def delete(name: String): F[Int] =
-        deleteQ(name).run.transact(tx)
-
-      override def get(name: String): F[Option[Servable]] =
-        for {
-          row    <- getQ(name).option.transact(tx)
-          mapped <- F.fromEither(row.traverse(toServableT))
-        } yield mapped
-
-      override def get(names: NonEmptySet[String]): F[List[Servable]] =
-        for {
-          rows   <- getManyQ(names.toNonEmptyList).to[List].transact(tx)
-          mapped <- F.fromEither(rows.traverse(toServableT))
-        } yield mapped
-    }
 }

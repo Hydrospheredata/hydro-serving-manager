@@ -52,17 +52,21 @@ object ServableMonitor extends UnsafeLogging {
     } yield CancellableMonitor(mon, fbr)
 
   def default[F[_]](
-      monitorSleep: FiniteDuration,
-      maxTimeout: FiniteDuration
-  )(implicit
-      F: Concurrent[F],
-      timer: Timer[F],
       probe: ServableProbe[F],
       servableRepository: ServableRepository[F]
+  )(implicit
+      F: Concurrent[F],
+      timer: Timer[F]
   ): F[CancellableMonitor[F]] =
     for {
       queue <- Queue.unbounded[F, MonitoringEntry[F]]
-      res   <- withQueue(queue, monitorSleep, maxTimeout)
+      res <-
+        withQueue(queue, 2.seconds, 1.minute)(
+          F,
+          timer,
+          probe,
+          servableRepository
+        ) //TODO(bulat) refactor
     } yield res
 
   private def monitoringLoop[F[_]](

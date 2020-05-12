@@ -2,7 +2,8 @@ package io.hydrosphere.serving.manager.domain.application.graph
 
 import cats.data.NonEmptyList
 import io.circe.generic.JsonCodec
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.application.ApplicationGraph
+import io.hydrosphere.serving.manager.domain.application.compat.{ExecutionNode, Variant}
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
@@ -37,16 +38,17 @@ case class ServableStage(
 )
 
 object ExecutionGraphAdapter {
-  def fromVersionPipeline(pipeline: NonEmptyList[PipelineStage]) =
+  def fromVersionPipeline(pipeline: ApplicationGraph) =
     VersionGraphAdapter(
-      pipeline.map { s =>
+      pipeline.nodes.map { s =>
         VersionStage(
-          modelVariants = s.modelVariants.map(v => ModelVariant(v.item, v.weight)),
+          modelVariants = s.variants.map(v => ModelVariant(v.modelVersion, v.weight)),
           signature = s.signature
         )
       }
     )
 
+  // TODO(bulat) delete if still unused
   def fromServablePipeline(pipeline: NonEmptyList[ExecutionNode]) =
     ServableGraphAdapter(
       pipeline.map { s =>

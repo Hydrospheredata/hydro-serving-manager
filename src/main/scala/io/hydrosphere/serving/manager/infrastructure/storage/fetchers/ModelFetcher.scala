@@ -24,8 +24,7 @@ trait ModelFetcher[F[_]] {
 }
 
 object ModelFetcher extends UnsafeLogging {
-  def default[F[_]: Sync: StorageOps]() = {
-    val storageOps = StorageOps[F]
+  def default[F[_]: Sync](storageOps: StorageOps[F]): ModelFetcher[F] =
     combinedFetcher(
       NonEmptyList.of(
         new SparkModelFetcher[F](storageOps),
@@ -35,7 +34,6 @@ object ModelFetcher extends UnsafeLogging {
         new FallbackContractFetcher[F](storageOps)
       )
     )
-  }
 
   /**
     * Sequentially applies fetchers and returns the first successful result
@@ -43,11 +41,11 @@ object ModelFetcher extends UnsafeLogging {
     */
   def combinedFetcher[F[_]](
       fetchers: NonEmptyList[ModelFetcher[F]]
-  )(
-      implicit F: MonadError[F, Throwable]
-  ): ModelFetcher[F] = {
+  )(implicit
+      F: MonadError[F, Throwable]
+  ): ModelFetcher[F] =
     new ModelFetcher[F] {
-      override def fetch(path: Path): F[Option[FetcherResult]] = {
+      override def fetch(path: Path): F[Option[FetcherResult]] =
         fetchers
           .traverse(fetcher => fetcher.fetch(path).attempt)
           .map { results =>
@@ -56,7 +54,5 @@ object ModelFetcher extends UnsafeLogging {
                 case Right(Some(result)) => result
               }
           }
-      }
     }
-  }
 }

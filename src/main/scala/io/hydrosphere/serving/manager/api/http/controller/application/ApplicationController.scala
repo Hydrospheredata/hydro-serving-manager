@@ -3,75 +3,83 @@ package io.hydrosphere.serving.manager.api.http.controller.application
 import cats.effect.Effect
 import cats.syntax.all._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application._
-import io.hydrosphere.serving.manager.domain.application.requests.{CreateApplicationRequest, UpdateApplicationRequest}
+import io.hydrosphere.serving.manager.domain.application.requests.{
+  CreateApplicationRequest,
+  UpdateApplicationRequest
+}
 
 class ApplicationController[F[_]: Effect](
-  appService: ApplicationService[F],
-)extends AkkaHttpControllerDsl {
+    appService: ApplicationService[F]
+) extends AkkaHttpControllerDsl {
 
-  def listAll = path("application") {
-    get {
-      completeF{
-        for {
-          apps <- appService.all()
-        } yield apps.map(ApplicationView.fromApplication)
-      }
-    }
-  }
-
-  def getApp = path("application" / Segment) { appName =>
-    get {
-      completeF{
-        for {
-          app <- appService.get(appName)
-        } yield ApplicationView.fromApplication(app)
-      }
-    }
-  }
-
-  def create = path("application") {
-    post {
-      entity(as[CreateApplicationRequest]) { r =>
-        completeF{
+  def listAll =
+    path("application") {
+      get {
+        completeF {
           for {
-            app <- appService.create(r)
-          } yield ApplicationView.fromApplication(app.started)
+            apps <- appService.all()
+          } yield apps.map(ApplicationView.fromApplication)
         }
       }
     }
-  }
 
-  def update = pathPrefix("application") {
-    put {
-      entity(as[UpdateApplicationRequest]) { r =>
-        completeF{
-          for {
-            app <- appService.update(r)
-          } yield ApplicationView.fromApplication(app.started)
-        }
-      }
-    }
-  }
-
-  def deleteApplicationByName = delete {
+  def getApp =
     path("application" / Segment) { appName =>
-      completeF{
-        for {
-          app <- appService.delete(appName)
-        } yield ApplicationView.fromApplication(app)
+      get {
+        completeF {
+          for {
+            app <- appService.get(appName)
+          } yield ApplicationView.fromApplication(app)
+        }
       }
     }
-  }
 
-  def generateInputsForApp = pathPrefix("application" / "generateInputs" / Segment) { appName =>
-    get {
-      completeF(
-        ApplicationService.generateInputs[F](appName)
-      )
+  def create =
+    path("application") {
+      post {
+        entity(as[CreateApplicationRequest]) { r =>
+          completeF {
+            for {
+              app <- appService.create(r)
+            } yield ApplicationView.fromApplication(app.started)
+          }
+        }
+      }
     }
-  }
+
+  def update =
+    pathPrefix("application") {
+      put {
+        entity(as[UpdateApplicationRequest]) { r =>
+          completeF {
+            for {
+              app <- appService.update(r)
+            } yield ApplicationView.fromApplication(app.started)
+          }
+        }
+      }
+    }
+
+  def deleteApplicationByName =
+    delete {
+      path("application" / Segment) { appName =>
+        completeF {
+          for {
+            app <- appService.delete(appName)
+          } yield ApplicationView.fromApplication(app)
+        }
+      }
+    }
+
+  def generateInputsForApp =
+    pathPrefix("application" / "generateInputs" / Segment) { appName =>
+      get {
+        completeF(
+          ApplicationService.generateInputs[F](appName)
+        )
+      }
+    }
 
   val routes =
     listAll ~

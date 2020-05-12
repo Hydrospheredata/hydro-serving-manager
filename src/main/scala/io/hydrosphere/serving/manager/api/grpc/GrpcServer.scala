@@ -18,19 +18,20 @@ object GrpcServer {
       config: ManagerConfiguration,
       managerGrpcService: ManagerGrpcService[F],
       discoveryService: GrpcServingDiscovery[F]
-  )(
-      implicit F: Sync[F],
+  )(implicit
+      F: Sync[F],
       ex: ExecutionContext
-  ): GrpcServer[F] = {
-    val builder = new BuilderWrapper(io.grpc.ServerBuilder.forPort(config.application.grpcPort))
-      .addService(ManagerServiceGrpc.bindService(managerGrpcService, ex))
-      .addService(ServingDiscoveryGrpc.bindService(discoveryService, ex))
+  ): F[GrpcServer[F]] =
+    F.delay {
+      val builder = new BuilderWrapper(io.grpc.ServerBuilder.forPort(config.application.grpcPort))
+        .addService(ManagerServiceGrpc.bindService(managerGrpcService, ex))
+        .addService(ServingDiscoveryGrpc.bindService(discoveryService, ex))
 
-    val underServer = builder.build
-    new GrpcServer[F] {
-      override def start(): F[Unit] = F.delay(underServer.start())
+      val underServer = builder.build
+      new GrpcServer[F] {
+        override def start(): F[Unit] = F.delay(underServer.start())
 
-      override def shutdown(): F[Unit] = F.delay(underServer.shutdownNow())
+        override def shutdown(): F[Unit] = F.delay(underServer.shutdownNow())
+      }
     }
-  }
 }

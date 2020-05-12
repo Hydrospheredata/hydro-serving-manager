@@ -26,8 +26,7 @@ trait ModelVersionBuilder[F[_]] {
 }
 
 object ModelVersionBuilder extends UnsafeLogging {
-  def apply[F[_]: Concurrent]()(
-      implicit
+  def apply[F[_]: Concurrent](
       dockerClient: DockerdClient[F],
       modelVersionRepository: ModelVersionRepository[F],
       imageRepository: ImageRepository[F],
@@ -35,97 +34,100 @@ object ModelVersionBuilder extends UnsafeLogging {
       storageOps: StorageOps[F],
       modelDiscoveryHub: ModelVersionEvents.Publisher[F],
       buildLoggingService: BuildLoggingService[F]
-  ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] {
-    override def build(
-        model: Model,
-        metadata: ModelVersionMetadata,
-        modelFileStructure: ModelFileStructure
-    ): F[DeferredResult[F, ModelVersion.Internal]] = {
-      for {
-        init     <- initialVersion(model, metadata)
-        handler  <- buildLoggingService.makeLogger(init)
-        _        <- modelDiscoveryHub.update(init)
-        deferred <- Deferred[F, ModelVersion.Internal]
-        _        <- handleBuild(init, modelFileStructure, handler).flatMap(deferred.complete).start
-      } yield DeferredResult(init, deferred)
-    }
-
-    def initialVersion(model: Model, metadata: ModelVersionMetadata): F[ModelVersion.Internal] = {
-      for {
-        version <- modelVersionService.getNextModelVersion(model.id)
-        image = imageRepository.getImageForModelVersion(metadata.modelName, version.toString)
-        mv = ModelVersion.Internal(
-          id = 0,
-          image = image,
-          created = Instant.now(),
-          finished = None,
-          modelVersion = version,
-          modelContract = metadata.contract,
-          runtime = metadata.runtime,
-          model = model,
-          hostSelector = metadata.hostSelector,
-          status = ModelVersionStatus.Assembling,
-          installCommand = metadata.installCommand,
-          metadata = metadata.metadata
-        )
-        modelVersion <- modelVersionRepository.create(mv)
-      } yield mv.copy(id = modelVersion.id)
-    }
-
-    def buildImage(buildPath: Path, image: DockerImage, handler: ProgressHandler): F[String] =
-      for {
-        imageId <- dockerClient.build(
-          buildPath,
-          image.fullName,
-          "Dockerfile",
-          handler,
-          List(BuildParam.noCache())
-        )
-        res <- dockerClient.inspectImage(imageId)
-      } yield res.id().stripPrefix("sha256:")
-
-    def handleBuild(
-        mv: ModelVersion.Internal,
-        modelFileStructure: ModelFileStructure,
-        handler: ProgressHandler
-    ): F[ModelVersion.Internal] = {
-      val innerCompleted = for {
-        buildPath <- prepare(mv, modelFileStructure)
-        imageSha  <- buildImage(buildPath.root, mv.image, handler)
-        finishedVersion = mv.copy(
-          finished = Instant.now().some,
-          status = ModelVersionStatus.Released
-        )
-        _ <- imageRepository.push(finishedVersion.image, handler)
-        _ <- buildLoggingService.finishLogging(mv.id)
-        _ <- modelVersionRepository.update(finishedVersion)
-        _ <- modelDiscoveryHub.update(finishedVersion)
-      } yield finishedVersion
-
-      innerCompleted.handleErrorWith { err =>
+  ): ModelVersionBuilder[F] =
+    new ModelVersionBuilder[F] {
+      override def build(
+          model: Model,
+          metadata: ModelVersionMetadata,
+          modelFileStructure: ModelFileStructure
+      ): F[DeferredResult[F, ModelVersion.Internal]] =
         for {
-          _ <- Concurrent[F].delay(logger.error("Model version build failed", err))
-          failed = mv.copy(status = ModelVersionStatus.Failed, finished = Instant.now().some)
-          _ <- buildLoggingService.finishLogging(mv.id).attempt
-          _ <- modelDiscoveryHub.update(failed).attempt
-          _ <- modelVersionRepository.update(failed).attempt
-        } yield failed
-      }
-    }
+          init     <- initialVersion(model, metadata)
+          handler  <- buildLoggingService.makeLogger(init)
+          _        <- modelDiscoveryHub.update(init)
+          deferred <- Deferred[F, ModelVersion.Internal]
+          _        <- handleBuild(init, modelFileStructure, handler).flatMap(deferred.complete).start
+        } yield DeferredResult(init, deferred)
 
-    def prepare(
-        modelVersion: ModelVersion.Internal,
-        modelFileStructure: ModelFileStructure
-    ): F[ModelFileStructure] = {
-      for {
-        _ <- storageOps
-          .writeBytes(modelFileStructure.dockerfile, BuildScript.generate(modelVersion).getBytes)
-        _ <- storageOps
-          .writeBytes(
-            modelFileStructure.contractPath,
-            Contract.toProto(modelVersion.modelContract).toByteArray
+      def initialVersion(model: Model, metadata: ModelVersionMetadata): F[ModelVersion.Internal] =
+        for {
+          version <- modelVersionService.getNextModelVersion(model.id)
+          image = imageRepository.getImageForModelVersion(metadata.modelName, version.toString)
+          mv = ModelVersion.Internal(
+            id = 0,
+            image = image,
+            created = Instant.now(),
+            finished = None,
+            modelVersion = version,
+            modelContract = metadata.contract,
+            runtime = metadata.runtime,
+            model = model,
+            hostSelector = metadata.hostSelector,
+            status = ModelVersionStatus.Assembling,
+            installCommand = metadata.installCommand,
+            metadata = metadata.metadata
           )
-      } yield modelFileStructure
+          modelVersion <- modelVersionRepository.create(mv)
+        } yield mv.copy(id = modelVersion.id)
+
+      def buildImage(buildPath: Path, image: DockerImage, handler: ProgressHandler): F[String] =
+        for {
+          imageId <- dockerClient.build(
+            buildPath,
+            image.fullName,
+            "Dockerfile",
+            handler,
+            List(BuildParam.noCache())
+          )
+          res <- dockerClient.inspectImage(imageId)
+        } yield res.id().stripPrefix("sha256:")
+
+      def handleBuild(
+          mv: ModelVersion.Internal,
+          modelFileStructure: ModelFileStructure,
+          handler: ProgressHandler
+      ): F[ModelVersion.Internal] = {
+        val innerCompleted = for {
+          buildPath <- prepare(mv, modelFileStructure)
+          imageSha  <- buildImage(buildPath.root, mv.image, handler)
+          finishedVersion = mv.copy(
+            finished = Instant.now().some,
+            status = ModelVersionStatus.Released
+          )
+          _ <- imageRepository.push(finishedVersion.image, handler)
+          _ <- buildLoggingService.finishLogging(mv.id)
+          _ <- modelVersionRepository.update(finishedVersion)
+          _ <- modelDiscoveryHub.update(finishedVersion)
+        } yield finishedVersion
+
+        innerCompleted.handleErrorWith { err =>
+          for {
+            _ <- Concurrent[F].delay(logger.error("Model version build failed", err))
+            failed = mv.copy(status = ModelVersionStatus.Failed, finished = Instant.now().some)
+            _ <- buildLoggingService.finishLogging(mv.id).attempt
+            _ <- modelDiscoveryHub.update(failed).attempt
+            _ <- modelVersionRepository.update(failed).attempt
+          } yield failed
+        }
+      }
+
+      def prepare(
+          modelVersion: ModelVersion.Internal,
+          modelFileStructure: ModelFileStructure
+      ): F[ModelFileStructure] =
+        for {
+          _ <-
+            storageOps
+              .writeBytes(
+                modelFileStructure.dockerfile,
+                BuildScript.generate(modelVersion).getBytes
+              )
+          _ <-
+            storageOps
+              .writeBytes(
+                modelFileStructure.contractPath,
+                Contract.toProto(modelVersion.modelContract).toByteArray
+              )
+        } yield modelFileStructure
     }
-  }
 }

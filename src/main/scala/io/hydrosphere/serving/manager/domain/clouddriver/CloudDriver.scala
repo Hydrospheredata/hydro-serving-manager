@@ -68,7 +68,7 @@ object CloudDriver {
     val ServiceId      = "HS_INSTANCE_ID"
   }
 
-  def fromConfig[F[_]: Async](
+  def make[F[_]: Async](
       dockerdClient: DockerdClient[F],
       config: CloudDriverConfiguration,
       dockerRepoConf: DockerRepositoryConfiguration

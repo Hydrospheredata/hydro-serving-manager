@@ -13,6 +13,8 @@ object Dependencies {
   lazy val circeVersion      = "0.13.0"
   lazy val enumeratumV       = "1.6.0"
   lazy val mockitoV          = "1.14.0"
+  lazy val logstageVersion   = "0.10.7"
+  lazy val distageVersion    = "0.10.7"
 
   lazy val aws = Seq(
     "com.amazonaws" % "aws-java-sdk-ecs"     % awsSdkVersion,
@@ -67,9 +69,12 @@ object Dependencies {
   ).map(_ % "test,it")
 
   lazy val logs = Seq(
-    "org.apache.logging.log4j" % "log4j-api"        % log4j2Version,
-    "org.apache.logging.log4j" % "log4j-core"       % log4j2Version,
-    "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4j2Version
+    "org.apache.logging.log4j" % "log4j-api"                  % log4j2Version,
+    "org.apache.logging.log4j" % "log4j-core"                 % log4j2Version,
+    "org.apache.logging.log4j" % "log4j-slf4j-impl"           % log4j2Version,
+    "io.7mind.izumi"          %% "logstage-core"              % logstageVersion,
+    "io.7mind.izumi"          %% "distage-extension-logstage" % logstageVersion,
+    "io.7mind.izumi"          %% "logstage-sink-slf4j"        % logstageVersion
   )
 
   lazy val ml = Seq(
@@ -86,6 +91,14 @@ object Dependencies {
     "org.flywaydb"   % "flyway-core"      % "4.2.0"
   )
 
+  lazy val di = Seq(
+    "io.7mind.izumi" %% "distage-core"              % distageVersion,
+    "io.7mind.izumi" %% "distage-extension-config"  % distageVersion,
+    "io.7mind.izumi" %% "distage-framework"         % distageVersion,
+    "io.7mind.izumi" %% "distage-framework-docker"  % distageVersion,
+    "io.7mind.izumi" %% "distage-testkit-scalatest" % distageVersion
+  )
+
   lazy val all = logs ++
     akks ++
     test ++
@@ -96,6 +109,7 @@ object Dependencies {
     ml ++
     db ++
     json ++
+    di ++
     Seq(
       "org.typelevel"         %% "cats-effect"       % catsV,
       "co.fs2"                %% "fs2-core"          % "2.3.0",

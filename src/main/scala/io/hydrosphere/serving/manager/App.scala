@@ -1,143 +1,182 @@
 package io.hydrosphere.serving.manager
 
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.Materializer
 import akka.util.Timeout
-import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Resource, Timer}
-import doobie.util.ExecutionContexts
-import doobie.util.transactor.Transactor
+import cats.Monad
+import cats.effect._
+import com.zaxxer.hikari.HikariDataSource
+import distage.ModuleDef
+import io.hydrosphere.serving.discovery.serving.ServingDiscoveryGrpc.ServingDiscovery
+import io.hydrosphere.serving.manager.api.ManagerServiceGrpc.ManagerService
 import io.hydrosphere.serving.manager.api.grpc._
-import io.hydrosphere.serving.manager.api.http.HttpServer
+import io.hydrosphere.serving.manager.api.http.controller._
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationController
 import io.hydrosphere.serving.manager.api.http.controller.events.SSEController
 import io.hydrosphere.serving.manager.api.http.controller.host_selector.HostSelectorController
 import io.hydrosphere.serving.manager.api.http.controller.model._
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
-import io.hydrosphere.serving.manager.api.http.controller._
+import io.hydrosphere.serving.manager.api.http.{AkkaHttpServer, HttpServer}
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
+import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
-import io.hydrosphere.serving.manager.domain.servable.ServableRepository
-import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
-import io.hydrosphere.serving.manager.domain.model.ModelRepository
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersionRepository
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
+import io.hydrosphere.serving.manager.domain.host_selector._
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
-import io.hydrosphere.serving.manager.domain.monitoring.MonitoringRepository
-import io.hydrosphere.serving.manager.infrastructure.db.Database
+import io.hydrosphere.serving.manager.domain.model.{ModelRepository, ModelService}
+import io.hydrosphere.serving.manager.domain.model_build._
+import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.monitoring._
+import io.hydrosphere.serving.manager.domain.servable.ServableMonitor.CancellableMonitor
+import io.hydrosphere.serving.manager.domain.servable._
+import io.hydrosphere.serving.manager.infrastructure.db.Database.HikariTransactor
 import io.hydrosphere.serving.manager.infrastructure.db.repository._
+import io.hydrosphere.serving.manager.infrastructure.db.{Database, FlywayClient}
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
-import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
+import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
+import io.hydrosphere.serving.manager.infrastructure.storage.{ModelUnpacker, StorageOps}
 import io.hydrosphere.serving.manager.util.UUIDGenerator
-import io.hydrosphere.serving.manager.util.random.RNG
+import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
+import izumi.fundamentals.reflection.Tags.TagK
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-case class App[F[_]](
-    config: ManagerConfiguration,
-    core: Core[F],
-    grpcServer: GrpcServer[F],
-    httpServer: HttpServer[F],
-    transactor: Transactor[F]
-)
-
 object App {
-  def make[F[_]: ConcurrentEffect: ContextShift: Timer](
+  def utilsModule[F[_]](
       config: ManagerConfiguration,
-      dockerClient: DockerdClient[F]
-  ): Resource[F, App[F]] = {
-    implicit val system                  = ActorSystem("manager")
-    implicit val materializer            = Materializer.createMaterializer(system)
-    implicit val timeout                 = Timeout(5.minute)
-    implicit val serviceExecutionContext = ExecutionContext.global
-    implicit val grpcCtor                = GrpcChannel.plaintextFactory[F]
-    implicit val predictionCtor          = PredictionClient.clientCtor[F](grpcCtor)
-    implicit val storageOps              = StorageOps.default[F]
-    implicit val uuidGen                 = UUIDGenerator.default[F]()
-    implicit val dc                      = dockerClient
-    for {
-      implicit0(rng: RNG[F]) <- Resource.liftF(RNG.default[F])
-      implicit0(cloudDriver: CloudDriver[F]) =
-        CloudDriver
-          .fromConfig[F](dockerClient, config.cloudDriver, config.dockerRepository)
+      dockerdClient: DockerdClient[F]
+  )(implicit
+      F: ConcurrentEffect[F],
+      cs: ContextShift[F],
+      timer: Timer[F],
+      ec: ExecutionContext,
+      as: ActorSystem,
+      mat: Materializer,
+      tagK: TagK[F]
+  ) =
+    new ModuleDef {
+      make[GrpcChannel.Factory[F]].from[GrpcChannel.PlaintextFactory[F]]
+      make[PredictionClient.Factory[F]].from[PredictionClient.DefaultFactory[F]]
+      make[UUIDGenerator[F]].from(UUIDGenerator.default[F]())
+      make[RNG[F]].fromEffect(RNG.default[F])
 
-      hk         <- Database.makeHikariDataSource[F](config.database)
-      connectEc  <- ExecutionContexts.fixedThreadPool[F](32)
-      transactEc <- Blocker[F]
-      implicit0(tx: Transactor[F]) <- Resource.liftF(
-        Database.makeTransactor[F](hk, connectEc, transactEc)
-      )
+      make[Timeout].from(Timeout(5.minute))
 
-      flyway <- Resource.liftF(Database.makeFlyway(tx))
-      _      <- Resource.liftF(flyway.migrate())
+      make[StorageOps[F]].from(StorageOps.default[F])
+      make[CloudDriver[F]].from(CloudDriver.make[F] _)
+      make[ImageRepository[F]].from(ImageRepository.make(dockerdClient, config.dockerRepository))
+      make[HikariTransactor[F]].fromResource(Database.makeTransactor[F](config.database))
+      make[FlywayClient[F]].fromEffect(FlywayClient.forTransactor[F, HikariDataSource] _)
 
-      implicit0(hsRepo: HostSelectorRepository[F])           = DBHostSelectorRepository.make()
-      implicit0(modelRepo: ModelRepository[F])               = DBModelRepository.make()
-      implicit0(modelVersionRepo: ModelVersionRepository[F]) = DBModelVersionRepository.make()
-      implicit0(servableRepo: ServableRepository[F])         = DBServableRepository.make()
-      implicit0(appRepo: ApplicationRepository[F])           = DBApplicationRepository.make()
-      implicit0(buildLogRepo: BuildLogRepository[F])         = DBBuildLogRepository.make()
-      implicit0(monitoringRepo: MonitoringRepository[F])     = DBMonitoringRepository.make()
-      implicit0(imageRepo: ImageRepository[F]) = ImageRepository.fromConfig(
-        dockerClient,
-        config.dockerRepository
-      )
+      make[DBStarter[F]].from(DBStarter.make[F] _)
+      make[NameGenerator[F]].from(NameGenerator.haiku[F] _)
+    }
 
-      core <- Resource.liftF(Core.make[F]())
+  def hostSelectorModule[F[_]](implicit F: Monad[F], tagK: TagK[F]) =
+    new ModuleDef {
+      make[HostSelectorRepository[F]].from[DBHostSelectorRepository[F]]
+      make[HostSelectorService[F]].from(HostSelectorService[F] _)
+    }
 
-      grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
-      discoveryService = new GrpcServingDiscovery[F](
-        core.appSub,
-        core.servableSub,
-        core.monitoringSub,
-        core.appService,
-        core.servableService,
-        core.repos.monitoringRepository
-      )
-      grpc = GrpcServer.default(config, grpcService, discoveryService)
+  def modelModule[F[_]](implicit F: Sync[F], clock: Clock[F], tagK: TagK[F]) =
+    new ModuleDef {
+      make[ModelRepository[F]].from[DBModelRepository[F]]
+      make[ModelService[F]].from(ModelService[F] _)
+      make[ModelUnpacker[F]].from(ModelUnpacker.default[F] _)
+      make[ModelFetcher[F]].from(ModelFetcher.default[F] _)
+    }
 
-      externalModelController = new ExternalModelController[F](core.modelService)
+  def modelVersionModule[F[_]](implicit F: Concurrent[F], tagK: TagK[F]) =
+    new ModuleDef {
+      make[ModelVersionRepository[F]].from[DBModelVersionRepository[F]]
+      make[ModelVersionService[F]].from(ModelVersionService[F] _)
+      make[ModelVersionBuilder[F]].from(ModelVersionBuilder[F] _)
 
-      modelController = new ModelController[F](
-        core.modelService,
-        core.repos.modelRepo,
-        core.versionService,
-        core.buildLoggingService
-      )
-      appController      = new ApplicationController[F](core.appService)
-      hsController       = new HostSelectorController[F](core.hostSelectorService)
-      servableController = new ServableController[F](core.servableService, cloudDriver)
-      sseController = new SSEController[F](
-        core.appSub,
-        core.modelSub,
-        core.servableSub,
-        core.monitoringSub
-      )
-      monitoringController = new MonitoringController[F](
-        core.monitoringService,
-        core.repos.monitoringRepository
-      )
+      make[ModelVersionEvents.PubSub[F]].fromEffect(ModelVersionEvents.makeTopic[F])
+      make[ModelVersionEvents.Publisher[F]].from { x: ModelVersionEvents.PubSub[F] => x.pub }
+      make[ModelVersionEvents.Subscriber[F]].from { x: ModelVersionEvents.PubSub[F] => x.sub }
+    }
 
-      apiClasses =
-        modelController.getClass ::
-          appController.getClass :: hsController.getClass ::
-          servableController.getClass :: sseController.getClass ::
-          monitoringController.getClass :: externalModelController.getClass :: Nil
-      swaggerController = new SwaggerDocController(apiClasses.toSet, "2")
+  def servableModule[F[_]](implicit
+      F: Concurrent[F],
+      timer: Timer[F],
+      tagK: TagK[F]
+  ) =
+    new ModuleDef {
+      make[ServableRepository[F]].from[DBServableRepository[F]]
+      make[ServableService[F]].from(ServableService[F] _)
+      make[ServableGC[F]].fromEffect(ServableGC.empty[F] _)
+      make[ServableProbe[F]].from(ServableProbe.default[F] _)
+      make[CancellableMonitor[F]].fromEffect(ServableMonitor.default[F] _)
+      make[ServableMonitor[F]].from { x: CancellableMonitor[F] => x.mon }
 
-      http = HttpServer.akkaBased(
-        config = config.application,
-        swaggerRoutes = swaggerController.routes,
-        modelRoutes = modelController.routes,
-        applicationRoutes = appController.routes,
-        hostSelectorRoutes = hsController.routes,
-        servableRoutes = servableController.routes,
-        sseRoutes = sseController.routes,
-        monitoringRoutes = monitoringController.routes,
-        externalModelRoutes = externalModelController.routes
-      )
-    } yield App(config, core, grpc, http, tx)
-  }
+      make[ServableEvents.PubSub[F]].fromEffect(ServableEvents.makeTopic[F])
+      make[ServableEvents.Publisher[F]].from { x: ServableEvents.PubSub[F] => x.pub }
+      make[ServableEvents.Subscriber[F]].from { x: ServableEvents.PubSub[F] => x.sub }
+    }
+
+  def applicationModule[F[_]](implicit F: Concurrent[F], tagK: TagK[F]) =
+    new ModuleDef {
+      make[ApplicationRepository[F]].from[DBApplicationRepository[F]]
+      make[ApplicationService[F]].from(ApplicationService[F] _)
+      make[ApplicationDeployer[F]].from(ApplicationDeployer.default[F] _)
+
+      make[ApplicationEvents.PubSub[F]].fromEffect(ApplicationEvents.makeTopic[F])
+      make[ApplicationEvents.Publisher[F]].from { x: ApplicationEvents.PubSub[F] => x.pub }
+      make[ApplicationEvents.Subscriber[F]].from { x: ApplicationEvents.PubSub[F] => x.sub }
+    }
+
+  def buildLogModule[F[_]](implicit F: ConcurrentEffect[F], tagK: TagK[F]) =
+    new ModuleDef {
+      make[BuildLogRepository[F]].from[DBBuildLogRepository[F]]
+      make[BuildLoggingService[F]].fromEffect(BuildLoggingService.make[F] _)
+    }
+
+  def monitoringModule[F[_]](implicit F: Concurrent[F], tagK: TagK[F]) =
+    new ModuleDef {
+      make[MonitoringRepository[F]].from[DBMonitoringRepository[F]]
+      make[MonitoringService[F]].from(MonitoringService[F] _)
+
+      make[MetricSpecEvents.PubSub[F]].fromEffect(MetricSpecEvents.makeTopic[F])
+      make[MetricSpecEvents.Publisher[F]].from { x: MetricSpecEvents.PubSub[F] => x.pub }
+      make[MetricSpecEvents.Subscriber[F]].from { x: MetricSpecEvents.PubSub[F] => x.sub }
+    }
+
+  def grpcModule[F[_]](implicit F: Sync[F], ex: ExecutionContext, tagK: TagK[F]) =
+    new ModuleDef {
+      make[ServingDiscovery].from[GrpcServingDiscovery[F]]
+      make[ManagerService].from[ManagerGrpcService[F]]
+      make[GrpcServer[F]].fromEffect(GrpcServer.default[F] _)
+    }
+
+  def httpModule[F[_]](implicit tagK: TagK[F]) =
+    new ModuleDef {
+      make[ExternalModelController[F]]
+      make[ModelController[F]]
+      make[ApplicationController[F]]
+      make[HostSelectorController[F]]
+      make[ServableController[F]]
+      make[MonitoringController[F]]
+      make[SwaggerDocController[F]]
+      make[SSEController[F]]
+      make[HttpServer[F]].from[AkkaHttpServer[F]]
+    }
+
+  def allModules[F[_]](
+      config: ManagerConfiguration,
+      dockerdClient: DockerdClient[F]
+  )(implicit
+      F: ConcurrentEffect[F],
+      cs: ContextShift[F],
+      timer: Timer[F],
+      ec: ExecutionContext,
+      as: ActorSystem,
+      mat: Materializer,
+      tagK: TagK[F]
+  ) =
+    utilsModule[F](config, dockerdClient) ++ hostSelectorModule[F] ++
+      modelModule[F] ++ modelVersionModule[F] ++ buildLogModule[F] ++
+      servableModule[F] ++ applicationModule[F] ++ monitoringModule[F] ++
+      httpModule[F] ++ grpcModule[F]
 }

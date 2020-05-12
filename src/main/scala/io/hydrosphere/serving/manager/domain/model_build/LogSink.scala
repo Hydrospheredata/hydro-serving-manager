@@ -22,63 +22,72 @@ trait BuildLoggingService[F[_]] {
 }
 
 object BuildLoggingService extends UnsafeLogging {
-  def make[F[_]]()(
-    implicit F: ConcurrentEffect[F],
-    buildLogRepository: BuildLogRepository[F]
-  ): F[BuildLoggingService[F]] = {
+  def make[F[_]](buildLogRepository: BuildLogRepository[F])(implicit
+      F: ConcurrentEffect[F]
+  ): F[BuildLoggingService[F]] =
     for {
-      state <- Ref.of[F, Map[Long, (Topic[F, String], SignallingRef[F, Boolean], ListBuffer[String])]](Map.empty)
-    } yield {
-      new BuildLoggingService[F] {
-        override def makeLogger(modelVersion: ModelVersion.Internal): F[ProgressHandler] = {
-          for {
-            signal <- SignallingRef[F, Boolean](false)
-            topic <- Topic[F, String]("")
-            buf = ListBuffer.empty[String]
+      state <-
+        Ref.of[F, Map[Long, (Topic[F, String], SignallingRef[F, Boolean], ListBuffer[String])]](
+          Map.empty
+        )
+    } yield new BuildLoggingService[F] {
+      override def makeLogger(modelVersion: ModelVersion.Internal): F[ProgressHandler] =
+        for {
+          signal <- SignallingRef[F, Boolean](false)
+          topic  <- Topic[F, String]("")
+          buf = ListBuffer.empty[String]
 
-            _ <- topic.subscribe(Int.MaxValue).interruptWhen(signal).evalMap { l =>
-              F.delay(buf += l).void
-            }.compile.drain.start
-            _ <- state.update(o => o ++ Map(modelVersion.id -> (topic, signal, buf)))
-          } yield DockerLogger.make(topic)
-        }
+          _ <-
+            topic
+              .subscribe(Int.MaxValue)
+              .interruptWhen(signal)
+              .evalMap(l => F.delay(buf += l).void)
+              .compile
+              .drain
+              .start
+          _ <- state.update(o => o ++ Map(modelVersion.id -> (topic, signal, buf)))
+        } yield DockerLogger.make(topic)
 
-        override def getLogs(modelVersionId: Long, sinceLine: Int): F[Option[fs2.Stream[F, String]]] = {
-          val dbLogs = for {
-            logs <- OptionT(buildLogRepository.get(modelVersionId))
-          } yield logs.drop(sinceLine)
+      override def getLogs(
+          modelVersionId: Long,
+          sinceLine: Int
+      ): F[Option[fs2.Stream[F, String]]] = {
+        val dbLogs = for {
+          logs <- OptionT(buildLogRepository.get(modelVersionId))
+        } yield logs.drop(sinceLine)
 
-          val runningLogs = for {
-            state <- OptionT.liftF(state.get)
-            row <- OptionT.fromOption[F](state.get(modelVersionId))
-            (topic, signal, buf) = row
-            trimmedBuf = fs2.Stream.emits[F, String](buf.toList.drop(sinceLine).init) // `init` because `topic.subscribe` puts the latest message in the stream
-            sub = topic.subscribe(32).interruptWhen(signal)
-          } yield trimmedBuf ++ sub
+        val runningLogs = for {
+          state <- OptionT.liftF(state.get)
+          row   <- OptionT.fromOption[F](state.get(modelVersionId))
+          (topic, signal, buf) = row
+          trimmedBuf =
+            fs2.Stream.emits[F, String](
+              buf.toList.drop(sinceLine).init
+            ) // `init` because `topic.subscribe` puts the latest message in the stream
+          sub = topic.subscribe(32).interruptWhen(signal)
+        } yield trimmedBuf ++ sub
 
-          dbLogs.orElse(runningLogs).value
-        }
+        dbLogs.orElse(runningLogs).value
+      }
 
-        override def finishLogging(modelVersionId: Long): F[Option[Unit]] = {
-          val f = for {
-            stateMap <- OptionT.liftF(state.get)
-            row <- OptionT.fromOption[F](stateMap.get(modelVersionId))
-            (_, signal, buf) = row
-            _ <- OptionT.liftF(signal.set(true))
-            _ <- OptionT.liftF(buildLogRepository.add(modelVersionId, buf.toList))
-            _ <- OptionT.liftF(state.update(x => x.filter { case (key, _) => key != modelVersionId }))
-          } yield ()
-          f.value
-        }
+      override def finishLogging(modelVersionId: Long): F[Option[Unit]] = {
+        val f = for {
+          stateMap <- OptionT.liftF(state.get)
+          row      <- OptionT.fromOption[F](stateMap.get(modelVersionId))
+          (_, signal, buf) = row
+          _ <- OptionT.liftF(signal.set(true))
+          _ <- OptionT.liftF(buildLogRepository.add(modelVersionId, buf.toList))
+          _ <- OptionT.liftF(state.update(x => x.filter { case (key, _) => key != modelVersionId }))
+        } yield ()
+        f.value
       }
     }
-  }
 }
 
 object DockerLogger {
-  final val ESC_CODE = 0x1B
+  final val ESC_CODE = 0x1b
 
-  def make[F[_] : Effect](topic: Topic[F, String]): ProgressHandler = {
+  def make[F[_]: Effect](topic: Topic[F, String]): ProgressHandler =
     new ProgressHandler {
 
       override def progress(message: ProgressMessage): Unit = {
@@ -87,11 +96,9 @@ object DockerLogger {
           .orElse(Option(message.status()))
         maybeMsg.foreach { msg =>
           val trimmed = msg.trim
-          if (trimmed.nonEmpty) {
+          if (trimmed.nonEmpty)
             topic.publish1(trimmed).toIO.unsafeRunSync()
-          }
         }
       }
     }
-  }
 }

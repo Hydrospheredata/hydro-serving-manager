@@ -9,7 +9,7 @@ import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
+import io.hydrosphere.serving.manager.domain.monitoring.{MonitoringRepository, MonitoringService}
 import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator, UnsafeLogging}
 import io.hydrosphere.serving.manager.util.random.NameGenerator
 
@@ -56,9 +56,7 @@ object ServableService extends UnsafeLogging {
     x.filter(s => s.metadata.toSet.subsetOf(metadata.toSet))
   }
 
-  def apply[F[_]]()(implicit
-      F: Concurrent[F],
-      timer: Timer[F],
+  def apply[F[_]](
       nameGenerator: NameGenerator[F],
       idGenerator: UUIDGenerator[F],
       cloudDriver: CloudDriver[F],
@@ -68,6 +66,9 @@ object ServableService extends UnsafeLogging {
       monitor: ServableMonitor[F],
       servableDH: ServableEvents.Publisher[F],
       monitoringRepository: MonitoringRepository[F]
+  )(implicit
+      F: Concurrent[F],
+      timer: Timer[F]
   ): ServableService[F] =
     new ServableService[F] {
       override def all(): F[List[Servable]] =
@@ -154,7 +155,7 @@ object ServableService extends UnsafeLogging {
               )
             )
 
-          metricSpec <- servable.metadata.get(Monitoring.MetricSpecIdKey).flatTraverse {
+          metricSpec <- servable.metadata.get(MonitoringService.MetricSpecIdKey).flatTraverse {
             metricSpecId => monitoringRepository.get(metricSpecId)
           }
           _ <- metricSpec match {
@@ -225,7 +226,7 @@ object ServableService extends UnsafeLogging {
       def generateUniqueSuffix(mv: ModelVersion.Internal): F[String] = {
         def _gen(tries: Long): F[String] =
           for {
-            randomSuffix <- nameGenerator.getName()
+            randomSuffix <- nameGenerator.getName
             fullName = Servable.fullName(mv.model.name, mv.modelVersion, randomSuffix)
             maybeServable <- servableRepository.get(fullName)
             res <- maybeServable match {

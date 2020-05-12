@@ -12,89 +12,106 @@ import io.hydrosphere.serving.manager.domain.monitoring._
 import io.hydrosphere.serving.manager.util.{UUIDGenerator, UnsafeLogging}
 
 class MonitoringController[F[_]](
-  monitoringService: Monitoring[F],
-  monRepo: MonitoringRepository[F]
-)(implicit F: Effect[F], uuid: UUIDGenerator[F]) extends AkkaHttpControllerDsl with UnsafeLogging {
+    monitoringService: MonitoringService[F],
+    monRepo: MonitoringRepository[F]
+)(implicit F: Effect[F], uuid: UUIDGenerator[F])
+    extends AkkaHttpControllerDsl
+    with UnsafeLogging {
 
-  def createSpec: Route = path("metricspec") {
-    post {
-      entity(as[MetricSpecCreationRequest]) { incomingMS =>
-        logger.info(s"Got MetricSpec create request: $incomingMS")
-        val flow = for {
-          id <- uuid.generate()
-          config = CustomModelMetricSpecConfiguration(
-            incomingMS.config.modelVersionId,
-            incomingMS.config.threshold,
-            incomingMS.config.thresholdCmpOperator,
-            None
+  def createSpec: Route =
+    path("metricspec") {
+      post {
+        entity(as[MetricSpecCreationRequest]) { incomingMS =>
+          logger.info(s"Got MetricSpec create request: $incomingMS")
+          val flow = for {
+            id <- uuid.generate()
+            config = CustomModelMetricSpecConfiguration(
+              incomingMS.config.modelVersionId,
+              incomingMS.config.threshold,
+              incomingMS.config.thresholdCmpOperator,
+              None
+            )
+            ms = CustomModelMetricSpec(
+              incomingMS.name,
+              incomingMS.modelVersionId,
+              config,
+              id = id.toString
+            )
+            res <- monitoringService.create(ms)
+          } yield fromMetricSpec(res)
+          completeF(flow)
+        }
+      }
+    }
+
+  def listSpecs: Route =
+    path("metricspec") {
+      get {
+        completeF(monitoringService.all().map(_.map(fromMetricSpec)))
+      }
+    }
+
+  def getSpec: Route =
+    path("metricspec" / Segment) { id =>
+      get {
+        val flow = OptionT(monRepo.get(id))
+          .map(fromMetricSpec)
+          .getOrElseF(
+            DomainError.notFound(s"Can't find metricspec id=$id").raiseError[F, MetricSpecView]
           )
-          ms = CustomModelMetricSpec(
-            incomingMS.name,
-            incomingMS.modelVersionId,
-            config,
-            id = id.toString
-          )
-          res <- monitoringService.create(ms)
-        } yield fromMetricSpec(res)
         completeF(flow)
       }
     }
-  }
 
-  def listSpecs: Route = path("metricspec") {
-    get {
-      completeF(monitoringService.all().map(_.map(fromMetricSpec)))
+  def getSpecForModelVersion: Route =
+    path("metricspec" / "modelversion" / LongNumber) { id =>
+      get {
+        completeF(monRepo.forModelVersion(id).map(_.map(fromMetricSpec)))
+      }
     }
-  }
 
-  def getSpec: Route = path("metricspec" / Segment) { id =>
-    get {
-      val flow = OptionT(monRepo.get(id))
-        .map(fromMetricSpec)
-        .getOrElseF(DomainError.notFound(s"Can't find metricspec id=$id").raiseError[F, MetricSpecView])
-      completeF(flow)
+  def deleteSpec: Route =
+    path("metricspec" / Segment) { id =>
+      delete {
+        completeF(monitoringService.delete(id).map(fromMetricSpec))
+      }
     }
-  }
 
-  def getSpecForModelVersion: Route = path("metricspec" / "modelversion" / LongNumber) { id =>
-    get {
-      completeF(monRepo.forModelVersion(id).map(_.map(fromMetricSpec)))
-    }
-  }
-
-  def deleteSpec: Route = path("metricspec" / Segment) { id =>
-    delete {
-      completeF(monitoringService.delete(id).map(fromMetricSpec))
-    }
-  }
-
-  def routes: Route = pathPrefix("monitoring") {
+  val routes: Route = pathPrefix("monitoring") {
     createSpec ~ listSpecs ~ getSpec ~ getSpecForModelVersion ~ deleteSpec
   }
 }
 
 object MonitoringRequests {
   @JsonCodec
-  final case class MetricSpecConfigCreationRequest(modelVersionId: Long, threshold: Double, thresholdCmpOperator: ThresholdCmpOperator)
+  final case class MetricSpecConfigCreationRequest(
+      modelVersionId: Long,
+      threshold: Double,
+      thresholdCmpOperator: ThresholdCmpOperator
+  )
   @JsonCodec
-  final case class MetricSpecCreationRequest(name: String, modelVersionId: Long, config: MetricSpecConfigCreationRequest)
+  final case class MetricSpecCreationRequest(
+      name: String,
+      modelVersionId: Long,
+      config: MetricSpecConfigCreationRequest
+  )
 
   @JsonCodec
   final case class MetricSpecConfigView(
-    modelVersionId: Long,
-    threshold: Double,
-    thresholdCmpOperator: ThresholdCmpOperator,
-    servable: Option[ServableView]
+      modelVersionId: Long,
+      threshold: Double,
+      thresholdCmpOperator: ThresholdCmpOperator,
+      servable: Option[ServableView]
   )
   @JsonCodec
   final case class MetricSpecView(
-    name: String,
-    modelVersionId: Long,
-    config: MetricSpecConfigView,
-    id: String
+      name: String,
+      modelVersionId: Long,
+      config: MetricSpecConfigView,
+      id: String
   )
 
-  def fromMetricSpec(res: CustomModelMetricSpec): MetricSpecView = {
+  def fromMetricSpec(res: CustomModelMetricSpec): MetricSpecView =
     MetricSpecView(
       name = res.name,
       modelVersionId = res.modelVersionId,
@@ -106,5 +123,4 @@ object MonitoringRequests {
         servable = res.config.servable.map(ServableView.fromServable)
       )
     )
-  }
 }

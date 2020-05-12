@@ -15,7 +15,7 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.application.graph.Variant
+import io.hydrosphere.serving.manager.domain.application.compat.Variant
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.contract.Contract
@@ -35,7 +35,7 @@ import io.hydrosphere.serving.tensorflow.types.DataType
 import org.mockito.Matchers
 
 class ModelServiceSpec extends GenericUnitTest {
-  val dummyImage = DockerImage("a", "b")
+  val dummyImage     = DockerImage("a", "b")
   implicit val clock = Clock.create[IO]
 
   describe("Model service") {
@@ -47,43 +47,88 @@ class ModelServiceSpec extends GenericUnitTest {
     describe("contract validation") {
       it("should fail if name is empty") {
         val contract = ModelContract(predict = Some(ModelSignature()))
-        val res = Contract.validateContract(contract)
+        val res      = Contract.validateContract(contract)
         assert(res.isInvalid, res)
       }
       it("should fail if input contains invalid dtype") {
         val inputs = Seq(
-          ModelField("name1", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)),
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)),
+          ModelField(
+            "name1",
+            None,
+            DataProfileType.NONE,
+            ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)
+          ),
+          ModelField(
+            "name2",
+            None,
+            DataProfileType.NONE,
+            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
+          )
         )
         val outputs = Seq(
-          ModelField("name3", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField(
+            "name3",
+            None,
+            DataProfileType.NONE,
+            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
+          )
         )
         val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
-        val res = Contract.validateContract(contract)
+        val res      = Contract.validateContract(contract)
         assert(res.isInvalid, res)
       }
       it("should fail if output contains invalid dtype") {
         val inputs = Seq(
-          ModelField("name1", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField(
+            "name1",
+            None,
+            DataProfileType.NONE,
+            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
+          )
         )
         val outputs = Seq(
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)),
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField(
+            "name2",
+            None,
+            DataProfileType.NONE,
+            ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)
+          ),
+          ModelField(
+            "name2",
+            None,
+            DataProfileType.NONE,
+            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
+          )
         )
         val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
-        val res = Contract.validateContract(contract)
+        val res      = Contract.validateContract(contract)
         assert(res.isInvalid, res)
       }
       it("should pass if ok") {
         val inputs = Seq(
-          ModelField("name1", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField(
+            "name1",
+            None,
+            DataProfileType.NONE,
+            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
+          )
         )
         val outputs = Seq(
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_BOOL)),
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField(
+            "name2",
+            None,
+            DataProfileType.NONE,
+            ModelField.TypeOrSubfields.Dtype(DataType.DT_BOOL)
+          ),
+          ModelField(
+            "name2",
+            None,
+            DataProfileType.NONE,
+            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
+          )
         )
         val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
-        val res = Contract.validateContract(contract)
+        val res      = Contract.validateContract(contract)
         assert(res.isValid, res)
       }
     }
@@ -98,12 +143,29 @@ class ModelServiceSpec extends GenericUnitTest {
           name = "runtime",
           tag = "latest"
         )
-        val contract = ModelContract("",
-          Some(ModelSignature(
-            "testSig",
-            Seq(ModelField("in", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE))),
-            Seq(ModelField("out", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)))
-          ))
+        val contract = ModelContract(
+          "",
+          Some(
+            ModelSignature(
+              "testSig",
+              Seq(
+                ModelField(
+                  "in",
+                  TensorShape.scalar.toProto,
+                  DataProfileType.NONE,
+                  ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)
+                )
+              ),
+              Seq(
+                ModelField(
+                  "out",
+                  TensorShape.scalar.toProto,
+                  DataProfileType.NONE,
+                  ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)
+                )
+              )
+            )
+          )
         )
         val modelVersion = ModelVersion.Internal(
           id = 1,
@@ -142,18 +204,23 @@ class ModelServiceSpec extends GenericUnitTest {
         when(modelRepo.create(Model(0, modelName))).thenReturn(IO(model))
 
         val versionBuilder = mock[ModelVersionBuilder[IO]]
-        when(versionBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(IO(
-          DeferredResult(modelVersion, new Deferred[IO, ModelVersion.Internal] {
-            override def get = IO(modelVersion)
+        when(versionBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
+          IO(
+            DeferredResult(
+              modelVersion,
+              new Deferred[IO, ModelVersion.Internal] {
+                override def get = IO(modelVersion)
 
-            override def complete(a: ModelVersion.Internal) = IO.unit
-          })
-        ))
+                override def complete(a: ModelVersion.Internal) = IO.unit
+              }
+            )
+          )
+        )
 
         val modelVersionService = mock[ModelVersionService[IO]]
         when(modelVersionService.getNextModelVersion(1)).thenReturn(IO(1L))
         val modelVersionRepository = mock[ModelVersionRepository[IO]]
-        val selectorRepo = mock[HostSelectorRepository[IO]]
+        val selectorRepo           = mock[HostSelectorRepository[IO]]
 
         val fetcher = new ModelFetcher[IO] {
           override def fetch(path: Path) = IO(None)
@@ -173,7 +240,8 @@ class ModelServiceSpec extends GenericUnitTest {
           modelVersionRepository = null
         )
 
-        val maybeModel = modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
+        val maybeModel =
+          modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
         assert(maybeModel.isRight, maybeModel)
         val rModel = maybeModel.right.get.started
         println(rModel)
@@ -182,21 +250,38 @@ class ModelServiceSpec extends GenericUnitTest {
 
       it("existing model") {
         val uploadFile = Paths.get("123123")
-        val modelName = "upload-model"
+        val modelName  = "upload-model"
         val modelRuntime = DockerImage(
           name = "runtime",
           tag = "latest"
         )
         val model = Model(
           id = 1,
-          name = modelName,
+          name = modelName
         )
-        val contract = ModelContract("",
-          Some(ModelSignature(
-            "testSig",
-            Seq(ModelField("in", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE))),
-            Seq(ModelField("out", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)))
-          ))
+        val contract = ModelContract(
+          "",
+          Some(
+            ModelSignature(
+              "testSig",
+              Seq(
+                ModelField(
+                  "in",
+                  TensorShape.scalar.toProto,
+                  DataProfileType.NONE,
+                  ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)
+                )
+              ),
+              Seq(
+                ModelField(
+                  "out",
+                  TensorShape.scalar.toProto,
+                  DataProfileType.NONE,
+                  ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)
+                )
+              )
+            )
+          )
         )
         val modelVersion = ModelVersion.Internal(
           id = 1,
@@ -230,16 +315,22 @@ class ModelServiceSpec extends GenericUnitTest {
         when(modelRepo.get(1)).thenReturn(IO(model.some))
 
         val storageMock = mock[ModelUnpacker[IO]]
-        when(storageMock.unpack(uploadFile)).thenReturn(IO(ModelFileStructure.forRoot(Paths.get(".AAAAAAAAA"))))
+        when(storageMock.unpack(uploadFile))
+          .thenReturn(IO(ModelFileStructure.forRoot(Paths.get(".AAAAAAAAA"))))
 
         val versionService = mock[ModelVersionBuilder[IO]]
-        when(versionService.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(IO(
-          DeferredResult(modelVersion, new Deferred[IO, ModelVersion.Internal] {
-            override def get = IO(modelVersion)
+        when(versionService.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
+          IO(
+            DeferredResult(
+              modelVersion,
+              new Deferred[IO, ModelVersion.Internal] {
+                override def get = IO(modelVersion)
 
-            override def complete(a: ModelVersion.Internal) = IO.unit
-          })
-        ))
+                override def complete(a: ModelVersion.Internal) = IO.unit
+              }
+            )
+          )
+        )
         val fetcher = new ModelFetcher[IO] {
           override def fetch(path: Path) = IO(None)
         }
@@ -258,7 +349,8 @@ class ModelServiceSpec extends GenericUnitTest {
           modelVersionRepository = null
         )
 
-        val maybeModel = modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
+        val maybeModel =
+          modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
         assert(maybeModel.isRight, maybeModel)
         val rModel = maybeModel.right.get.started
         assert(rModel.model.name === "upload-model", rModel)
@@ -287,14 +379,22 @@ class ModelServiceSpec extends GenericUnitTest {
       }
 
       it("uploaded and fetched") {
-        val contract = ModelContract(predict = Some(ModelSignature(
-          "sig", Seq.empty, Seq.empty
-        )))
-        val fetched = Some(FetcherResult(
-          modelName = "uuuu",
-          modelContract = contract,
-          metadata = Map("f" -> "123", "overriden" -> "false")
-        ))
+        val contract = ModelContract(predict =
+          Some(
+            ModelSignature(
+              "sig",
+              Seq.empty,
+              Seq.empty
+            )
+          )
+        )
+        val fetched = Some(
+          FetcherResult(
+            modelName = "uuuu",
+            modelContract = contract,
+            metadata = Map("f" -> "123", "overriden" -> "false")
+          )
+        )
         val uploaded = ModelUploadMetadata(
           name = "upload-name",
           runtime = DockerImage("test", "test"),
@@ -338,7 +438,12 @@ class ModelServiceSpec extends GenericUnitTest {
           status = Application.Failed(None),
           signature = ModelSignature.defaultInstance,
           kafkaStreaming = Nil,
-          versionGraph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(appFailedVersion, 100)), ModelSignature.defaultInstance))
+          versionGraph = NonEmptyList.of(
+            PipelineStage(
+              NonEmptyList.of(Variant(appFailedVersion, 100)),
+              ModelSignature.defaultInstance
+            )
+          )
         )
 
         val servableFailedModel = Model(2, "servable-failing")
@@ -394,42 +499,40 @@ class ModelServiceSpec extends GenericUnitTest {
         )
         val modelRepo = new ModelRepository[IO] {
           override def create(entity: Model): IO[Model] = ???
-          override def get(id: Long): IO[Option[Model]] = {
+          override def get(id: Long): IO[Option[Model]] =
             id match {
-              case appFailedModel.id => IO.pure(Some(appFailedModel))
+              case appFailedModel.id      => IO.pure(Some(appFailedModel))
               case servableFailedModel.id => IO.pure(Some(servableFailedModel))
-              case okModel.id => IO.pure(Some(okModel))
-              case _ => IO(None)
+              case okModel.id             => IO.pure(Some(okModel))
+              case _                      => IO(None)
             }
-          }
-          override def all(): IO[Seq[Model]] = ???
+          override def all(): IO[Seq[Model]]                = ???
           override def get(name: String): IO[Option[Model]] = ???
-          override def update(value: Model): IO[Int] = ???
-          override def delete(id: Long): IO[Int] = IO.pure(1)
+          override def update(value: Model): IO[Int]        = ???
+          override def delete(id: Long): IO[Int]            = IO.pure(1)
         }
         val appRepo = new ApplicationRepository[IO] {
-          override def create(entity: GenericApplication): IO[GenericApplication] = ???
-          override def get(id: Long): IO[Option[GenericApplication]] = ???
-          override def get(name: String): IO[Option[GenericApplication]] = ???
-          override def update(value: GenericApplication): IO[Int] = ???
+          override def create(entity: GenericApplication): IO[GenericApplication]      = ???
+          override def get(id: Long): IO[Option[GenericApplication]]                   = ???
+          override def get(name: String): IO[Option[GenericApplication]]               = ???
+          override def update(value: GenericApplication): IO[Int]                      = ???
           override def updateRow(row: DBApplicationRepository.ApplicationRow): IO[Int] = ???
-          override def delete(id: Long): IO[Int] = ???
-          override def all(): IO[List[GenericApplication]] = ???
-          override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = {
+          override def delete(id: Long): IO[Int]                                       = ???
+          override def all(): IO[List[GenericApplication]]                             = ???
+          override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] =
             versionIdx match {
               case appFailedModel.id => IO(app :: Nil)
-              case _ => IO.pure(Nil)
+              case _                 => IO.pure(Nil)
             }
-          }
           override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
         }
         val servableRepo = new ServableRepository[IO] {
-          override def all(): IO[List[GenericServable]] = ???
+          override def all(): IO[List[GenericServable]]                       = ???
           override def upsert(servable: GenericServable): IO[GenericServable] = ???
-          override def delete(name: String): IO[Int] = ???
-          override def get(name: String): IO[Option[GenericServable]] = ???
-          override def get(names: Seq[String]): IO[List[GenericServable]] = ???
-          override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = {
+          override def delete(name: String): IO[Int]                          = ???
+          override def get(name: String): IO[Option[GenericServable]]         = ???
+          override def get(names: Seq[String]): IO[List[GenericServable]]     = ???
+          override def findForModelVersion(versionId: Long): IO[List[GenericServable]] =
             versionId match {
               case servableFailedVersion.id =>
                 println("Here")
@@ -438,29 +541,26 @@ class ModelServiceSpec extends GenericUnitTest {
                 println(s"Ok ${versionId}")
                 IO.pure(Nil)
             }
-          }
         }
         val modelVersionService = new ModelVersionService[IO] {
-          override def all(): IO[List[ModelVersion.Internal]] = ???
-          override def get(id: Long): IO[ModelVersion.Internal] = ???
+          override def all(): IO[List[ModelVersion.Internal]]                 = ???
+          override def get(id: Long): IO[ModelVersion.Internal]               = ???
           override def get(name: String, version: Long): IO[ModelVersionView] = ???
-          override def getNextModelVersion(modelId: Long): IO[Long] = ???
-          override def list: IO[List[ModelVersionView]] = ???
-          override def listForModel(modelId: Long): IO[List[ModelVersion.Internal]] = {
+          override def getNextModelVersion(modelId: Long): IO[Long]           = ???
+          override def list: IO[List[ModelVersionView]]                       = ???
+          override def listForModel(modelId: Long): IO[List[ModelVersion.Internal]] =
             modelId match {
-              case appFailedModel.id => IO.pure(appFailedVersion :: Nil)
+              case appFailedModel.id      => IO.pure(appFailedVersion :: Nil)
               case servableFailedModel.id => IO.pure(servableFailedVersion :: Nil)
-              case okModel.id => IO.pure(okVersion1 :: okVersion2 :: Nil)
-              case _ => IO.raiseError(new RuntimeException(s"Shouldn't delete model $modelId"))
+              case okModel.id             => IO.pure(okVersion1 :: okVersion2 :: Nil)
+              case _                      => IO.raiseError(new RuntimeException(s"Shouldn't delete model $modelId"))
             }
-          }
-          override def delete(versionId: Long): IO[Option[ModelVersion.Internal]] = {
+          override def delete(versionId: Long): IO[Option[ModelVersion.Internal]] =
             versionId match {
               case okVersion1.id => IO.pure(Some(okVersion1))
               case okVersion2.id => IO.pure(Some(okVersion2))
-              case _ => IO.raiseError(new RuntimeException(s"Shouldn't delete version $versionId"))
+              case _             => IO.raiseError(new RuntimeException(s"Shouldn't delete version $versionId"))
             }
-          }
         }
         val modelService = ModelService.apply[IO]()(
           MonadError[IO, Throwable],
@@ -482,7 +582,8 @@ class ModelServiceSpec extends GenericUnitTest {
         val failedApp = modelService.deleteModel(appFailedModel.id).attempt.unsafeRunSync()
         assert(failedApp.left.get.isInstanceOf[DomainError.InvalidRequest], failedApp)
 
-        val failedServable = modelService.deleteModel(servableFailedModel.id).attempt.unsafeRunSync()
+        val failedServable =
+          modelService.deleteModel(servableFailedModel.id).attempt.unsafeRunSync()
         assert(failedServable.left.get.isInstanceOf[DomainError.InvalidRequest], failedServable)
       }
     }

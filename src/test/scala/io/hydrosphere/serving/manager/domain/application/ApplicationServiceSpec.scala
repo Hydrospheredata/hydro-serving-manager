@@ -13,7 +13,7 @@ import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
-import io.hydrosphere.serving.manager.domain.application.graph.{Variant, VersionGraphComposer}
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
@@ -29,8 +29,16 @@ import scala.collection.mutable.ListBuffer
 class ApplicationServiceSpec extends GenericUnitTest {
   val signature = ModelSignature(
     "claim",
-    Seq(ModelField("in", None, typeOrSubfields = ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE))),
-    Seq(ModelField("out", None, typeOrSubfields = ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)))
+    Seq(
+      ModelField("in", None, typeOrSubfields = ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE))
+    ),
+    Seq(
+      ModelField(
+        "out",
+        None,
+        typeOrSubfields = ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)
+      )
+    )
   )
   val contract = ModelContract("", Some(signature))
   val modelVersion = ModelVersion.Internal(
@@ -67,11 +75,25 @@ class ApplicationServiceSpec extends GenericUnitTest {
       when(versionRepo.get(1)).thenReturn(IO(Some(externalMv)))
       val servableService = new ServableService[IO] {
         def all(): IO[List[Servable.GenericServable]] = ???
-        def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-        def deploy(modelVersion: ModelVersion.Internal, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def getFiltered(
+            name: Option[String],
+            versionId: Option[Long],
+            metadata: Map[String, String]
+        ): IO[List[Servable.GenericServable]] = ???
+        def deploy(
+            modelVersion: ModelVersion.Internal,
+            metadata: Map[String, String]
+        ): IO[DeferredResult[IO, GenericServable]]  = ???
         def stop(name: String): IO[GenericServable] = ???
-        def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-        def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(
+            name: String,
+            version: Long,
+            metadata: Map[String, String]
+        ): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(
+            modelId: Long,
+            metadata: Map[String, String]
+        ): IO[DeferredResult[IO, GenericServable]] = ???
         def get(name: String): IO[GenericServable] = ???
       }
       val graphComposer = VersionGraphComposer.default
@@ -82,56 +104,77 @@ class ApplicationServiceSpec extends GenericUnitTest {
         Concurrent[IO],
         applicationRepository = appRepo,
         versionRepository = versionRepo,
-        servableService= servableService,
+        servableService = servableService,
         discoveryHub = discoveryHub,
         graphComposer = graphComposer
       )
-      val graph = ExecutionGraphRequest(NonEmptyList.of(
-        PipelineStageRequest(NonEmptyList.of(
-          ModelVariantRequest(
-            modelVersionId = 1,
-            weight = 100
+      val graph = ExecutionGraphRequest(
+        NonEmptyList.of(
+          PipelineStageRequest(
+            NonEmptyList.of(
+              ModelVariantRequest(
+                modelVersionId = 1,
+                weight = 100
+              )
+            )
           )
-        ))
-      ))
+        )
+      )
       val result = appDeployer.deploy("test", graph, List.empty).attempt.unsafeRunSync()
-      result.left.value.getClass should be (classOf[DomainError.InvalidRequest])
+      result.left.value.getClass should be(classOf[DomainError.InvalidRequest])
     }
 
     it("should start application build") {
       ioAssert {
         val appRepo = mock[ApplicationRepository[IO]]
         when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(IO(
-          Application(
-            id = 1,
-            name = "test",
-            namespace = None,
-            status = Application.Assembling,
-            signature = signature.copy(signatureName = "test"),
-            kafkaStreaming = List.empty,
-            versionGraph = NonEmptyList.of(PipelineStage(
-              NonEmptyList.of(Variant(modelVersion, 100)),
-              modelVersion.modelContract.predict.get
-            ))
+        when(appRepo.create(Matchers.any())).thenReturn(
+          IO(
+            Application(
+              id = 1,
+              name = "test",
+              namespace = None,
+              status = Application.Assembling,
+              signature = signature.copy(signatureName = "test"),
+              kafkaStreaming = List.empty,
+              versionGraph = NonEmptyList.of(
+                PipelineStage(
+                  NonEmptyList.of(compat.Variant(modelVersion, 100)),
+                  modelVersion.modelContract.predict.get
+                )
+              )
+            )
           )
-        ))
+        )
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         val servableService = new ServableService[IO] {
           def all(): IO[List[Servable.GenericServable]] = ???
-          def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-          def deploy(modelVersion: ModelVersion.Internal, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = {
+          def getFiltered(
+              name: Option[String],
+              versionId: Option[Long],
+              metadata: Map[String, String]
+          ): IO[List[Servable.GenericServable]] = ???
+          def deploy(
+              modelVersion: ModelVersion.Internal,
+              metadata: Map[String, String]
+          ): IO[DeferredResult[IO, GenericServable]] =
             IO.pure {
               val s = Servable(modelVersion, "hi", Servable.Serving("Ok", "host", 9090), Nil)
               val d = Deferred[IO, GenericServable].unsafeRunSync()
               d.complete(s).unsafeRunSync()
               DeferredResult(s, d)
             }
-          }
           def stop(name: String): IO[GenericServable] = ???
-          def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-          def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def findAndDeploy(
+              name: String,
+              version: Long,
+              metadata: Map[String, String]
+          ): IO[DeferredResult[IO, GenericServable]] = ???
+          def findAndDeploy(
+              modelId: Long,
+              metadata: Map[String, String]
+          ): IO[DeferredResult[IO, GenericServable]] = ???
           def get(name: String): IO[GenericServable] = ???
         }
         val graphComposer = VersionGraphComposer.default
@@ -142,22 +185,26 @@ class ApplicationServiceSpec extends GenericUnitTest {
           Concurrent[IO],
           applicationRepository = appRepo,
           versionRepository = versionRepo,
-          servableService= servableService,
+          servableService = servableService,
           discoveryHub = discoveryHub,
           graphComposer = graphComposer
         )
-        val graph = ExecutionGraphRequest(NonEmptyList.of(
-          PipelineStageRequest(NonEmptyList.of(
-            ModelVariantRequest(
-              modelVersionId = 1,
-              weight = 100
+        val graph = ExecutionGraphRequest(
+          NonEmptyList.of(
+            PipelineStageRequest(
+              NonEmptyList.of(
+                ModelVariantRequest(
+                  modelVersionId = 1,
+                  weight = 100
+                )
+              )
             )
-          ))
-        ))
+          )
+        )
         appDeployer.deploy("test", graph, List.empty).map { res =>
           assert(res.started.name === "test")
           assert(res.started.status.isInstanceOf[Application.Assembling.type])
-          // build will fail nonetheless
+        // build will fail nonetheless
         }
       }
     }
@@ -167,33 +214,42 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val appRepo = mock[ApplicationRepository[IO]]
         when(appRepo.update(Matchers.any())).thenReturn(IO.pure(1))
         when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(IO(
-          Application(
-            id = 1,
-            name = "test",
-            namespace = None,
-            status = Application.Assembling,
-            signature = signature.copy(signatureName = "test"),
-            kafkaStreaming = List.empty,
-            versionGraph = NonEmptyList.of(
-              PipelineStage(NonEmptyList.of(
-                Variant(modelVersion, 100)),
-                signature
+        when(appRepo.create(Matchers.any())).thenReturn(
+          IO(
+            Application(
+              id = 1,
+              name = "test",
+              namespace = None,
+              status = Application.Assembling,
+              signature = signature.copy(signatureName = "test"),
+              kafkaStreaming = List.empty,
+              versionGraph = NonEmptyList.of(
+                PipelineStage(NonEmptyList.of(compat.Variant(modelVersion, 100)), signature)
               )
             )
           )
-        ))
+        )
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         val servableService = new ServableService[IO] {
           def all(): IO[List[Servable.GenericServable]] = ???
-          def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-          def deploy(mv: ModelVersion.Internal, metadata: Map[String, String]): IO[Nothing] = {
+          def getFiltered(
+              name: Option[String],
+              versionId: Option[Long],
+              metadata: Map[String, String]
+          ): IO[List[Servable.GenericServable]] = ???
+          def deploy(mv: ModelVersion.Internal, metadata: Map[String, String]): IO[Nothing] =
             IO.raiseError(new RuntimeException("Test error"))
-          }
-          def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def findAndDeploy(
+              name: String,
+              version: Long,
+              metadata: Map[String, String]
+          ): IO[DeferredResult[IO, GenericServable]]  = ???
           def stop(name: String): IO[GenericServable] = ???
-          def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def findAndDeploy(
+              modelId: Long,
+              metadata: Map[String, String]
+          ): IO[DeferredResult[IO, GenericServable]] = ???
           def get(name: String): IO[GenericServable] = ???
         }
         val graphComposer = VersionGraphComposer.default
@@ -204,18 +260,22 @@ class ApplicationServiceSpec extends GenericUnitTest {
           Concurrent[IO],
           applicationRepository = appRepo,
           versionRepository = versionRepo,
-          servableService= servableService,
+          servableService = servableService,
           discoveryHub = discoveryHub,
           graphComposer = graphComposer
         )
-        val graph = ExecutionGraphRequest(NonEmptyList.of(
-          PipelineStageRequest(NonEmptyList.of(
-            ModelVariantRequest(
-              modelVersionId = 1,
-              weight = 100
+        val graph = ExecutionGraphRequest(
+          NonEmptyList.of(
+            PipelineStageRequest(
+              NonEmptyList.of(
+                ModelVariantRequest(
+                  modelVersionId = 1,
+                  weight = 100
+                )
+              )
             )
-          ))
-        ))
+          )
+        )
         appDeployer.deploy("test", graph, List.empty).flatMap { res =>
           println("Waiting for build")
           res.completed.get.map { x =>
@@ -231,25 +291,33 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val appRepo = mock[ApplicationRepository[IO]]
         when(appRepo.update(Matchers.any())).thenReturn(IO(1))
         when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(IO(
-          Application(
-            id = 1,
-            name = "test",
-            namespace = None,
-            status = Application.Assembling,
-            signature = signature.copy(signatureName = "test"),
-            kafkaStreaming = List.empty,
-            versionGraph = NonEmptyList.of(PipelineStage(
-              NonEmptyList.of(Variant(modelVersion, 100)),
-              modelVersion.modelContract.predict.get
-            ))
+        when(appRepo.create(Matchers.any())).thenReturn(
+          IO(
+            Application(
+              id = 1,
+              name = "test",
+              namespace = None,
+              status = Application.Assembling,
+              signature = signature.copy(signatureName = "test"),
+              kafkaStreaming = List.empty,
+              versionGraph = NonEmptyList.of(
+                PipelineStage(
+                  NonEmptyList.of(compat.Variant(modelVersion, 100)),
+                  modelVersion.modelContract.predict.get
+                )
+              )
+            )
           )
-        ))
+        )
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         val servableService = new ServableService[IO] {
           def all(): IO[List[Servable.GenericServable]] = ???
-          def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
+          def getFiltered(
+              name: Option[String],
+              versionId: Option[Long],
+              metadata: Map[String, String]
+          ): IO[List[Servable.GenericServable]] = ???
           def deploy(mv: ModelVersion.Internal, metadata: Map[String, String]) = {
             val s = Servable(
               modelVersion = mv,
@@ -260,35 +328,41 @@ class ApplicationServiceSpec extends GenericUnitTest {
             DeferredResult.completed(s)
           }
           def findAndDeploy(name: String, version: Long, metadata: Map[String, String]) = ???
-          def stop(name: String): IO[GenericServable] = ???
-          def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def stop(name: String): IO[GenericServable]                                   = ???
+          def findAndDeploy(
+              modelId: Long,
+              metadata: Map[String, String]
+          ): IO[DeferredResult[IO, GenericServable]] = ???
           def get(name: String): IO[GenericServable] = ???
         }
 
         val appChanged = ListBuffer.empty[GenericApplication]
         val discoveryHub = new ApplicationEvents.Publisher[IO] {
-          override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = {
+          override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] =
             t match {
-              case DiscoveryEvent.Initial => IO.unit
+              case DiscoveryEvent.Initial           => IO.unit
               case DiscoveryEvent.ItemUpdate(items) => IO(appChanged ++= items)
               case DiscoveryEvent.ItemRemove(items) => IO.unit
             }
-          }
         }
-        val graph = ExecutionGraphRequest(NonEmptyList.of(
-          PipelineStageRequest(NonEmptyList.of(
-            ModelVariantRequest(
-              modelVersionId = 1,
-              weight = 100
+        val graph = ExecutionGraphRequest(
+          NonEmptyList.of(
+            PipelineStageRequest(
+              NonEmptyList.of(
+                ModelVariantRequest(
+                  modelVersionId = 1,
+                  weight = 100
+                )
+              )
             )
-          ))
-        ))
+          )
+        )
         val graphComposer = VersionGraphComposer.default
         val appDeployer = ApplicationDeployer.default[IO]()(
           Concurrent[IO],
           applicationRepository = appRepo,
           versionRepository = versionRepo,
-          servableService= servableService,
+          servableService = servableService,
           discoveryHub = discoveryHub,
           graphComposer = graphComposer
         )
@@ -314,18 +388,20 @@ class ApplicationServiceSpec extends GenericUnitTest {
           signature = signature.copy(signatureName = "test"),
           status = Application.Assembling,
           kafkaStreaming = List.empty,
-          versionGraph =  NonEmptyList.of(PipelineStage(
-            NonEmptyList.of(Variant(modelVersion, 100)),
-            modelVersion.modelContract.predict.get
-          ))
+          versionGraph = NonEmptyList.of(
+            PipelineStage(
+              NonEmptyList.of(compat.Variant(modelVersion, 100)),
+              modelVersion.modelContract.predict.get
+            )
+          )
         )
-        var app = Option(ogApp)
+        var app     = Option(ogApp)
         val appRepo = mock[ApplicationRepository[IO]]
         when(appRepo.get(Matchers.anyLong())).thenReturn(IO(app))
         when(appRepo.get(Matchers.anyString())).thenReturn(IO(app))
         when(appRepo.create(Matchers.any())).thenReturn(IO(ogApp))
         when(appRepo.update(Matchers.any())).thenReturn(IO(1))
-        when(appRepo.delete(Matchers.any())).thenReturn(IO{
+        when(appRepo.delete(Matchers.any())).thenReturn(IO {
           app = None
           1
         })
@@ -335,38 +411,52 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
         val servableService = new ServableService[IO] {
           def all(): IO[List[Servable.GenericServable]] = ???
-          def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-          def deploy(mv: ModelVersion.Internal, metadata: Map[String, String]) = {
-            DeferredResult.completed(Servable(mv, "test", Servable.Serving("Ok", "host", 9090), Nil, Map.empty))
-          }
+          def getFiltered(
+              name: Option[String],
+              versionId: Option[Long],
+              metadata: Map[String, String]
+          ): IO[List[Servable.GenericServable]] = ???
+          def deploy(mv: ModelVersion.Internal, metadata: Map[String, String]) =
+            DeferredResult.completed(
+              Servable(mv, "test", Servable.Serving("Ok", "host", 9090), Nil, Map.empty)
+            )
           def findAndDeploy(name: String, version: Long, metadata: Map[String, String]) = ???
-          def stop(name: String): IO[GenericServable] = ???
-          def findAndDeploy(modelId: Long, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+          def stop(name: String): IO[GenericServable]                                   = ???
+          def findAndDeploy(
+              modelId: Long,
+              metadata: Map[String, String]
+          ): IO[DeferredResult[IO, GenericServable]] = ???
           def get(name: String): IO[GenericServable] = ???
         }
 
         val apps = ListBuffer.empty[GenericApplication]
         val eventPublisher = new ApplicationEvents.Publisher[IO] {
-          override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] = {
+          override def publish(t: DiscoveryEvent[GenericApplication, String]): IO[Unit] =
             t match {
-              case DiscoveryEvent.Initial => IO.unit
+              case DiscoveryEvent.Initial           => IO.unit
               case DiscoveryEvent.ItemUpdate(items) => IO(apps ++= items)
               case DiscoveryEvent.ItemRemove(items) => IO(apps.filterNot(a => items.contains(a)))
             }
-          }
         }
-        val graph = ExecutionGraphRequest(NonEmptyList.of(
-          PipelineStageRequest(NonEmptyList.of(
-            ModelVariantRequest(
-              modelVersionId = 1,
-              weight = 100
+        val graph = ExecutionGraphRequest(
+          NonEmptyList.of(
+            PipelineStageRequest(
+              NonEmptyList.of(
+                ModelVariantRequest(
+                  modelVersionId = 1,
+                  weight = 100
+                )
+              )
             )
-          ))
-        ))
+          )
+        )
         val appDep = new ApplicationDeployer[IO] {
-          override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream]): IO[DeferredResult[IO, GenericApplication]] = {
+          override def deploy(
+              name: String,
+              executionGraph: ExecutionGraphRequest,
+              kafkaStreaming: List[ApplicationKafkaStream]
+          ): IO[DeferredResult[IO, GenericApplication]] =
             DeferredResult.completed[IO, GenericApplication](ogApp)
-          }
         }
         val gc = ServableGC.noop[IO]()
         val applicationService = ApplicationService[IO]()(

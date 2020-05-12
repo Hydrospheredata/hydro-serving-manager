@@ -12,7 +12,6 @@ import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.implicits.javatime._
 import doobie.util.transactor.Transactor
-
 import io.hydrosphere.serving.manager.domain.contract.Contract
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -22,6 +21,52 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelecto
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.util.CollectionOps._
 import io.hydrosphere.serving.manager.infrastructure.db.Metas._
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository._
+
+class DBModelVersionRepository[F[_]](tx: Transactor[F])(implicit
+    F: Bracket[F, Throwable]
+) extends ModelVersionRepository[F] {
+  override def all(): F[List[ModelVersion]] =
+    for {
+      rows <- allQ.to[List].transact(tx)
+    } yield rows.map(toModelVersionT)
+
+  override def create(entity: ModelVersion): F[ModelVersion] =
+    for {
+      id <- insertQ(fromModelVersion(entity))
+        .withUniqueGeneratedKeys[Long]("model_version_id")
+        .transact(tx)
+    } yield entity match {
+      case imv: ModelVersion.Internal => imv.copy(id = id)
+      case emv: ModelVersion.External => emv.copy(id = id)
+    }
+
+  override def update(entity: ModelVersion): F[Int] =
+    updateQ(fromModelVersion(entity)).run.transact(tx)
+
+  override def get(id: Long): F[Option[ModelVersion]] =
+    for {
+      row <- getQ(id).option.transact(tx)
+    } yield row.map(toModelVersionT)
+
+  override def get(modelName: String, modelVersion: Long): F[Option[ModelVersion]] =
+    for {
+      row <- getQ(modelName, modelVersion).option.transact(tx)
+    } yield row.map(toModelVersionT)
+
+  override def delete(id: Long): F[Int] =
+    deleteQ(id).run.transact(tx)
+
+  override def listForModel(modelId: Long): F[List[ModelVersion]] =
+    for {
+      rows <- listVersionsQ(modelId).to[List].transact(tx)
+    } yield rows.map(toModelVersionT)
+
+  override def lastModelVersionByModel(modelId: Long): F[Option[ModelVersion]] =
+    for {
+      row <- lastModelVersionQ(modelId).option.transact(tx)
+    } yield row.map(toModelVersionT)
+}
 
 object DBModelVersionRepository {
 
@@ -259,51 +304,4 @@ object DBModelVersionRepository {
          |DELETE FROM hydro_serving.model_version
          |  WHERE model_version_id = $id
       """.stripMargin.update
-
-  def make[F[_]]()(implicit
-      F: Bracket[F, Throwable],
-      tx: Transactor[F]
-  ): ModelVersionRepository[F] =
-    new ModelVersionRepository[F] {
-      override def all(): F[List[ModelVersion]] =
-        for {
-          rows <- allQ.to[List].transact(tx)
-        } yield rows.map(toModelVersionT)
-
-      override def create(entity: ModelVersion): F[ModelVersion] =
-        for {
-          id <- insertQ(fromModelVersion(entity))
-            .withUniqueGeneratedKeys[Long]("model_version_id")
-            .transact(tx)
-        } yield entity match {
-          case imv: ModelVersion.Internal => imv.copy(id = id)
-          case emv: ModelVersion.External => emv.copy(id = id)
-        }
-
-      override def update(entity: ModelVersion): F[Int] =
-        updateQ(fromModelVersion(entity)).run.transact(tx)
-
-      override def get(id: Long): F[Option[ModelVersion]] =
-        for {
-          row <- getQ(id).option.transact(tx)
-        } yield row.map(toModelVersionT)
-
-      override def get(modelName: String, modelVersion: Long): F[Option[ModelVersion]] =
-        for {
-          row <- getQ(modelName, modelVersion).option.transact(tx)
-        } yield row.map(toModelVersionT)
-
-      override def delete(id: Long): F[Int] =
-        deleteQ(id).run.transact(tx)
-
-      override def listForModel(modelId: Long): F[List[ModelVersion]] =
-        for {
-          rows <- listVersionsQ(modelId).to[List].transact(tx)
-        } yield rows.map(toModelVersionT)
-
-      override def lastModelVersionByModel(modelId: Long): F[Option[ModelVersion]] =
-        for {
-          row <- lastModelVersionQ(modelId).option.transact(tx)
-        } yield row.map(toModelVersionT)
-    }
 }

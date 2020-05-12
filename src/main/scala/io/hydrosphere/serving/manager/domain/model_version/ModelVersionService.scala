@@ -25,63 +25,61 @@ trait ModelVersionService[F[_]] {
 }
 
 object ModelVersionService extends UnsafeLogging {
-  def apply[F[_]]()(
-      implicit F: MonadError[F, Throwable],
+  def apply[F[_]](
       modelVersionRepository: ModelVersionRepository[F],
       applicationRepo: ApplicationRepository[F],
       modelPublisher: ModelVersionEvents.Publisher[F]
-  ): ModelVersionService[F] = new ModelVersionService[F] {
+  )(implicit
+      F: MonadError[F, Throwable]
+  ): ModelVersionService[F] =
+    new ModelVersionService[F] {
 
-    def list: F[List[ModelVersionView]] = {
-      for {
-        allVersions <- modelVersionRepository.all()
-        f           <- allVersions.map(_.id).traverse { x => applicationRepo.findVersionUsage(x).map(x -> _) }
-        usageMap = f.toMap
-      } yield {
-        allVersions.map { v => ModelVersionView.fromVersion(v, usageMap.getOrElse(v.id, Nil)) }
+      def list: F[List[ModelVersionView]] =
+        for {
+          allVersions <- modelVersionRepository.all()
+          f <-
+            allVersions.map(_.id).traverse(x => applicationRepo.findVersionUsage(x).map(x -> _))
+          usageMap = f.toMap
+        } yield allVersions.map { v =>
+          ModelVersionView.fromVersion(v, usageMap.getOrElse(v.id, Nil))
+        }
+
+      def delete(versionId: Long): F[Option[ModelVersion]] = {
+        val f = for {
+          version <- OptionT(modelVersionRepository.get(versionId))
+          _       <- OptionT.liftF(modelVersionRepository.delete(versionId))
+          _       <- OptionT.liftF(modelPublisher.remove(versionId))
+        } yield version
+        f.value
       }
-    }
 
-    def delete(versionId: Long): F[Option[ModelVersion]] = {
-      val f = for {
-        version <- OptionT(modelVersionRepository.get(versionId))
-        _       <- OptionT.liftF(modelVersionRepository.delete(versionId))
-        _       <- OptionT.liftF(modelPublisher.remove(versionId))
-      } yield version
-      f.value
-    }
+      def getNextModelVersion(modelId: Long): F[Long] =
+        for {
+          versions <- modelVersionRepository.lastModelVersionByModel(modelId)
+        } yield versions.fold(1L)(_.modelVersion + 1)
 
-    def getNextModelVersion(modelId: Long): F[Long] = {
-      for {
-        versions <- modelVersionRepository.lastModelVersionByModel(modelId)
-      } yield versions.fold(1L)(_.modelVersion + 1)
-    }
-
-    override def get(name: String, version: Long): F[ModelVersionView] = {
-      for {
-        _ <- F.fromOption(
-          Model.validate(name),
-          DomainError.invalidRequest("Name contains invalid characters.")
-        )
-        mv <- OptionT(modelVersionRepository.get(name, version))
-          .getOrElseF(
-            F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $name:$version"))
+      override def get(name: String, version: Long): F[ModelVersionView] =
+        for {
+          _ <- F.fromOption(
+            Model.validate(name),
+            DomainError.invalidRequest("Name contains invalid characters.")
           )
-        apps <- applicationRepo.findVersionUsage(mv.id)
-      } yield ModelVersionView.fromVersion(mv, apps)
-    }
+          mv <- OptionT(modelVersionRepository.get(name, version))
+            .getOrElseF(
+              F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $name:$version"))
+            )
+          apps <- applicationRepo.findVersionUsage(mv.id)
+        } yield ModelVersionView.fromVersion(mv, apps)
 
-    override def all(): F[List[ModelVersion]] = modelVersionRepository.all()
+      override def all(): F[List[ModelVersion]] = modelVersionRepository.all()
 
-    override def get(id: Long): F[ModelVersion] = {
-      for {
-        mv <- OptionT(modelVersionRepository.get(id))
-          .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $id")))
-      } yield mv
-    }
+      override def get(id: Long): F[ModelVersion] =
+        for {
+          mv <- OptionT(modelVersionRepository.get(id))
+            .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find a ModelVersion $id")))
+        } yield mv
 
-    override def listForModel(modelId: Long): F[List[ModelVersion]] = {
-      modelVersionRepository.listForModel(modelId)
+      override def listForModel(modelId: Long): F[List[ModelVersion]] =
+        modelVersionRepository.listForModel(modelId)
     }
-  }
 }

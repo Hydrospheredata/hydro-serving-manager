@@ -7,11 +7,28 @@ import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.model_build.BuildLogRepository
+import DBBuildLogRepository._
+
+class DBBuildLogRepository[F[_]](tx: Transactor[F])(implicit F: Bracket[F, Throwable])
+    extends BuildLogRepository[F] {
+  override def add(modelVersionId: Long, logs: List[String]): F[Unit] = {
+    val row = BuildLogRow(modelVersionId, logs)
+    insertQ(row).run.transact(tx).void
+  }
+
+  override def get(modelVersionId: Long): F[Option[fs2.Stream[F, String]]] =
+    for {
+      rows <- getQ(modelVersionId).to[List].transact(tx)
+    } yield rows match {
+      case Nil => None
+      case _   => Some(fs2.Stream.emits(rows.foldLeft(List.empty[String])(_ ++ _.logs)).covary[F])
+    }
+}
 
 object DBBuildLogRepository {
   final case class BuildLogRow(
-    version_id: Long,
-    logs: List[String]
+      version_id: Long,
+      logs: List[String]
   )
 
   def getQ(modelVersionId: Long): doobie.Query0[BuildLogRow] =
@@ -26,22 +43,4 @@ object DBBuildLogRepository {
          |  VALUES(${br.version_id}, ${br.logs})
       """.stripMargin.update
 
-  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): BuildLogRepository[F] =
-    new BuildLogRepository[F] {
-      override def add(modelVersionId: Long, logs: List[String]): F[Unit] = {
-        val row = BuildLogRow(modelVersionId, logs)
-        insertQ(row).run.transact(tx).void
-      }
-
-      override def get(modelVersionId: Long): F[Option[fs2.Stream[F, String]]] = {
-        for {
-          rows <- getQ(modelVersionId).to[List].transact(tx)
-        } yield {
-          rows match {
-            case Nil => None
-            case _ => Some(fs2.Stream.emits(rows.foldLeft(List.empty[String])(_ ++ _.logs)).covary[F])
-          }
-        }
-      }
-    }
 }

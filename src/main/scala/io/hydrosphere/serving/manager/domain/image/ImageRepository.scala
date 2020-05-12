@@ -19,14 +19,13 @@ trait ImageRepository[F[_]] {
 }
 
 object ImageRepository {
-  def fromConfig[F[_]: Sync](
+  def make[F[_]: Sync](
       dockerClient: DockerdClient[F],
       dockerRepositoryConfiguration: DockerRepositoryConfiguration
-  )(implicit executionContext: ExecutionContext): ImageRepository[F] = {
+  ): ImageRepository[F] =
     dockerRepositoryConfiguration match {
       case c: DockerRepositoryConfiguration.Remote => new RemoteImageRepository[F](dockerClient, c)
       case c: DockerRepositoryConfiguration.Ecs    => new ECSImageRepository[F](dockerClient, c)
       case _                                       => new LocalImageRepository[F]
     }
-  }
 }

@@ -1,8 +1,8 @@
 package io.hydrosphere.serving.manager.api.http.controller.application
 
+import cats.implicits._
 import io.circe.generic.JsonCodec
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.application.Application.Status
 import io.hydrosphere.serving.manager.domain.application.graph._
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationKafkaStream}
 import io.hydrosphere.serving.manager.domain.contract.Signature
@@ -20,36 +20,24 @@ case class ApplicationView(
 )
 
 object ApplicationView {
-  def fromApplication(app: GenericApplication): ApplicationView = {
-    val (status, graph, message) = app.status match {
-      case Application.Assembling =>
-        val graph  = ExecutionGraphAdapter.fromVersionPipeline(app.versionGraph)
-        val status = "Assembling"
-        (status, graph, None)
-      case Application.Failed(reason) =>
-        val graph  = ExecutionGraphAdapter.fromVersionPipeline(app.versionGraph)
-        val status = "Failed"
-        (status, graph, reason)
-      case Application.Ready(stages) =>
-        val versionGraph = stages.map { node =>
-          val signature = node.signature
-          val subs = node.variants.map { variant =>
-            Variant(variant.item.modelVersion, variant.weight)
-          }
-          PipelineStage(subs, signature)
-        }
-        val graph  = ExecutionGraphAdapter.fromVersionPipeline(versionGraph)
-        val status = "Ready"
-        (status, graph, None)
+  def fromApplication(app: Application): ApplicationView = {
+    val graph = app.status match {
+      case Status.Assembling =>
+        ExecutionGraphAdapter.fromVersionPipeline(app.executionGraph)
+      case Status.Failed =>
+        ExecutionGraphAdapter.fromVersionPipeline(app.executionGraph)
+      case Status.Ready =>
+        ExecutionGraphAdapter.fromVersionPipeline(app.executionGraph)
     }
+
     ApplicationView(
       id = app.id,
       name = app.name,
-      status = status,
+      status = app.status.entryName,
       signature = app.signature,
       executionGraph = graph,
       kafkaStreaming = app.kafkaStreaming,
-      message = message,
+      message = app.message.some,
       metadata = app.metadata
     )
   }
