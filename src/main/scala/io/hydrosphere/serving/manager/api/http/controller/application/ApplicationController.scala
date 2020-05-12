@@ -76,7 +76,7 @@ class ApplicationController[F[_]: Effect](
     pathPrefix("application" / "generateInputs" / Segment) { appName =>
       get {
         completeF(
-          ApplicationService.generateInputs[F](appName)
+          appService.generateInputs(appName)
         )
       }
     }

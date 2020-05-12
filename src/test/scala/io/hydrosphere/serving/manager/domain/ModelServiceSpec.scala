@@ -1,42 +1,25 @@
 package io.hydrosphere.serving.manager.domain
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.Paths
 import java.time.Instant
 
-import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.{Clock, IO}
-import cats.effect.concurrent.Deferred
+import cats.effect.IO
 import cats.syntax.option._
-import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.contract.model_field.ModelField
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
-import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.application.compat.Variant
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
-import io.hydrosphere.serving.manager.domain.contract.Contract
+import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model._
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{FetcherResult, ModelFetcher}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, ModelUnpacker}
 import io.hydrosphere.serving.manager.util.DeferredResult
-import io.hydrosphere.serving.tensorflow.TensorShape
-import io.hydrosphere.serving.tensorflow.types.DataType
-import org.mockito.Matchers
 
 class ModelServiceSpec extends GenericUnitTest {
-  val dummyImage     = DockerImage("a", "b")
-  implicit val clock = Clock.create[IO]
 
   describe("Model service") {
     describe("name validation") {
@@ -44,94 +27,7 @@ class ModelServiceSpec extends GenericUnitTest {
         assert(Model.validate("ClassifierModel").isEmpty)
       }
     }
-    describe("contract validation") {
-      it("should fail if name is empty") {
-        val contract = ModelContract(predict = Some(ModelSignature()))
-        val res      = Contract.validateContract(contract)
-        assert(res.isInvalid, res)
-      }
-      it("should fail if input contains invalid dtype") {
-        val inputs = Seq(
-          ModelField(
-            "name1",
-            None,
-            DataProfileType.NONE,
-            ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)
-          ),
-          ModelField(
-            "name2",
-            None,
-            DataProfileType.NONE,
-            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
-          )
-        )
-        val outputs = Seq(
-          ModelField(
-            "name3",
-            None,
-            DataProfileType.NONE,
-            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
-          )
-        )
-        val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
-        val res      = Contract.validateContract(contract)
-        assert(res.isInvalid, res)
-      }
-      it("should fail if output contains invalid dtype") {
-        val inputs = Seq(
-          ModelField(
-            "name1",
-            None,
-            DataProfileType.NONE,
-            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
-          )
-        )
-        val outputs = Seq(
-          ModelField(
-            "name2",
-            None,
-            DataProfileType.NONE,
-            ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)
-          ),
-          ModelField(
-            "name2",
-            None,
-            DataProfileType.NONE,
-            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
-          )
-        )
-        val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
-        val res      = Contract.validateContract(contract)
-        assert(res.isInvalid, res)
-      }
-      it("should pass if ok") {
-        val inputs = Seq(
-          ModelField(
-            "name1",
-            None,
-            DataProfileType.NONE,
-            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
-          )
-        )
-        val outputs = Seq(
-          ModelField(
-            "name2",
-            None,
-            DataProfileType.NONE,
-            ModelField.TypeOrSubfields.Dtype(DataType.DT_BOOL)
-          ),
-          ModelField(
-            "name2",
-            None,
-            DataProfileType.NONE,
-            ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)
-          )
-        )
-        val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
-        val res      = Contract.validateContract(contract)
-        assert(res.isValid, res)
-      }
-    }
+
     describe("uploads") {
       it("a new model") {
         val model = Model(
@@ -143,30 +39,7 @@ class ModelServiceSpec extends GenericUnitTest {
           name = "runtime",
           tag = "latest"
         )
-        val contract = ModelContract(
-          "",
-          Some(
-            ModelSignature(
-              "testSig",
-              Seq(
-                ModelField(
-                  "in",
-                  TensorShape.scalar.toProto,
-                  DataProfileType.NONE,
-                  ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)
-                )
-              ),
-              Seq(
-                ModelField(
-                  "out",
-                  TensorShape.scalar.toProto,
-                  DataProfileType.NONE,
-                  ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)
-                )
-              )
-            )
-          )
-        )
+
         val modelVersion = ModelVersion.Internal(
           id = 1,
           image = DockerImage(
@@ -176,7 +49,7 @@ class ModelServiceSpec extends GenericUnitTest {
           created = Instant.now(),
           finished = Some(Instant.now()),
           modelVersion = 1,
-          modelContract = contract,
+          modelContract = defaultContract,
           runtime = modelRuntime,
           model = model,
           hostSelector = None,
@@ -190,60 +63,44 @@ class ModelServiceSpec extends GenericUnitTest {
           name = modelName,
           runtime = modelRuntime,
           hostSelectorName = None,
-          contract = Some(contract),
-          profileTypes = None,
+          contract = Some(defaultContract),
           installCommand = None
         )
 
-        val modelRepo = mock[ModelRepository[IO]]
-        when(modelRepo.get(Matchers.anyLong())).thenReturn(IO(None))
-
+        val modelRepo   = mock[ModelRepository[IO]]
         val storageMock = mock[ModelUnpacker[IO]]
         when(storageMock.unpack(uploadFile)).thenReturn(IO(ModelFileStructure.forRoot(uploadFile)))
         when(modelRepo.get(modelName)).thenReturn(IO(None))
         when(modelRepo.create(Model(0, modelName))).thenReturn(IO(model))
 
         val versionBuilder = mock[ModelVersionBuilder[IO]]
-        when(versionBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
-          IO(
-            DeferredResult(
-              modelVersion,
-              new Deferred[IO, ModelVersion.Internal] {
-                override def get = IO(modelVersion)
-
-                override def complete(a: ModelVersion.Internal) = IO.unit
-              }
-            )
-          )
+        when(versionBuilder.build(any, any, any)).thenReturn(
+          DeferredResult.completed(modelVersion)
         )
 
         val modelVersionService = mock[ModelVersionService[IO]]
-        when(modelVersionService.getNextModelVersion(1)).thenReturn(IO(1L))
-        val modelVersionRepository = mock[ModelVersionRepository[IO]]
-        val selectorRepo           = mock[HostSelectorRepository[IO]]
+        val selectorRepo        = mock[HostSelectorRepository[IO]]
 
-        val fetcher = new ModelFetcher[IO] {
-          override def fetch(path: Path) = IO(None)
-        }
+        val fetcher = mock[ModelFetcher[IO]]
+        when(fetcher.fetch(any)).thenReturn(IO(None))
 
-        val modelManagementService = ModelService[IO]()(
-          MonadError[IO, Throwable],
-          clock,
+        val modelManagementService = ModelService[IO](
           modelRepository = modelRepo,
           modelVersionService = modelVersionService,
-          storageService = storageMock,
+          modelUnpacker = storageMock,
           appRepo = null,
           hostSelectorRepository = selectorRepo,
           fetcher = fetcher,
           modelVersionBuilder = versionBuilder,
           servableRepo = null,
-          modelVersionRepository = null
+          modelVersionRepository = null,
+          logger = loggerF
         )
 
         val maybeModel =
           modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
         assert(maybeModel.isRight, maybeModel)
-        val rModel = maybeModel.right.get.started
+        val rModel = maybeModel.getOrElse(fail()).started
         println(rModel)
         assert(rModel.model.name === "tf-model")
       }
@@ -259,30 +116,6 @@ class ModelServiceSpec extends GenericUnitTest {
           id = 1,
           name = modelName
         )
-        val contract = ModelContract(
-          "",
-          Some(
-            ModelSignature(
-              "testSig",
-              Seq(
-                ModelField(
-                  "in",
-                  TensorShape.scalar.toProto,
-                  DataProfileType.NONE,
-                  ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)
-                )
-              ),
-              Seq(
-                ModelField(
-                  "out",
-                  TensorShape.scalar.toProto,
-                  DataProfileType.NONE,
-                  ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)
-                )
-              )
-            )
-          )
-        )
         val modelVersion = ModelVersion.Internal(
           id = 1,
           image = DockerImage(
@@ -292,7 +125,7 @@ class ModelServiceSpec extends GenericUnitTest {
           created = Instant.now(),
           finished = Some(Instant.now()),
           modelVersion = 1,
-          modelContract = contract,
+          modelContract = defaultContract,
           runtime = modelRuntime,
           model = model,
           hostSelector = None,
@@ -304,55 +137,41 @@ class ModelServiceSpec extends GenericUnitTest {
           name = modelName,
           runtime = modelRuntime,
           hostSelectorName = None,
-          contract = Some(contract),
-          profileTypes = None
+          contract = Some(defaultContract)
         )
         println(upload)
 
         val modelRepo = mock[ModelRepository[IO]]
-        when(modelRepo.update(Matchers.any(classOf[Model]))).thenReturn(IO(1))
         when(modelRepo.get(modelName)).thenReturn(IO(model.some))
-        when(modelRepo.get(1)).thenReturn(IO(model.some))
 
         val storageMock = mock[ModelUnpacker[IO]]
         when(storageMock.unpack(uploadFile))
           .thenReturn(IO(ModelFileStructure.forRoot(Paths.get(".AAAAAAAAA"))))
 
         val versionService = mock[ModelVersionBuilder[IO]]
-        when(versionService.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
-          IO(
-            DeferredResult(
-              modelVersion,
-              new Deferred[IO, ModelVersion.Internal] {
-                override def get = IO(modelVersion)
-
-                override def complete(a: ModelVersion.Internal) = IO.unit
-              }
-            )
-          )
+        when(versionService.build(any, any, any)).thenReturn(
+          DeferredResult.completed[IO, ModelVersion.Internal](modelVersion)
         )
-        val fetcher = new ModelFetcher[IO] {
-          override def fetch(path: Path) = IO(None)
-        }
+        val fetcher = mock[ModelFetcher[IO]]
+        when(fetcher.fetch(any)).thenReturn(IO(None))
 
-        val modelManagementService = ModelService[IO]()(
-          MonadError[IO, Throwable],
-          clock,
+        val modelManagementService = ModelService[IO](
           modelRepository = modelRepo,
           modelVersionService = null,
-          storageService = storageMock,
+          modelUnpacker = storageMock,
           appRepo = null,
           hostSelectorRepository = null,
           fetcher = fetcher,
           modelVersionBuilder = versionService,
           servableRepo = null,
-          modelVersionRepository = null
+          modelVersionRepository = null,
+          logger = loggerF
         )
 
         val maybeModel =
           modelManagementService.uploadModel(uploadFile, upload).attempt.unsafeRunSync()
         assert(maybeModel.isRight, maybeModel)
-        val rModel = maybeModel.right.get.started
+        val rModel = maybeModel.getOrElse(fail()).started
         assert(rModel.model.name === "upload-model", rModel)
       }
     }
@@ -364,30 +183,21 @@ class ModelServiceSpec extends GenericUnitTest {
           name = "upload-name",
           runtime = DockerImage("test", "test"),
           hostSelectorName = None,
-          contract = None,
-          profileTypes = Some(Map("a" -> DataProfileType.IMAGE)),
+          contract = defaultContract.some,
           installCommand = Some("echo hello"),
           metadata = Some(Map("author" -> "me"))
         )
-        val res = ModelVersionMetadata.combineMetadata(fetched, uploaded, None)
+        val res = ModelVersionMetadata.combineMetadata(fetched, uploaded, None).get
         assert(res.modelName === "upload-name")
         assert(res.runtime === DockerImage("test", "test"))
-        assert(res.contract === ModelContract.defaultInstance)
+        assert(res.contract === defaultContract)
         assert(res.hostSelector === None)
         assert(res.installCommand === Some("echo hello"))
         assert(res.metadata === Map("author" -> "me"))
       }
 
       it("uploaded and fetched") {
-        val contract = ModelContract(predict =
-          Some(
-            ModelSignature(
-              "sig",
-              Seq.empty,
-              Seq.empty
-            )
-          )
-        )
+        val contract = defaultContract
         val fetched = Some(
           FetcherResult(
             modelName = "uuuu",
@@ -400,11 +210,10 @@ class ModelServiceSpec extends GenericUnitTest {
           runtime = DockerImage("test", "test"),
           hostSelectorName = None,
           contract = None,
-          profileTypes = Some(Map("a" -> DataProfileType.IMAGE)),
           installCommand = Some("echo hello"),
           metadata = Some(Map("author" -> "me", "overriden" -> "true"))
         )
-        val res = ModelVersionMetadata.combineMetadata(fetched, uploaded, None)
+        val res = ModelVersionMetadata.combineMetadata(fetched, uploaded, None).get
         assert(res.modelName === "upload-name")
         assert(res.runtime === DockerImage("test", "test"))
         assert(res.contract === contract)
@@ -423,7 +232,7 @@ class ModelServiceSpec extends GenericUnitTest {
           created = Instant.now(),
           finished = Some(Instant.now()),
           modelVersion = 1,
-          modelContract = ModelContract.defaultInstance,
+          modelContract = defaultContract,
           runtime = dummyImage,
           model = appFailedModel,
           hostSelector = None,
@@ -435,15 +244,18 @@ class ModelServiceSpec extends GenericUnitTest {
           id = 1,
           name = "app",
           namespace = None,
-          status = Application.Failed(None),
-          signature = ModelSignature.defaultInstance,
+          status = Application.Status.Failed,
           kafkaStreaming = Nil,
-          versionGraph = NonEmptyList.of(
-            PipelineStage(
-              NonEmptyList.of(Variant(appFailedVersion, 100)),
-              ModelSignature.defaultInstance
-            )
-          )
+          executionGraph = ApplicationGraph(
+            NonEmptyList.of(
+              WeightedNode(
+                NonEmptyList.of(Variant(appFailedVersion, None, 100)),
+                defaultContract.predict
+              )
+            ),
+            defaultContract.predict
+          ),
+          message = "Failed"
         )
 
         val servableFailedModel = Model(2, "servable-failing")
@@ -453,7 +265,7 @@ class ModelServiceSpec extends GenericUnitTest {
           created = Instant.now(),
           finished = Some(Instant.now()),
           modelVersion = 2,
-          modelContract = ModelContract.defaultInstance,
+          modelContract = defaultContract,
           runtime = dummyImage,
           model = servableFailedModel,
           hostSelector = None,
@@ -464,9 +276,12 @@ class ModelServiceSpec extends GenericUnitTest {
         val servable = Servable(
           modelVersion = servableFailedVersion,
           nameSuffix = "123",
-          status = Servable.NotServing("asd", None, None),
+          status = Servable.Status.NotServing,
           usedApps = Nil,
-          metadata = Map.empty
+          metadata = Map.empty,
+          message = "ok",
+          host = None,
+          port = None
         )
         val okModel = Model(3, "ok")
         val okVersion1 = ModelVersion.Internal(
@@ -475,7 +290,7 @@ class ModelServiceSpec extends GenericUnitTest {
           created = Instant.now(),
           finished = Some(Instant.now()),
           modelVersion = 1,
-          modelContract = ModelContract.defaultInstance,
+          modelContract = defaultContract,
           runtime = dummyImage,
           model = okModel,
           hostSelector = None,
@@ -489,7 +304,7 @@ class ModelServiceSpec extends GenericUnitTest {
           created = Instant.now(),
           finished = Some(Instant.now()),
           modelVersion = 2,
-          modelContract = ModelContract.defaultInstance,
+          modelContract = defaultContract,
           runtime = dummyImage,
           model = okModel,
           hostSelector = None,
@@ -497,94 +312,74 @@ class ModelServiceSpec extends GenericUnitTest {
           installCommand = None,
           metadata = Map.empty
         )
-        val modelRepo = new ModelRepository[IO] {
-          override def create(entity: Model): IO[Model] = ???
-          override def get(id: Long): IO[Option[Model]] =
-            id match {
-              case appFailedModel.id      => IO.pure(Some(appFailedModel))
-              case servableFailedModel.id => IO.pure(Some(servableFailedModel))
-              case okModel.id             => IO.pure(Some(okModel))
-              case _                      => IO(None)
-            }
-          override def all(): IO[Seq[Model]]                = ???
-          override def get(name: String): IO[Option[Model]] = ???
-          override def update(value: Model): IO[Int]        = ???
-          override def delete(id: Long): IO[Int]            = IO.pure(1)
+        val modelRepo = mock[ModelRepository[IO]]
+        when(modelRepo.get(anyLong)).thenAnswer[Long] {
+          case appFailedModel.id      => IO.pure(Some(appFailedModel))
+          case servableFailedModel.id => IO.pure(Some(servableFailedModel))
+          case okModel.id             => IO.pure(Some(okModel))
+          case _                      => IO(None)
         }
-        val appRepo = new ApplicationRepository[IO] {
-          override def create(entity: GenericApplication): IO[GenericApplication]      = ???
-          override def get(id: Long): IO[Option[GenericApplication]]                   = ???
-          override def get(name: String): IO[Option[GenericApplication]]               = ???
-          override def update(value: GenericApplication): IO[Int]                      = ???
-          override def updateRow(row: DBApplicationRepository.ApplicationRow): IO[Int] = ???
-          override def delete(id: Long): IO[Int]                                       = ???
-          override def all(): IO[List[GenericApplication]]                             = ???
-          override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] =
-            versionIdx match {
-              case appFailedModel.id => IO(app :: Nil)
-              case _                 => IO.pure(Nil)
-            }
-          override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
+        when(modelRepo.delete(anyLong)).thenReturn(IO(1))
+
+        val appRepo = mock[ApplicationRepository[IO]]
+        when(appRepo.findVersionUsage(anyLong)).thenAnswer[Long] {
+          case appFailedModel.id => IO(app :: Nil)
+          case _                 => IO.pure(Nil)
         }
-        val servableRepo = new ServableRepository[IO] {
-          override def all(): IO[List[GenericServable]]                       = ???
-          override def upsert(servable: GenericServable): IO[GenericServable] = ???
-          override def delete(name: String): IO[Int]                          = ???
-          override def get(name: String): IO[Option[GenericServable]]         = ???
-          override def get(names: Seq[String]): IO[List[GenericServable]]     = ???
-          override def findForModelVersion(versionId: Long): IO[List[GenericServable]] =
-            versionId match {
-              case servableFailedVersion.id =>
-                println("Here")
-                IO.pure(servable :: Nil)
-              case _ =>
-                println(s"Ok ${versionId}")
-                IO.pure(Nil)
-            }
+
+        val servableRepoMock = mock[ServableRepository[IO]]
+        when(servableRepoMock.findForModelVersion(anyLong)).thenAnswer[Long] {
+          case servableFailedVersion.id =>
+            IO.pure(servable :: Nil)
+          case x =>
+            IO.pure(Nil)
         }
-        val modelVersionService = new ModelVersionService[IO] {
-          override def all(): IO[List[ModelVersion.Internal]]                 = ???
-          override def get(id: Long): IO[ModelVersion.Internal]               = ???
-          override def get(name: String, version: Long): IO[ModelVersionView] = ???
-          override def getNextModelVersion(modelId: Long): IO[Long]           = ???
-          override def list: IO[List[ModelVersionView]]                       = ???
-          override def listForModel(modelId: Long): IO[List[ModelVersion.Internal]] =
-            modelId match {
-              case appFailedModel.id      => IO.pure(appFailedVersion :: Nil)
-              case servableFailedModel.id => IO.pure(servableFailedVersion :: Nil)
-              case okModel.id             => IO.pure(okVersion1 :: okVersion2 :: Nil)
-              case _                      => IO.raiseError(new RuntimeException(s"Shouldn't delete model $modelId"))
-            }
-          override def delete(versionId: Long): IO[Option[ModelVersion.Internal]] =
-            versionId match {
-              case okVersion1.id => IO.pure(Some(okVersion1))
-              case okVersion2.id => IO.pure(Some(okVersion2))
-              case _             => IO.raiseError(new RuntimeException(s"Shouldn't delete version $versionId"))
-            }
+
+        val versionServiceMock = mock[ModelVersionService[IO]]
+        when(versionServiceMock.listForModel(anyLong)).thenAnswer[Long] {
+          case appFailedModel.id      => IO.pure(appFailedVersion :: Nil)
+          case servableFailedModel.id => IO.pure(servableFailedVersion :: Nil)
+          case okModel.id             => IO.pure(okVersion1 :: okVersion2 :: Nil)
+          case x                      => IO.raiseError(new RuntimeException(s"Shouldn't delete model $x"))
         }
-        val modelService = ModelService.apply[IO]()(
-          MonadError[IO, Throwable],
-          clock,
+
+        when(versionServiceMock.delete(anyLong)).thenAnswer[Long] {
+          case okVersion1.id => IO.pure(Some(okVersion1))
+          case okVersion2.id => IO.pure(Some(okVersion2))
+          case x             => IO.raiseError(new RuntimeException(s"Shouldn't delete version $x"))
+        }
+        val modelService = ModelService.apply[IO](
           modelRepository = modelRepo,
           appRepo = appRepo,
-          servableRepo = servableRepo,
-          modelVersionService = modelVersionService,
-          storageService = null,
+          servableRepo = servableRepoMock,
+          modelVersionService = versionServiceMock,
+          modelUnpacker = null,
           hostSelectorRepository = null,
           fetcher = null,
           modelVersionBuilder = null,
-          modelVersionRepository = null
+          modelVersionRepository = null,
+          logger = loggerF
         )
 
         val result = modelService.deleteModel(okModel.id).unsafeRunSync()
         assert(result.name == okModel.name)
 
         val failedApp = modelService.deleteModel(appFailedModel.id).attempt.unsafeRunSync()
-        assert(failedApp.left.get.isInstanceOf[DomainError.InvalidRequest], failedApp)
+        assert(
+          failedApp.swap
+            .getOrElse(fail())
+            .isInstanceOf[DomainError.InvalidRequest],
+          failedApp
+        )
 
         val failedServable =
           modelService.deleteModel(servableFailedModel.id).attempt.unsafeRunSync()
-        assert(failedServable.left.get.isInstanceOf[DomainError.InvalidRequest], failedServable)
+        assert(
+          failedServable.swap
+            .getOrElse(fail())
+            .isInstanceOf[DomainError.InvalidRequest],
+          failedServable
+        )
       }
     }
   }

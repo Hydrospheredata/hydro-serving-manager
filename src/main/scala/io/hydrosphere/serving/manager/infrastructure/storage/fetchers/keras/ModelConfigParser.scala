@@ -7,12 +7,13 @@ import cats.effect.Sync
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.{Monad, MonadError}
-import io.circe.parser._
+import io.circe.syntax._
 import io.hydrosphere.serving.manager.domain.contract.Contract
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.FetcherResult
 import io.hydrosphere.serving.manager.util.{HDF5File, UnsafeLogging}
 import org.apache.commons.io.FilenameUtils
+import io.hydrosphere.serving.manager.util.JsonOps._
 
 private[keras] trait ModelConfigParser[F[_]] {
   def importModel: F[FetcherResult]
@@ -29,14 +30,13 @@ private[keras] object ModelConfigParser extends UnsafeLogging {
     f.value
   }
 
-  def findH5file[F[_]: Monad](source: StorageOps[F], directory: Path) = {
+  def findH5file[F[_]: Monad](source: StorageOps[F], directory: Path) =
     for {
       dirFile <- OptionT(source.getReadableFile(directory))
       file <- OptionT.fromOption(
         dirFile.listFiles().find(f => f.isFile && f.getName.endsWith(".h5")).map(_.toPath)
       )
     } yield file
-  }
 
   case class H5[F[_]: Sync](source: StorageOps[F], h5path: Path) extends ModelConfigParser[F] {
     def importModel: F[FetcherResult] = {
@@ -56,15 +56,13 @@ private[keras] object ModelConfigParser extends UnsafeLogging {
     }
   }
 
-  case class JsonString[F[_]](modelConfigJson: String, name: String, version: String)(
-      implicit F: MonadError[F, Throwable]
+  case class JsonString[F[_]](modelConfigJson: String, name: String, version: String)(implicit
+      F: MonadError[F, Throwable]
   ) extends ModelConfigParser[F] {
 
-    override def importModel: F[FetcherResult] = {
+    override def importModel: F[FetcherResult] =
       for {
-        config <- F.fromEither(
-          parse(modelConfigJson).flatMap(_.as[ModelConfig])
-        )
+        config <- F.fromEither(modelConfigJson.parseJsonAs[ModelConfig])
         signature <- F.fromOption(
           config.toPredictSignature,
           new IllegalArgumentException(s"Can't extract predict signature from ${config}")
@@ -72,14 +70,11 @@ private[keras] object ModelConfigParser extends UnsafeLogging {
         contract = Contract(
           predict = signature
         )
-      } yield {
-        FetcherResult(
-          modelName = name,
-          modelContract = contract,
-          metadata = Map.empty
-        )
-      }
-    }
+      } yield FetcherResult(
+        modelName = name,
+        modelContract = contract,
+        metadata = Map.empty
+      )
   }
 
 }

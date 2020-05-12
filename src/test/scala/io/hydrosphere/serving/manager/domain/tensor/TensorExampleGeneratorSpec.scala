@@ -1,39 +1,23 @@
 package io.hydrosphere.serving.manager.domain.tensor
 
-import com.google.protobuf.ByteString
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
-import io.hydrosphere.serving.contract.utils.ContractBuilders
+import cats.data.NonEmptyList
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.model.api.TensorExampleGenerator
-import io.hydrosphere.serving.tensorflow.TensorShape
-import io.hydrosphere.serving.tensorflow.tensor.{MapTensorData, TensorProto, TypedTensorFactory}
-import io.hydrosphere.serving.tensorflow.tensor_shape.TensorShapeProto
-import io.hydrosphere.serving.tensorflow.types.DataType
+import io.hydrosphere.serving.manager.domain.contract.{DataType, Field, Signature, TensorShape}
 
 class TensorExampleGeneratorSpec extends GenericUnitTest {
-  val fooString = ByteString.copyFromUtf8("foo")
+  val fooString = "foo"
 
   describe("TensorExampleGenerator") {
     describe("should generate correct example") {
       it("when scalar flat signature") {
-        val sig1 = ModelSignature(
+        val sig1 = Signature(
           "sig1",
-          List(
-            ContractBuilders.simpleTensorModelField("in1", DataType.DT_STRING, TensorShape.scalar)
-          ),
-          List(
-            ContractBuilders.simpleTensorModelField("out1", DataType.DT_DOUBLE, TensorShape.vector(-1))
-          )
+          NonEmptyList.of(Field.Tensor("in1", DataType.DT_STRING, TensorShape.scalar, None)),
+          NonEmptyList.of(Field.Tensor("out1", DataType.DT_STRING, TensorShape.varVector, None))
         )
 
         val expected = Map(
-          "in1" -> TypedTensorFactory.create(
-            TensorProto(
-              dtype = DataType.DT_STRING,
-              tensorShape = TensorShape.scalar.toProto,
-              stringVal = List(fooString)
-            )
-          )
+          "in1" -> StringTensor(TensorShape.scalar, Seq(fooString))
         )
 
         val generated = TensorExampleGenerator(sig1).inputs
@@ -41,32 +25,28 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("when vector flat signature") {
-        val sig1 = ModelSignature(
+        val sig1 = Signature(
           "sig1",
-          List(
-            ContractBuilders.simpleTensorModelField("in1", DataType.DT_STRING, TensorShape.vector(-1)),
-            ContractBuilders.simpleTensorModelField("in2", DataType.DT_INT32, TensorShape.vector(3))
+          NonEmptyList.of(
+            Field.Tensor("in1", DataType.DT_STRING, TensorShape.varVector, None),
+            Field.Tensor("in2", DataType.DT_INT32, TensorShape.vector(3), None)
           ),
-          List(
-            ContractBuilders.simpleTensorModelField("out1", DataType.DT_DOUBLE, TensorShape.vector(-1))
+          NonEmptyList.of(
+            Field.Tensor("out1", DataType.DT_DOUBLE, TensorShape.varVector, None)
           )
         )
 
         val expected = Map(
-          "in1" -> TypedTensorFactory.create(
-            TensorProto(
-              dtype = DataType.DT_STRING,
-              tensorShape = TensorShape.vector(-1).toProto,
-              stringVal = List(fooString)
+          "in1" ->
+            StringTensor(
+              TensorShape.varVector,
+              Seq(fooString)
+            ),
+          "in2" ->
+            Int32Tensor(
+              TensorShape.vector(3),
+              List(1, 1, 1)
             )
-          ),
-          "in2" -> TypedTensorFactory.create(
-            TensorProto(
-              dtype = DataType.DT_INT32,
-              tensorShape = TensorShape.vector(3).toProto,
-              intVal = List(1, 1, 1)
-            )
-          )
         )
 
         val generated = TensorExampleGenerator(sig1).inputs
@@ -74,35 +54,34 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("when nested singular signature") {
-        val sig1 = ModelSignature(
+        val sig1 = Signature(
           "sig1",
-          List(
-            ContractBuilders.complexField(
+          NonEmptyList.of(
+            Field.Map(
               "in1",
-              TensorShape.scalar.toProto,
-              Seq(
-                ContractBuilders.simpleTensorModelField("a", DataType.DT_STRING, TensorShape.scalar),
-                ContractBuilders.simpleTensorModelField("b", DataType.DT_STRING, TensorShape.scalar)
-              )
+              List(
+                Field.Tensor("a", DataType.DT_STRING, TensorShape.scalar, None),
+                Field.Tensor("b", DataType.DT_STRING, TensorShape.scalar, None)
+              ),
+              TensorShape.scalar
             )
           ),
-          List(
-            ContractBuilders.simpleTensorModelField("out1", DataType.DT_DOUBLE, TensorShape.vector(-1))
-          )
+          NonEmptyList.of(Field.Tensor("out1", DataType.DT_DOUBLE, TensorShape.varVector, None))
         )
 
         val expected = Map(
           "in1" ->
-            TypedTensorFactory.create(
-              TensorProto(
-                dtype = DataType.DT_MAP,
-                tensorShape = TensorShape.scalar.toProto,
-                mapVal = Seq(
-                  MapTensorData(
-                    Map(
-                      "a" -> TensorProto(DataType.DT_STRING, TensorShape.scalar.toProto, stringVal = List(fooString)),
-                      "b" -> TensorProto(DataType.DT_STRING, TensorShape.scalar.toProto, stringVal = List(fooString))
-                    )
+            MapTensor(
+              shape = TensorShape.scalar,
+              data = Seq(
+                Map(
+                  "a" -> StringTensor(
+                    TensorShape.scalar,
+                    List(fooString)
+                  ),
+                  "b" -> StringTensor(
+                    TensorShape.scalar,
+                    List(fooString)
                   )
                 )
               )
@@ -114,50 +93,60 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("when nested vector signature") {
-        val sig1 = ModelSignature(
+        val sig1 = Signature(
           "sig1",
-          List(
-            ContractBuilders.complexField(
+          NonEmptyList.of(
+            Field.Map(
               "in1",
-              TensorShape.vector(3).toProto,
-              Seq(
-                ContractBuilders.simpleTensorModelField("a", DataType.DT_STRING, TensorShape.scalar),
-                ContractBuilders.simpleTensorModelField("b", DataType.DT_STRING, TensorShape.scalar)
-              )
+              List(
+                Field.Tensor("a", DataType.DT_STRING, TensorShape.scalar, None),
+                Field.Tensor("b", DataType.DT_STRING, TensorShape.scalar, None)
+              ),
+              TensorShape.vector(3)
             )
           ),
-          List(
-            ContractBuilders.simpleTensorModelField("out1", DataType.DT_DOUBLE, TensorShape.vector(-1))
+          NonEmptyList.of(
+            Field.Tensor("out1", DataType.DT_DOUBLE, TensorShape.varVector, None)
           )
         )
 
         val expected = Map(
-          "in1" -> TypedTensorFactory.create(
-            TensorProto(
-              dtype = DataType.DT_MAP,
-              tensorShape = TensorShape.vector(3).toProto,
-              mapVal = Seq(
-                MapTensorData(
-                  Map(
-                    "a" -> TensorProto(DataType.DT_STRING, TensorShape.scalar.toProto, stringVal = List(fooString)),
-                    "b" -> TensorProto(DataType.DT_STRING, TensorShape.scalar.toProto, stringVal = List(fooString))
+          "in1" ->
+            MapTensor(
+              TensorShape.vector(3),
+              Seq(
+                Map(
+                  "a" -> StringTensor(
+                    TensorShape.scalar,
+                    List(fooString)
+                  ),
+                  "b" -> StringTensor(
+                    TensorShape.scalar,
+                    List(fooString)
                   )
                 ),
-                MapTensorData(
-                  Map(
-                    "a" -> TensorProto(DataType.DT_STRING, TensorShape.scalar.toProto, stringVal = List(fooString)),
-                    "b" -> TensorProto(DataType.DT_STRING, TensorShape.scalar.toProto, stringVal = List(fooString))
+                Map(
+                  "a" -> StringTensor(
+                    TensorShape.scalar,
+                    List(fooString)
+                  ),
+                  "b" -> StringTensor(
+                    TensorShape.scalar,
+                    List(fooString)
                   )
                 ),
-                MapTensorData(
-                  Map(
-                    "a" -> TensorProto(DataType.DT_STRING, TensorShape.scalar.toProto, stringVal = List(fooString)),
-                    "b" -> TensorProto(DataType.DT_STRING, TensorShape.scalar.toProto, stringVal = List(fooString))
+                Map(
+                  "a" -> StringTensor(
+                    TensorShape.scalar,
+                    List(fooString)
+                  ),
+                  "b" -> StringTensor(
+                    TensorShape.scalar,
+                    List(fooString)
                   )
                 )
               )
             )
-          )
         )
 
         val generated = TensorExampleGenerator(sig1).inputs
@@ -165,26 +154,26 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("should generate None shape") {
-        val tensorShape = TensorShape.AnyDims
-        val resultOpt = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
+        val tensorShape = TensorShape.Dynamic
+        val resultOpt   = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
         assert(resultOpt.isDefined)
         val result = resultOpt.get
-        assert(result.shape.toProto === None)
+        assert(result.shape === tensorShape)
         assert(result.data === Seq(1.0))
       }
 
       it("should generate correct scalar") {
-        val tensorShape = TensorShape.Dims(Seq.empty)
-        val resultOpt = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
+        val tensorShape = TensorShape.scalar
+        val resultOpt   = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
         assert(resultOpt.isDefined)
         val result = resultOpt.get
-        assert(result.shape.toProto === Some(TensorShapeProto(Seq.empty)))
+        assert(result.shape === tensorShape)
         assert(result.data === Seq(1.0))
       }
 
       it("should generate correct [-1] vector") {
-        val tensorShape = TensorShape.Dims(Seq(-1))
-        val resultOpt = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
+        val tensorShape = TensorShape.varVector
+        val resultOpt   = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
         assert(resultOpt.isDefined)
         val result = resultOpt.get
         assert(result.shape === tensorShape)
@@ -192,8 +181,8 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("should generate correct [1] vector") {
-        val tensorShape = TensorShape.Dims(Seq(1))
-        val resultOpt = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
+        val tensorShape = TensorShape.vector(1)
+        val resultOpt   = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
         assert(resultOpt.isDefined)
         val result = resultOpt.get
         assert(result.shape === tensorShape)
@@ -201,8 +190,8 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("should generate correct [2] vector") {
-        val tensorShape = TensorShape.Dims(Seq(2))
-        val resultOpt = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
+        val tensorShape = TensorShape.vector(2)
+        val resultOpt   = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
         assert(resultOpt.isDefined)
         val result = resultOpt.get
         assert(result.shape === tensorShape)
@@ -210,8 +199,8 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("should generate correct [-1,1] vector") {
-        val tensorShape = TensorShape.Dims(Seq(-1, 1))
-        val resultOpt = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
+        val tensorShape = TensorShape.mat(-1, 1)
+        val resultOpt   = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
         assert(resultOpt.isDefined)
         val result = resultOpt.get
         assert(result.shape === tensorShape)
@@ -219,8 +208,8 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("should generate correct [-1, 4] vector") {
-        val tensorShape = TensorShape.Dims(Seq(-1, 4))
-        val resultOpt = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
+        val tensorShape = TensorShape.mat(-1, 4)
+        val resultOpt   = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
         assert(resultOpt.isDefined)
         val result = resultOpt.get
         assert(result.shape === tensorShape)
@@ -228,8 +217,8 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("should generate correct [1, 4] vector") {
-        val tensorShape = TensorShape.Dims(Seq(1, 4))
-        val resultOpt = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
+        val tensorShape = TensorShape.mat(1, 4)
+        val resultOpt   = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
         assert(resultOpt.isDefined)
         val result = resultOpt.get
         assert(result.shape === tensorShape)
@@ -237,12 +226,15 @@ class TensorExampleGeneratorSpec extends GenericUnitTest {
       }
 
       it("should generate correct [4, 4] vector") {
-        val tensorShape = TensorShape.Dims(Seq(4,4))
-        val resultOpt = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
+        val tensorShape = TensorShape.mat(4, 4)
+        val resultOpt   = TensorExampleGenerator.generateTensor(tensorShape, DataType.DT_FLOAT)
         assert(resultOpt.isDefined)
         val result = resultOpt.get
         assert(result.shape === tensorShape)
-        assert(result.data === Seq(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
+        assert(
+          result.data === Seq(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            1.0, 1.0)
+        )
       }
 
     }

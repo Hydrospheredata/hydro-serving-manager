@@ -2,19 +2,20 @@ package io.hydrosphere.serving.manager.infrastructure.storage.fetchers.keras
 
 import cats.data.NonEmptyList
 import io.circe.Json
-import io.circe.generic.JsonCodec
 import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
 import io.hydrosphere.serving.manager.domain.contract.{DataType, Field, Signature, TensorShape}
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.tensorflow.TypeMapper
 
 @ConfiguredJsonCodec
-private[keras] sealed trait ModelConfig {
+sealed private[keras] trait ModelConfig {
   def toPredictSignature: Option[Signature]
 }
 
 private[keras] object ModelConfig {
+  implicit val config: Configuration =
+    Configuration.default.withSnakeCaseMemberNames.withDiscriminator("class_name")
 
-  @JsonCodec
+  @ConfiguredJsonCodec
   case class Model(config: FunctionalModelConfig) extends ModelConfig {
     override def toPredictSignature: Option[Signature] = {
       // first element of the array is layer name
@@ -30,9 +31,12 @@ private[keras] object ModelConfig {
       val inputLayers  = config.layers.filter(l => inputNames.contains(l.name))
       val outputLayers = config.layers.filter(l => outputNames.contains(l.name))
 
+      println(outputNames)
+      println(outputLayers.map(_.config.field))
+
       for {
-        inputs  <- NonEmptyList.fromList(inputLayers.flatMap(_.config.field))
-        outputs <- NonEmptyList.fromList(outputLayers.flatMap(_.config.field))
+        inputs  <- NonEmptyList.fromList(inputLayers.map(_.config.field))
+        outputs <- NonEmptyList.fromList(outputLayers.map(_.config.field))
       } yield Signature(
         signatureName = "Predict",
         inputs = inputs,
@@ -41,7 +45,7 @@ private[keras] object ModelConfig {
     }
   }
 
-  @JsonCodec
+  @ConfiguredJsonCodec
   case class FunctionalModelConfig(
       name: String,
       layers: List[FunctionalLayerConfig],
@@ -49,34 +53,33 @@ private[keras] object ModelConfig {
       outputLayers: List[List[Json]]
   )
 
-  @JsonCodec
+  @ConfiguredJsonCodec
   case class FunctionalLayerConfig(
       name: String,
       className: String,
-      config: LayerConfig,
-      inboundNodes: Json
+      config: LayerConfig
+//      inboundNodes: Json
   )
 
-  @JsonCodec
+  @ConfiguredJsonCodec
   case class Sequential(config: List[SequentialLayerConfig]) extends ModelConfig {
-    override def toPredictSignature: Option[Signature] = {
+    override def toPredictSignature: Option[Signature] =
       for {
         firstLayer <- config.headOption
         lastLayer  <- config.lastOption
-        input      <- firstLayer.config.field
-        output     <- lastLayer.config.field
+        input  = firstLayer.config.field
+        output = lastLayer.config.field
       } yield Signature(
         signatureName = "Predict",
         inputs = NonEmptyList.of(input),
         outputs = NonEmptyList.of(output)
       )
-    }
   }
 
-  @JsonCodec
+  @ConfiguredJsonCodec
   case class SequentialLayerConfig(className: String, config: LayerConfig)
 
-  @JsonCodec
+  @ConfiguredJsonCodec
   case class LayerConfig(
       name: String,
       dtype: Option[String],
@@ -96,18 +99,12 @@ private[keras] object ModelConfig {
       arrDims.orElse(scalarDims).getOrElse(TensorShape.Dynamic)
     }
 
-    def field: Option[Field] = {
-      for {
-        dtype <- dtype.flatMap(TypeMapper.toType)
-      } yield Field.Tensor(
+    def field: Field =
+      Field.Tensor(
         name = name,
         shape = getShape,
-        dtype = dtype,
+        dtype = dtype.flatMap(TypeMapper.toType).getOrElse(DataType.DT_FLOAT),
         profile = None
       )
-    }
   }
-
-  implicit val config = Configuration.default.withDiscriminator("class_name")
-
 }

@@ -92,7 +92,8 @@ object ModelVersionBuilder extends UnsafeLogging {
           imageSha  <- buildImage(buildPath.root, mv.image, handler)
           finishedVersion = mv.copy(
             finished = Instant.now().some,
-            status = ModelVersionStatus.Released
+            status = ModelVersionStatus.Released,
+            image = mv.image.copy(digest = imageSha.some)
           )
           _ <- imageRepository.push(finishedVersion.image, handler)
           _ <- buildLoggingService.finishLogging(mv.id)

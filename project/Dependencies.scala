@@ -12,7 +12,7 @@ object Dependencies {
   lazy val doobieV           = "0.9.0"
   lazy val circeVersion      = "0.13.0"
   lazy val enumeratumV       = "1.6.0"
-  lazy val mockitoV          = "1.14.0"
+  lazy val mockitoV          = "1.14.1"
   lazy val logstageVersion   = "0.10.7"
   lazy val distageVersion    = "0.10.7"
 
@@ -59,14 +59,13 @@ object Dependencies {
   ).map(_ exclude ("com.google.api.grpc", "proto-google-common-protos"))
 
   lazy val test = Seq(
-    "org.mockito"       %% "mockito-scala"           % mockitoV,
-    "org.mockito"       %% "mockito-scala-scalatest" % mockitoV,
-    "org.mockito"       %% "mockito-scala-cats"      % mockitoV,
-    "com.typesafe.akka" %% "akka-http-testkit"       % akkaHttpVersion,
-    "org.scalactic"     %% "scalactic"               % scalaTestVersion,
-    "org.scalatest"     %% "scalatest"               % scalaTestVersion,
-    "com.typesafe.akka" %% "akka-testkit"            % akkaVersion
-  ).map(_ % "test,it")
+    "org.mockito"       %% "mockito-scala"           % mockitoV         % "test,it",
+    "org.mockito"       %% "mockito-scala-scalatest" % mockitoV         % "test,it",
+    "org.scalactic"     %% "scalactic"               % scalaTestVersion % "test,it",
+    "org.scalatest"     %% "scalatest"               % scalaTestVersion % "test,it",
+    "com.typesafe.akka" %% "akka-http-testkit"       % akkaHttpVersion  % "test,it",
+    "com.typesafe.akka" %% "akka-testkit"            % akkaVersion      % "test,it"
+  )
 
   lazy val logs = Seq(
     "org.apache.logging.log4j" % "log4j-api"                  % log4j2Version,

@@ -1,10 +1,11 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import cats.data.Validated.Valid
-import cats.data.{NonEmptyList, Validated}
+import cats.data.NonEmptyList
+import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.manager.domain.contract.ops.{MergeError, ModelSignatureOps}
 
 object ApplicationValidator {
 
@@ -36,9 +37,11 @@ object ApplicationValidator {
     val isSameName    = signatures.forall(_.signatureName == signatureName)
     if (isSameName) {
       val res =
-        signatures.tail.foldRight(Validated.validNel[DomainError, Signature](signatures.head)) {
-          case (acc, Valid(sig)) =>
-            ??? // ModelSignatureOps.merge(sig, acc) // TODO migrate from lib
+        signatures.tail.foldRight(
+          Either.right[NonEmptyList[MergeError], Signature](signatures.head)
+        ) {
+          case (acc, Right(sig)) =>
+            ModelSignatureOps.merge(sig, acc)
           case (_, x) => x
         }
       res
@@ -46,7 +49,6 @@ object ApplicationValidator {
           error => DomainError.invalidRequest(s"Errors while merging signatures: $error"),
           res => res.copy(signatureName = signatureName)
         )
-        .toEither
     } else
       Left(
         DomainError.invalidRequest(

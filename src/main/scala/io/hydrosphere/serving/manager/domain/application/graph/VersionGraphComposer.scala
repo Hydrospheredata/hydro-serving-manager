@@ -2,7 +2,6 @@ package io.hydrosphere.serving.manager.domain.application.graph
 
 import cats.data.NonEmptyList
 import cats.implicits._
-import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.{
   ApplicationGraph,

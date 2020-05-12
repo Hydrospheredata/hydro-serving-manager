@@ -106,7 +106,10 @@ object Converters {
   def fromApp(app: Application): grpc.entities.ServingApp = {
     val stages = toGStages(app)
     val contract =
-      ModelContract(modelName = app.name, predict = Signature.toProto(app.signature).some)
+      ModelContract(
+        modelName = app.name,
+        predict = Signature.toProto(app.executionGraph.signature).some
+      )
     grpc.entities.ServingApp(
       id = app.id.toString,
       name = app.name,

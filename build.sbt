@@ -19,26 +19,34 @@ publishArtifact := false
 parallelExecution in Test := false
 parallelExecution in IntegrationTest := false
 
-fork in(Test, test) := true
-fork in(IntegrationTest, test) := true
-fork in(IntegrationTest, testOnly) := true
+fork in (Test, test) := true
+fork in (IntegrationTest, test) := true
+fork in (IntegrationTest, testOnly) := true
 
 enablePlugins(BuildInfoPlugin, sbtdocker.DockerPlugin)
 
 configs(IntegrationTest)
 ManagerDev.settings
 Defaults.itSettings
-buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, git.gitCurrentBranch, git.gitCurrentTags, git.gitHeadCommit)
+buildInfoKeys := Seq[BuildInfoKey](
+  name,
+  version,
+  scalaVersion,
+  sbtVersion,
+  git.gitCurrentBranch,
+  git.gitCurrentTags,
+  git.gitHeadCommit
+)
 buildInfoPackage := "io.hydrosphere.serving"
 buildInfoOptions += BuildInfoOption.ToJson
 
 imageNames in docker := Seq(ImageName(s"hydrosphere/serving-manager:${version.value}"))
 dockerfile in docker := {
-  val jarFile: File = sbt.Keys.`package`.in(Compile, packageBin).value
-  val classpath = (dependencyClasspath in Compile).value
+  val jarFile: File       = sbt.Keys.`package`.in(Compile, packageBin).value
+  val classpath           = (dependencyClasspath in Compile).value
   val dockerFilesLocation = baseDirectory.value / "src/main/docker/"
-  val jarTarget = s"/hydro-serving/app/manager.jar"
-  val osName = sys.props.get("os.name").getOrElse("unknown")
+  val jarTarget           = s"/hydro-serving/app/manager.jar"
+  val osName              = sys.props.get("os.name").getOrElse("unknown")
 
   new sbtdocker.Dockerfile {
     // Base image

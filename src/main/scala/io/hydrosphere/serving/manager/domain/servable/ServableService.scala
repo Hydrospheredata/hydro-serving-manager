@@ -108,14 +108,14 @@ object ServableService extends UnsafeLogging {
           randomSuffix <- generateUniqueSuffix(modelVersion)
           d            <- Deferred[F, Servable]
           initServable = Servable(
-            modelVersion,
-            randomSuffix,
-            Servable.Status.Starting,
-            Nil,
-            metadata,
-            "Initialization",
-            None,
-            None
+            modelVersion = modelVersion,
+            nameSuffix = randomSuffix,
+            status = Servable.Status.Starting,
+            usedApps = Nil,
+            message = "Initialization",
+            host = None,
+            port = None,
+            metadata = metadata
           )
           _ <- servableRepository.upsert(initServable)
           _ <- awaitServable(initServable)
@@ -124,7 +124,8 @@ object ServableService extends UnsafeLogging {
               case NonFatal(ex) =>
                 cloudDriver.remove(initServable.fullName).attempt >>
                   d.complete(
-                      initServable.copy(status = Servable.Status.NotServing, msg = ex.getMessage)
+                      initServable
+                        .copy(status = Servable.Status.NotServing, message = ex.getMessage)
                     )
                     .attempt >>
                   F.delay(logger.error("Error during servable deploy", ex))
@@ -134,16 +135,21 @@ object ServableService extends UnsafeLogging {
 
       def awaitServable(servable: Servable): F[Servable] =
         for {
-          _ <- cloudDriver.run(
+          inst <- cloudDriver.run(
             servable.fullName,
             servable.modelVersion.id,
             servable.modelVersion.image,
             servable.modelVersion.hostSelector
           )
+          _ = logger.trace(
+            s"CloudDriver run ${servable}"
+          )
+          _ = logger.trace(s"ServableMonitor submitted ${servable}")
           servableDef    <- monitor.monitor(servable)
           resultServable <- servableDef.get
-          _              <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))
-          _              <- servableDH.update(resultServable)
+          _ = logger.trace(s"Servable init finished ${resultServable}")
+          _ <- servableDH.update(resultServable)
+          _ = logger.trace(s"Servable discovery event published ${resultServable}")
         } yield resultServable
 
       override def stop(name: String): F[Servable] =

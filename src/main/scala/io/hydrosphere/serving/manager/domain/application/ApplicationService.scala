@@ -9,6 +9,8 @@ import io.hydrosphere.serving.manager.domain.DomainError.NotFound
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.{ServableGC, ServableService}
+import io.hydrosphere.serving.manager.domain.tensor.TensorExampleGenerator
+import io.hydrosphere.serving.manager.domain.tensor.json.TensorJsonLens
 import io.hydrosphere.serving.manager.util.{DeferredResult, UnsafeLogging}
 
 trait ApplicationService[F[_]] {
@@ -21,18 +23,11 @@ trait ApplicationService[F[_]] {
   def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, Application]]
 
   def get(name: String): F[Application]
+
+  def generateInputs(name: String): F[Json]
 }
 
 object ApplicationService extends UnsafeLogging {
-
-  // TODO(bulat) implement
-  def generateInputs[F[_]](name: String): F[Json] =
-    ???
-//    for {
-//      app <- get(name)
-//      tensorData <- F.delay(TensorExampleGenerator(app.signature).inputs)
-//      jsonData <- F.delay(TensorJsonLens.mapToJson(tensorData))
-//    } yield jsonData
 
   def apply[F[_]](
       applicationRepository: ApplicationRepository[F],
@@ -45,6 +40,12 @@ object ApplicationService extends UnsafeLogging {
       F: Concurrent[F]
   ): ApplicationService[F] =
     new ApplicationService[F] {
+      def generateInputs(name: String): F[Json] =
+        for {
+          app        <- get(name)
+          tensorData <- F.delay(TensorExampleGenerator(app.executionGraph.signature).inputs)
+          jsonData   <- F.delay(TensorJsonLens.mapToJson(tensorData))
+        } yield jsonData
 
       def create(req: CreateApplicationRequest): F[DeferredResult[F, Application]] =
         applicationDeployer.deploy(

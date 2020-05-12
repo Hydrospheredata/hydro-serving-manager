@@ -31,11 +31,18 @@ case object DataProfileType extends Enum[DataProfileType] with CirceEnum[DataPro
 
   override def values: IndexedSeq[DataProfileType] = findValues
 
-  def toProto(profileType: DataType): ProtoDataProfileType = {
+  def toProto(profileType: DataProfileType): ProtoDataProfileType =
     ProtoDataProfileType.fromName(profileType.entryName).getOrElse(ProtoDataProfileType.NONE)
-  }
 
-  def fromProto(protoProfileType: ProtoDataProfileType): Option[DataProfileType] = {
-    DataProfileType.withNameInsensitiveOption(protoProfileType.name)
-  }
+  def fromProto(protoProfileType: ProtoDataProfileType): Either[String, Option[DataProfileType]] =
+    protoProfileType match {
+      case ProtoDataProfileType.NONE => Right(None)
+      case x =>
+        DataProfileType
+          .withNameInsensitiveOption(x.name)
+          .toRight(s"Unknown DataProfile enum: ${protoProfileType.name}")
+          .map(Some.apply)
+    }
+
+  val protoNone: ProtoDataProfileType = ProtoDataProfileType.NONE
 }

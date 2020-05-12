@@ -111,7 +111,6 @@ object DBApplicationRepository {
     } yield Application(
       id = ar.id,
       name = ar.application_name,
-      signature = ar.application_contract,
       kafkaStreaming = kafkaStreaming,
       namespace = ar.namespace,
       status = status,
@@ -132,7 +131,7 @@ object DBApplicationRepository {
       application_name = app.name,
       namespace = app.namespace,
       status = app.status.entryName,
-      application_contract = app.signature,
+      application_contract = app.executionGraph.signature,
       execution_graph = app.executionGraph.asJson.noSpaces,
       used_servables = servables,
       used_model_versions = models,
@@ -142,7 +141,7 @@ object DBApplicationRepository {
     )
   }
 
-  case class AppDBSchemaErrors(errs: List[AppDBSchemaError]) extends Throwable
+  case class AppDBSchemaErrors(errs: List[Throwable]) extends Throwable
 
   sealed trait AppDBSchemaError extends Throwable with Serializable with Product
 

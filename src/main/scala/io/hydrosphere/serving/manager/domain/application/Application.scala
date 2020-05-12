@@ -29,7 +29,6 @@ case class Application(
     name: String,
     namespace: Option[String],
     status: Application.Status,
-    signature: Signature,
     kafkaStreaming: List[ApplicationKafkaStream],
     executionGraph: ApplicationGraph,
     message: String,

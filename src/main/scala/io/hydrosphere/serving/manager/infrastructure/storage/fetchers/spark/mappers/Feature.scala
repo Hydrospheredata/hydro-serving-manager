@@ -21,12 +21,13 @@ class IDFMapper(m: SparkModelMetadata) extends InputOutputMapper(m) {
 class Word2VecMapper(m: SparkModelMetadata) extends InputOutputMapper(m) {
   def inputType(metadata: SparkModelMetadata) = FieldInfo(DataType.DT_STRING, TensorShape.varVector)
 
-  def outputType(metadata: SparkModelMetadata) = FieldInfo(
-    DataType.DT_DOUBLE,
-    TensorShape.fixedVector(
-      metadata.getParam[Double]("vectorSize").getOrElse(-1.0).toLong
-    ) // NB Spark uses doubles to store vector length
-  )
+  def outputType(metadata: SparkModelMetadata) =
+    FieldInfo(
+      DataType.DT_DOUBLE,
+      TensorShape.vector(
+        metadata.getParam[Double]("vectorSize").getOrElse(-1.0).toLong
+      ) // NB Spark uses doubles to store vector length
+    )
 }
 class CountVectorizerMapper(m: SparkModelMetadata) extends InputOutputMapper(m) {
   override def inputType(sparkModelMetadata: SparkModelMetadata) =
@@ -67,10 +68,11 @@ class PCAMapper(m: SparkModelMetadata) extends InputOutputMapper(m) {
   override def inputType(sparkModelMetadata: SparkModelMetadata) =
     SparkMlTypeMapper.featuresVec(sparkModelMetadata)
 
-  override def outputType(sparkModelMetadata: SparkModelMetadata) = FieldInfo(
-    DataType.DT_DOUBLE,
-    TensorShape.fixedVector(sparkModelMetadata.getParam[Double]("k").getOrElse(-1.0).toLong)
-  )
+  override def outputType(sparkModelMetadata: SparkModelMetadata) =
+    FieldInfo(
+      DataType.DT_DOUBLE,
+      TensorShape.vector(sparkModelMetadata.getParam[Double]("k").getOrElse(-1.0).toLong)
+    )
 }
 class PolynomialExpansionMapper(m: SparkModelMetadata) extends InputOutputMapper(m) {
   override def inputType(sparkModelMetadata: SparkModelMetadata) =
@@ -164,7 +166,7 @@ class ElementwiseProductMapper(m: SparkModelMetadata) extends InputOutputMapper(
     FieldInfo(DataType.DT_DOUBLE, TensorShape.varVector)
 }
 class VectorAssemblerMapper(m: SparkModelMetadata) extends SparkMlTypeMapper(m) {
-  override def inputSchema: Option[List[Field]] = {
+  override def inputSchema: Option[List[Field]] =
     m.getParam[Seq[String]]("inputCols")
       .map {
         _.map { col =>
@@ -176,9 +178,8 @@ class VectorAssemblerMapper(m: SparkModelMetadata) extends SparkMlTypeMapper(m) 
           )
         }.toList
       }
-  }
 
-  override def outputSchema: Option[List[Field]] = {
+  override def outputSchema: Option[List[Field]] =
     m.getParam[String]("outputCol")
       .map { name =>
         List(
@@ -190,7 +191,6 @@ class VectorAssemblerMapper(m: SparkModelMetadata) extends SparkMlTypeMapper(m) 
           )
         )
       }
-  }
 }
 class VectorSlicerMapper(m: SparkModelMetadata) extends InputOutputMapper(m) {
   override def inputType(sparkModelMetadata: SparkModelMetadata) =

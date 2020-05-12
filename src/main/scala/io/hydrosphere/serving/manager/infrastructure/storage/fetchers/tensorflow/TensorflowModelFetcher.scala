@@ -68,7 +68,7 @@ class TensorflowModelFetcher[F[_]: Monad](storageOps: StorageOps[F]) extends Mod
     f.value
   }
 
-  def getPredictSignature(savedModel: SavedModel) = {
+  def getPredictSignature(savedModel: SavedModel): Option[Signature] = {
     val servingSignatures = Try {
       savedModel.getMetaGraphsList.asScala
         .filter(_.getMetaInfoDef.getTagsList.asScala.contains(TensorflowModelFetcher.serveTag))
@@ -101,11 +101,12 @@ object TensorflowModelFetcher {
       val dims   = tShape.getDimList.asScala.toList.map(x => x.getSize)
       TensorShape.Static(dims)
     } else TensorShape.Dynamic
-    val convertedDtype = DataType.fromProto(ProtoDataType.fromValue(tensorInfo.getDtypeValue))
+    val convertedDtype =
+      DataType.fromProto(ProtoDataType.fromValue(tensorInfo.getDtypeValue)).toOption
     convertedDtype.map(FieldInfo(_, shape))
   }
 
-  def convertTensorMap(tensorMap: Map[String, TensorInfo]): Option[List[Field]] = {
+  def convertTensorMap(tensorMap: Map[String, TensorInfo]): Option[List[Field]] =
     tensorMap.toList.traverse {
       case (inputName, inputDef) =>
         convertTensor(inputDef).map(info =>
@@ -117,9 +118,8 @@ object TensorflowModelFetcher {
           )
         )
     }
-  }
 
-  def convertSignature(signatureKV: (String, SignatureDef)): Option[Signature] = {
+  def convertSignature(signatureKV: (String, SignatureDef)): Option[Signature] =
     for {
       inputs  <- convertTensorMap(signatureKV._2.getInputsMap.asScala.toMap)
       outputs <- convertTensorMap(signatureKV._2.getOutputsMap.asScala.toMap)
@@ -131,5 +131,4 @@ object TensorflowModelFetcher {
       inputs = inputNEL,
       outputs = outputNEL
     )
-  }
 }

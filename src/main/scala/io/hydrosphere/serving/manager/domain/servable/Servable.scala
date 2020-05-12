@@ -11,10 +11,10 @@ case class Servable(
     nameSuffix: String,
     status: Status,
     usedApps: List[String],
-    metadata: Map[String, String] = Map.empty,
-    msg: String,
+    message: String,
     host: Option[String],
-    port: Option[Int]
+    port: Option[Int],
+    metadata: Map[String, String] = Map.empty
 ) {
   def fullName: String =
     Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, nameSuffix)

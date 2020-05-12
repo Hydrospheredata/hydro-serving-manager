@@ -100,7 +100,6 @@ object ApplicationDeployer extends UnsafeLogging {
           id = 0,
           name = name,
           namespace = namespace,
-          signature = graph.signature,
           kafkaStreaming = kafkaStreaming,
           status = Application.Status.Assembling,
           executionGraph = graph,
@@ -146,21 +145,21 @@ object ApplicationDeployer extends UnsafeLogging {
                       F.raiseError[Servable](
                         DomainError
                           .internalError(
-                            s"Servable ${servable.fullName} is in invalid state: ${servable.msg}"
+                            s"Servable ${servable.fullName} is in invalid state: ${servable.message}"
                           )
                       )
                     case Servable.Status.NotAvailable =>
                       F.raiseError[Servable](
                         DomainError
                           .internalError(
-                            s"Servable ${servable.fullName} is in invalid state: ${servable.msg}"
+                            s"Servable ${servable.fullName} is in invalid state: ${servable.message}"
                           )
                       )
                     case Servable.Status.Starting =>
                       F.raiseError[Servable](
                         DomainError
                           .internalError(
-                            s"Servable ${servable.fullName} is in invalid state: ${servable.msg}"
+                            s"Servable ${servable.fullName} is in invalid state: ${servable.message}"
                           )
                       )
                   }

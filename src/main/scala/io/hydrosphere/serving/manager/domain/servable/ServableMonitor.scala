@@ -20,6 +20,7 @@ trait ServableMonitor[F[_]] {
   def monitor(servable: Servable): F[Deferred[F, Servable]]
 }
 
+//TODO(bulat) refactor
 object ServableMonitor extends UnsafeLogging {
   final case class CancellableMonitor[F[_]](mon: ServableMonitor[F], fiber: Fiber[F, Unit])
   type MonitoringEntry[F[_]] = (Servable, Deferred[F, Servable])
@@ -27,18 +28,20 @@ object ServableMonitor extends UnsafeLogging {
   def withQueue[F[_]](
       queue: Queue[F, MonitoringEntry[F]],
       monitorSleep: FiniteDuration,
-      maxTimeout: FiniteDuration
-  )(implicit
-      F: Concurrent[F],
-      timer: Timer[F],
+      maxTimeout: FiniteDuration,
       probe: ServableProbe[F],
       servableRepository: ServableRepository[F]
-  ): F[CancellableMonitor[F]] =
+  )(implicit
+      F: Concurrent[F],
+      timer: Timer[F]
+  ): F[CancellableMonitor[F]] = {
+    implicit val p  = probe
+    implicit val sp = servableRepository
     for {
       deathNoteRef <- Ref.of(Map.empty[String, FiniteDuration])
       fbr <-
         monitoringLoop(monitorSleep, maxTimeout, queue, deathNoteRef)
-          .handleError(x => logger.error(s"Error in monitoring loop", x))
+          .handleError(x => logger.warn(s"Error in monitoring loop", x))
           .foreverM[Unit]
           .start
       mon = new ServableMonitor[F] {
@@ -50,6 +53,7 @@ object ServableMonitor extends UnsafeLogging {
           } yield deferred
       }
     } yield CancellableMonitor(mon, fbr)
+  }
 
   def default[F[_]](
       probe: ServableProbe[F],
@@ -60,13 +64,7 @@ object ServableMonitor extends UnsafeLogging {
   ): F[CancellableMonitor[F]] =
     for {
       queue <- Queue.unbounded[F, MonitoringEntry[F]]
-      res <-
-        withQueue(queue, 2.seconds, 1.minute)(
-          F,
-          timer,
-          probe,
-          servableRepository
-        ) //TODO(bulat) refactor
+      res   <- withQueue[F](queue, 2.seconds, 1.minute, probe, servableRepository)
     } yield res
 
   private def monitoringLoop[F[_]](
@@ -83,13 +81,17 @@ object ServableMonitor extends UnsafeLogging {
     for {
       (servable, deferred) <- queue.dequeue1
       name = servable.fullName
-      deathNote   <- deathNoteRef.get
-      probeResult <- probe.probe(servable)
+      deathNote <- deathNoteRef.get
+      probeResult <- probe.probe(servable).attempt.map {
+        case Right(value) => value
+        case Left(error) =>
+          ProbeResponse.InstanceNotFound(s"Probe crashed. Reason: ${error.getMessage}")
+      }
       updatedServable = servable.copy(
         status = probeResult.getStatus,
         host = probeResult.getHost,
         port = probeResult.getPort,
-        msg = probeResult.message
+        message = probeResult.message
       )
       _ <- F.delay(logger.debug(s"Probed: ${updatedServable.fullName}"))
       _ <- probeResult.getStatus match {
@@ -115,7 +117,7 @@ object ServableMonitor extends UnsafeLogging {
                 val invalidServable = updatedServable
                   .copy(
                     status = Servable.Status.NotServing,
-                    msg = s"Ping timeout exceeded. Info: ${probeResult.message}",
+                    message = s"Ping timeout exceeded. Info: ${probeResult.message}",
                     host = probeResult.getHost,
                     port = probeResult.getPort
                   )

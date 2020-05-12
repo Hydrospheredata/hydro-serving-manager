@@ -2,12 +2,10 @@ package io.hydrosphere.serving.manager.domain.model_version
 
 import java.time.Instant
 
-import cats.MonadError
 import cats.effect.IO
-import io.hydrosphere.serving.contract.model_contract.ModelContract
+import cats.implicits._
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
-import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 
 import scala.collection.mutable.ListBuffer
@@ -17,113 +15,98 @@ class ModelVersionServiceSpec extends GenericUnitTest {
     it("should calculate first version") {
       val versionRepo = mock[ModelVersionRepository[IO]]
       when(versionRepo.lastModelVersionByModel(1)).thenReturn(IO(None))
-      val versionService = ModelVersionService.apply[IO]()(
-        MonadError[IO, Throwable],
+      val versionService = ModelVersionService.apply[IO](
         modelVersionRepository = versionRepo,
         applicationRepo = null,
         modelPublisher = null
       )
-      assert(versionService.getNextModelVersion(1).unsafeRunSync() === 1)
+      assert(versionService.getNextModelVersion(1).unsafeRunSync() == 1)
     }
+
     it("should calculate second version") {
       val versionRepo = mock[ModelVersionRepository[IO]]
-      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(IO(
-        Some(ModelVersion.Internal(
-          id = 1,
-          image = DockerImage("asd", "asd"),
-          created = Instant.now(),
-          finished = None,
-          modelVersion = 1,
-          modelContract = ModelContract.defaultInstance,
-          runtime = DockerImage("asd", "asd"),
-          model = Model(1, "asd"),
-          hostSelector = None,
-          status = ModelVersionStatus.Released,
-          installCommand = None,
-          metadata = Map.empty
-        )))
-      )
-      val versionService = ModelVersionService.apply[IO]()(
-        MonadError[IO, Throwable],
-        modelVersionRepository = versionRepo,
-        applicationRepo = null,
-        modelPublisher = null
-      )
-      assert(versionService.getNextModelVersion(1).unsafeRunSync() === 2)
-    }
-    it("should calculate third version") {
-      val versionRepo = mock[ModelVersionRepository[IO]]
-      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(IO(
-        Some(ModelVersion.Internal(
-          id = 1,
-          image = DockerImage("asd", "asd"),
-          created = Instant.now(),
-          finished = None,
-          modelVersion = 2,
-          modelContract = ModelContract.defaultInstance,
-          runtime = DockerImage("asd", "asd"),
-          model = Model(1, "asd"),
-          hostSelector = None,
-          status = ModelVersionStatus.Released,
-          installCommand = None,
-          metadata = Map.empty
-        )))
-      )
-      val versionService = ModelVersionService.apply[IO]()(
-        MonadError[IO, Throwable],
-        modelVersionRepository = versionRepo,
-        applicationRepo = null,
-        modelPublisher = null
-      )
-      assert(versionService.getNextModelVersion(1).unsafeRunSync() === 3)
-    }
-    it("should notify when version deletes") {
-      val versionRepo = new ModelVersionRepository[IO] {
-        override def create(entity: ModelVersion): IO[ModelVersion] = ???
-
-        override def get(id: Long): IO[Option[ModelVersion]] = IO {
+      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(
+        IO(
           Some(
             ModelVersion.Internal(
               id = 1,
-              image = DockerImage("", ""),
+              image = dummyImage,
               created = Instant.now(),
               finished = None,
-              modelVersion = 4,
-              modelContract = ModelContract.defaultInstance,
-              runtime = DockerImage("", ""),
-              model = Model(1, "aaaa"),
+              modelVersion = 1,
+              modelContract = defaultContract,
+              runtime = dummyImage,
+              model = Model(1, "asd"),
               hostSelector = None,
-              status = ModelVersionStatus.Assembling,
+              status = ModelVersionStatus.Released,
               installCommand = None,
               metadata = Map.empty
             )
           )
-        }
+        )
+      )
+      val versionService = ModelVersionService.apply[IO](
+        modelVersionRepository = versionRepo,
+        applicationRepo = null,
+        modelPublisher = null
+      )
+      assert(versionService.getNextModelVersion(1).unsafeRunSync() == 2)
+    }
+    it("should calculate third version") {
+      val versionRepo = mock[ModelVersionRepository[IO]]
+      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(
+        IO(
+          Some(
+            ModelVersion.Internal(
+              id = 1,
+              image = dummyImage,
+              created = Instant.now(),
+              finished = None,
+              modelVersion = 2,
+              modelContract = defaultContract,
+              runtime = dummyImage,
+              model = Model(1, "asd"),
+              hostSelector = None,
+              status = ModelVersionStatus.Released,
+              installCommand = None,
+              metadata = Map.empty
+            )
+          )
+        )
+      )
+      val versionService = ModelVersionService.apply[IO](
+        modelVersionRepository = versionRepo,
+        applicationRepo = null,
+        modelPublisher = null
+      )
+      assert(versionService.getNextModelVersion(1).unsafeRunSync() == 3)
+    }
+    it("should notify when version deletes") {
+      val versionRepo = mock[ModelVersionRepository[IO]]
+      when(versionRepo.get(anyLong)).thenReturn(IO {
+        Some(
+          ModelVersion.Internal(
+            id = 1,
+            image = dummyImage,
+            created = Instant.now(),
+            finished = None,
+            modelVersion = 4,
+            modelContract = defaultContract,
+            runtime = dummyImage,
+            model = Model(1, "aaaa"),
+            hostSelector = None,
+            status = ModelVersionStatus.Assembling,
+            installCommand = None,
+            metadata = Map.empty
+          )
+        )
+      })
+      when(versionRepo.delete(anyLong)).thenReturn(1.pure[IO])
 
-        override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
-
-        override def delete(id: Long): IO[Int] = IO(1)
-
-        override def update(entity: ModelVersion): IO[Int] = ???
-
-        override def all(): IO[List[ModelVersion]] = ???
-
-        override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
-
-        override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]] = ???
-      }
-      val events = ListBuffer.empty[Long]
-      val modelPub = new ModelVersionEvents.Publisher[IO] {
-        override def publish(t: DiscoveryEvent[ModelVersion, Long]): IO[Unit] = {
-          t match {
-            case DiscoveryEvent.Initial => IO.unit
-            case DiscoveryEvent.ItemUpdate(_) => IO.raiseError(new RuntimeException("Unreachable"))
-            case DiscoveryEvent.ItemRemove(items) => IO(events ++= items)
-          }
-        }
-      }
-      val versionService = ModelVersionService[IO]()(
-        MonadError[IO, Throwable],
+      val events   = ListBuffer.empty[Long]
+      val modelPub = mock[ModelVersionEvents.Publisher[IO]]
+      when(modelPub.remove(any)).thenAnswer[Long](item => IO(events += item))
+      val versionService = ModelVersionService[IO](
         modelVersionRepository = versionRepo,
         applicationRepo = null,
         modelPublisher = modelPub
@@ -136,13 +119,10 @@ class ModelVersionServiceSpec extends GenericUnitTest {
       it("for a new model") {
         ioAssert {
           val versionRepo = mock[ModelVersionRepository[IO]]
-          when(versionRepo.lastModelVersionByModel(1)).thenReturn(
-            IO(None)
-          )
-          val versionService = ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null, null)
-          versionService.getNextModelVersion(1).map { x =>
-            assert(x === 1)
-          }
+          when(versionRepo.lastModelVersionByModel(1)).thenReturn(None.pure[IO])
+          val versionService =
+            ModelVersionService[IO](versionRepo, null, null)
+          versionService.getNextModelVersion(1).map(x => assert(x == 1))
         }
       }
 
@@ -150,25 +130,27 @@ class ModelVersionServiceSpec extends GenericUnitTest {
         ioAssert {
           val versionRepo = mock[ModelVersionRepository[IO]]
           when(versionRepo.lastModelVersionByModel(1)).thenReturn(
-            IO(Some(ModelVersion.Internal(
-              id = 1,
-              image = DockerImage("", ""),
-              created = Instant.now(),
-              finished = None,
-              modelVersion = 4,
-              modelContract = ModelContract.defaultInstance,
-              runtime = DockerImage("", ""),
-              model = Model(1, "aaaa"),
-              hostSelector = None,
-              status = ModelVersionStatus.Assembling,
-              installCommand = None,
-              metadata = Map.empty
-            )))
+            IO(
+              Some(
+                ModelVersion.Internal(
+                  id = 1,
+                  image = dummyImage,
+                  created = Instant.now(),
+                  finished = None,
+                  modelVersion = 4,
+                  modelContract = defaultContract,
+                  runtime = dummyImage,
+                  model = Model(1, "aaaa"),
+                  hostSelector = None,
+                  status = ModelVersionStatus.Assembling,
+                  installCommand = None,
+                  metadata = Map.empty
+                )
+              )
+            )
           )
-          val versionService = ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null, null)
-          versionService.getNextModelVersion(1).map { x =>
-            assert(x === 5)
-          }
+          val versionService = ModelVersionService[IO](versionRepo, null, null)
+          versionService.getNextModelVersion(1).map(x => assert(x == 5))
         }
       }
     }

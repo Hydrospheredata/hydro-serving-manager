@@ -55,7 +55,7 @@ object DockerImage {
     input.split("/").toList match {
       case user :: rest :: Nil if user.nonEmpty && rest.nonEmpty => (Some(user) -> rest).asRight
       case rest :: Nil                                           => (None       -> rest).asRight
-      case _                                                     => InvalidDockerImageName(s"Image name is invalid: $input").asLeft
       case Nil                                                   => InvalidDockerImageName(s"Image name cannot be empty").asLeft
+      case _                                                     => InvalidDockerImageName(s"Image name is invalid: $input").asLeft
     }
 }

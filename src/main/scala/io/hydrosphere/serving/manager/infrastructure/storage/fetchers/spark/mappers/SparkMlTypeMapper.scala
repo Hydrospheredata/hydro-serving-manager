@@ -12,21 +12,19 @@ abstract class SparkMlTypeMapper(val m: SparkModelMetadata) {
 
 object SparkMlTypeMapper {
 
-  def featuresVec(sparkModelMetadata: SparkModelMetadata): FieldInfo = {
+  def featuresVec(sparkModelMetadata: SparkModelMetadata): FieldInfo =
     FieldInfo(
       DataType.DT_DOUBLE,
-      TensorShape.fixedVector(sparkModelMetadata.numFeatures.getOrElse(-1).toLong)
+      TensorShape.vector(sparkModelMetadata.numFeatures.getOrElse(-1).toLong)
     )
-  }
 
-  def classesVec(sparkModelMetadata: SparkModelMetadata): FieldInfo = {
+  def classesVec(sparkModelMetadata: SparkModelMetadata): FieldInfo =
     FieldInfo(
       DataType.DT_DOUBLE,
-      TensorShape.fixedVector(sparkModelMetadata.numFeatures.getOrElse(-1).toLong)
+      TensorShape.vector(sparkModelMetadata.numFeatures.getOrElse(-1).toLong)
     )
-  }
 
-  def apply(sparkModelMetadata: SparkModelMetadata): SparkMlTypeMapper = {
+  def apply(sparkModelMetadata: SparkModelMetadata): SparkMlTypeMapper =
     sparkModelMetadata.`class` match {
       case "org.apache.spark.ml.feature.HashingTF"     => new HashingTFMapper(sparkModelMetadata)
       case "org.apache.spark.ml.feature.IDF"           => new IDFMapper(sparkModelMetadata)
@@ -104,5 +102,4 @@ object SparkMlTypeMapper {
       case "org.apache.spark.ml.clustering.KMeansModel" => new KMeansMapper(sparkModelMetadata)
       case _                                            => new UntypedMapper(sparkModelMetadata)
     }
-  }
 }

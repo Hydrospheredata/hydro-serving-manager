@@ -55,12 +55,12 @@ case object DataType extends Enum[DataType] with CirceEnum[DataType] {
 
   override def values: IndexedSeq[DataType] = findValues
 
-  def toProto(dtype: DataType): ProtoDataType = {
+  def toProto(dtype: DataType): ProtoDataType =
     ProtoDataType.fromName(dtype.entryName).getOrElse(ProtoDataType.DT_INVALID)
-  }
 
-  def fromProto(protoDtype: ProtoDataType): Option[DataType] = {
-    DataType.withNameInsensitiveOption(protoDtype.name)
-  }
+  def fromProto(protoDtype: ProtoDataType): Either[String, DataType] =
+    DataType
+      .withNameInsensitiveOption(protoDtype.name)
+      .toRight(s"Unknown DataType enum: ${protoDtype.name}")
 
 }

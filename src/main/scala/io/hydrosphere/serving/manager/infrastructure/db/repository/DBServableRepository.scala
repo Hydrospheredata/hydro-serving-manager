@@ -77,7 +77,7 @@ object DBServableRepository {
       status_text = s.status.entryName,
       host = s.host,
       port = s.port,
-      status = s.msg,
+      status = s.message,
       metadata = s.metadata.maybeEmpty.map(_.asJson.noSpaces)
     )
 
@@ -103,7 +103,7 @@ object DBServableRepository {
             metadata = sr.metadata
               .flatMap(m => parse(m).flatMap(_.as[Map[String, String]]).toOption)
               .getOrElse(Map.empty),
-            msg = sr.status_text,
+            message = sr.status_text,
             host = sr.host,
             port = sr.port
           )

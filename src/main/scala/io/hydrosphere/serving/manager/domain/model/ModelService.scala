@@ -43,7 +43,7 @@ object ModelService {
       modelRepository: ModelRepository[F],
       modelVersionRepository: ModelVersionRepository[F],
       modelVersionService: ModelVersionService[F],
-      storageService: ModelUnpacker[F],
+      modelUnpacker: ModelUnpacker[F],
       appRepo: ApplicationRepository[F],
       hostSelectorRepository: HostSelectorRepository[F],
       servableRepo: ServableRepository[F],
@@ -85,7 +85,7 @@ object ModelService {
             DomainError.invalidRequest("Model name contains invalid characters")
           )
           hs          <- maybeHostSelector
-          modelPath   <- storageService.unpack(filePath)
+          modelPath   <- modelUnpacker.unpack(filePath)
           fetchResult <- fetcher.fetch(modelPath.filesPath)
           versionMetadata <- F.fromOption(
             ModelVersionMetadata.combineMetadata(fetchResult, meta, hs),

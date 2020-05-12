@@ -18,13 +18,21 @@ case object TensorShape {
 
   def scalar: Static = Static(List())
 
-  def fixedVector(size: Long): Static = Static(List(size))
+  def vector(size: Long): Static = Static(List(size))
 
   def varVector: Static = Static(List(infiniteDim))
+
+  def mat(dims: Long*): Static = Static(dims.toList)
 
   def toProto(tensorShape: TensorShape): Option[TensorShapeProto] =
     tensorShape match {
       case Static(dims) => Some(TensorShapeProto(dim = dims.map(d => TensorShapeProto.Dim(d))))
       case Dynamic      => None
+    }
+
+  def fromProto(protoShape: Option[TensorShapeProto]): TensorShape =
+    protoShape match {
+      case Some(value) => Static(value.dim.map(_.size).toList)
+      case None        => Dynamic
     }
 }
