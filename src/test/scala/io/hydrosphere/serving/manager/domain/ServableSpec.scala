@@ -16,7 +16,7 @@ import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
@@ -74,7 +74,7 @@ class ServableSpec extends GenericUnitTest {
           }
           case _ => IO(None)
         }
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None): IO[CloudInstance] = ???
         override def remove(name: String): IO[Unit] = ???
 
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
@@ -124,7 +124,7 @@ class ServableSpec extends GenericUnitTest {
           }
           case _ => IO(None)
         }
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None): IO[CloudInstance] = ???
         override def remove(name: String): IO[Unit] = ???
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
         override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
@@ -152,7 +152,7 @@ class ServableSpec extends GenericUnitTest {
           }
           case _ => IO(None)
         }
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None): IO[CloudInstance] = ???
         override def remove(name: String): IO[Unit] = ???
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
         override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
@@ -306,7 +306,7 @@ class ServableSpec extends GenericUnitTest {
       val cloudDriver = new CloudDriver[IO] {
         override def instances: IO[List[CloudInstance]] = ???
         override def instance(name: String): IO[Option[CloudInstance]] = ???
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = {
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None): IO[CloudInstance] = {
           IO.raiseError(new IllegalStateException("Shouldn't reach this"))
         }
         override def remove(name: String): IO[Unit] = ???
@@ -370,7 +370,7 @@ class ServableSpec extends GenericUnitTest {
       val cloudDriver = new CloudDriver[IO] {
         override def instances: IO[List[CloudInstance]] = ???
         override def instance(name: String): IO[Option[CloudInstance]] = ???
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = {
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None): IO[CloudInstance] = {
           val instance = CloudInstance(modelVersionId, name, CloudInstance.Status.Starting)
           driverState += instance
           IO(instance)
@@ -473,7 +473,7 @@ class ServableSpec extends GenericUnitTest {
       val cloudDriver = new CloudDriver[IO] {
         override def instances: IO[List[CloudInstance]] = ???
         override def instance(name: String): IO[Option[CloudInstance]] = ???
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None) = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None) = ???
         override def remove(name: String): IO[Unit] = {
           driverState += name
           IO.unit
@@ -570,7 +570,7 @@ class ServableSpec extends GenericUnitTest {
       val cloudDriver = new CloudDriver[IO] {
         override def instances: IO[List[CloudInstance]] = ???
         override def instance(name: String): IO[Option[CloudInstance]] = ???
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None) = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None) = ???
         override def remove(name: String): IO[Unit] = {
           driverState += name
           IO.unit
@@ -729,7 +729,7 @@ class ServableSpec extends GenericUnitTest {
       val cd = new CloudDriver[IO] {
         override def instances: IO[List[CloudInstance]] = ???
         override def instance(name: String): IO[Option[CloudInstance]] = ???
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector]): IO[CloudInstance] = {
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration]): IO[CloudInstance] = {
           IO(CloudInstance(modelVersionId, name, CloudInstance.Status.Running("localhost", 9090)))
         }
         override def remove(name: String): IO[Unit] = ???
@@ -796,7 +796,7 @@ class ServableSpec extends GenericUnitTest {
       val cd = new CloudDriver[IO] {
         override def instances: IO[List[CloudInstance]] = ???
         override def instance(name: String): IO[Option[CloudInstance]] = ???
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector]): IO[CloudInstance] = {
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration]): IO[CloudInstance] = {
           IO(CloudInstance(modelVersionId, name, CloudInstance.Status.Running("localhost", 9090)))
         }
         override def remove(name: String): IO[Unit] = ???

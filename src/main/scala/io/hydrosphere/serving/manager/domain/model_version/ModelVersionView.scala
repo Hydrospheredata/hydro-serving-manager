@@ -4,7 +4,7 @@ import java.time.Instant
 
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 
@@ -20,7 +20,7 @@ case class ModelVersionView(
   applications: List[String],
   image: Option[DockerImage],
   runtime: Option[DockerImage],
-  hostSelector: Option[HostSelector],
+  hostSelector: Option[DeploymentConfiguration],
   isExternal: Boolean
 )
 

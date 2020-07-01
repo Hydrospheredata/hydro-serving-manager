@@ -7,7 +7,7 @@ import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
@@ -78,7 +78,7 @@ object DBModelVersionRepository {
         runtime = runtime,
         model = model,
         hostSelector = hsr.map { h =>
-          HostSelector(
+          DeployConfiguration(
             id = h.host_selector_id,
             name = h.name,
             nodeSelector = h.node_selector

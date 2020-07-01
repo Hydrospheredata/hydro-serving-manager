@@ -4,7 +4,7 @@ import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import cats.effect.Effect
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
-import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository, HostSelectorService}
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, HostSelectorRepository, HostSelectorService}
 import io.swagger.annotations._
 import javax.ws.rs.Path
 
@@ -21,7 +21,7 @@ class HostSelectorController[F[_]: Effect](
   @Path("/")
   @ApiOperation(value = "listHostSelectors", notes = "listHostSelectors", nickname = "listHostSelectors", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Serving Hosts", response = classOf[HostSelector], responseContainer = "List"),
+    new ApiResponse(code = 200, message = "Serving Hosts", response = classOf[DeploymentConfiguration], responseContainer = "List"),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def listHostSelectors = pathPrefix("hostSelector") {
@@ -37,7 +37,7 @@ class HostSelectorController[F[_]: Effect](
       dataTypeClass = classOf[CreateHostSelector], paramType = "body")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Host", response = classOf[HostSelector]),
+    new ApiResponse(code = 200, message = "Host", response = classOf[DeploymentConfiguration]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def createHostSelector = pathPrefix("hostSelector") {
@@ -71,7 +71,7 @@ class HostSelectorController[F[_]: Effect](
     new ApiImplicitParam(name = "envName", required = true, dataType = "string", paramType = "path", value = "envName")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, response = classOf[HostSelector], message = "HostSelector"),
+    new ApiResponse(code = 200, response = classOf[DeploymentConfiguration], message = "HostSelector"),
     new ApiResponse(code = 404, message = "Not Found"),
     new ApiResponse(code = 500, message = "Internal server error")
   ))

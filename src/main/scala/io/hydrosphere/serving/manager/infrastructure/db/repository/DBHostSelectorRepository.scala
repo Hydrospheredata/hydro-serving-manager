@@ -10,7 +10,7 @@ import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository}
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, HostSelectorRepository}
 
 object DBHostSelectorRepository {
 
@@ -20,11 +20,11 @@ object DBHostSelectorRepository {
     node_selector: Map[String, String]
   )
 
-  def toHostSelector(hs: HostSelectorRow) = HostSelector(hs.host_selector_id, hs.name, hs.node_selector)
+  def toHostSelector(hs: HostSelectorRow) = DeployConfiguration(hs.host_selector_id, hs.name, hs.node_selector)
 
   def allQ: doobie.Query0[HostSelectorRow] = sql"SELECT * FROM hydro_serving.host_selector".query[HostSelectorRow]
 
-  def insertQ(entity: HostSelector): doobie.Update0 = sql"INSERT INTO hydro_serving.host_selector (name, node_selector) VALUES (${entity.name}, ${entity.nodeSelector})".update
+  def insertQ(entity: DeploymentConfiguration): doobie.Update0 = sql"INSERT INTO hydro_serving.host_selector (name, node_selector) VALUES (${entity.name}, ${entity.nodeSelector})".update
 
   def getByIdQ(id: Long): doobie.Query0[HostSelectorRow] = sql"SELECT * FROM hydro_serving.host_selector WHERE id = $id".query[HostSelectorRow]
 
@@ -34,19 +34,19 @@ object DBHostSelectorRepository {
 
   def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): HostSelectorRepository[F] = {
     new HostSelectorRepository[F] {
-      override def create(entity: HostSelector): F[HostSelector] = {
+      override def create(entity: DeploymentConfiguration): F[DeploymentConfiguration] = {
         for {
           id <- insertQ(entity).withUniqueGeneratedKeys[Long]("id").transact(tx)
-        } yield HostSelector(id, entity.name, entity.nodeSelector)
+        } yield DeployConfiguration(id, entity.name, entity.nodeSelector)
       }
 
-      override def get(id: Long): F[Option[HostSelector]] = {
+      override def get(id: Long): F[Option[DeploymentConfiguration]] = {
         for {
           row <- getByIdQ(id).option.transact(tx)
         } yield row.map(toHostSelector)
       }
 
-      override def get(name: String): F[Option[HostSelector]] = {
+      override def get(name: String): F[Option[DeploymentConfiguration]] = {
         for {
           row <- getByNameQ(name).option.transact(tx)
         } yield row.map(toHostSelector)
@@ -54,7 +54,7 @@ object DBHostSelectorRepository {
 
       override def delete(id: Long): F[Int] = deleteQ(id).run.transact(tx)
 
-      override def all(): F[List[HostSelector]] = {
+      override def all(): F[List[DeploymentConfiguration]] = {
         for {
           rows <- allQ.to[List].transact(tx)
         } yield rows.map(toHostSelector)

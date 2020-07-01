@@ -14,7 +14,7 @@ import io.hydrosphere.serving.manager.domain.application.graph.Variant
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
@@ -66,7 +66,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
 
         override def instance(name: String): IO[Option[CloudInstance]] = ???
 
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None): IO[CloudInstance] = ???
 
         override def remove(name: String): IO[Unit] = IO(removed += name)
 
@@ -210,7 +210,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
 
         override def instance(name: String): IO[Option[CloudInstance]] = ???
 
-        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): IO[CloudInstance] = ???
+        override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None): IO[CloudInstance] = ???
 
         override def remove(name: String): IO[Unit] = ???
 

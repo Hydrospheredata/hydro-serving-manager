@@ -2,17 +2,17 @@ package io.hydrosphere.serving.manager.domain
 
 import cats.Id
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.domain.host_selector.{HostSelector, HostSelectorRepository, HostSelectorService}
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, HostSelectorRepository, HostSelectorService}
 import org.mockito.{Matchers, Mockito}
 
-class HostSelectorServiceSpec extends GenericUnitTest {
+class DeploymentConfigurationServiceSpec extends GenericUnitTest {
   describe("Environment management service") {
     it("should return an environment by id") {
       val envRepo = mock[HostSelectorRepository[Id]]
 
       Mockito.when(envRepo.get("test")).thenReturn(
         Some(
-          HostSelector(1, "test", Map("foo" -> "bar"))
+          DeployConfiguration(1, "test", Map("foo" -> "bar"))
         )
       )
 
@@ -32,7 +32,7 @@ class HostSelectorServiceSpec extends GenericUnitTest {
       Mockito.when(envRepo.get("new_test")).thenReturn(
         None
       )
-      val hostSelector = HostSelector(
+      val hostSelector = DeployConfiguration(
         1,
         "new_test",
         Map("foo" -> "bar")
@@ -53,7 +53,7 @@ class HostSelectorServiceSpec extends GenericUnitTest {
       val envRepo = mock[HostSelectorRepository[Id]]
 
       Mockito.when(envRepo.get("new_test")).thenReturn(
-        Some(HostSelector(1, "new_test", Map("foo" -> "bar")))
+        Some(DeployConfiguration(1, "new_test", Map("foo" -> "bar")))
       )
 
       val environmentService = HostSelectorService(envRepo)

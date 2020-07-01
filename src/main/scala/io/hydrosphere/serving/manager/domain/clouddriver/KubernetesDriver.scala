@@ -3,7 +3,7 @@ package io.hydrosphere.serving.manager.domain.clouddriver
 import akka.stream.scaladsl.Source
 import cats.effect.Async
 import cats.implicits._
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 
 import scala.util.Try

@@ -3,7 +3,7 @@ package io.hydrosphere.serving.manager.domain.model_version
 import java.time.Instant
 
 import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionStatus.ModelVersionStatus
@@ -30,7 +30,7 @@ object ModelVersion {
     modelContract: ModelContract,
     runtime: DockerImage,
     model: Model,
-    hostSelector: Option[HostSelector],
+    hostSelector: Option[DeploymentConfiguration],
     status: ModelVersionStatus,
     installCommand: Option[String],
     metadata: Map[String, String]

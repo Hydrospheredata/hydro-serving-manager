@@ -3,9 +3,9 @@ package io.hydrosphere.serving.manager.infrastructure.protocol
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.graph._
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
-import io.hydrosphere.serving.manager.domain.clouddriver
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstance
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.deploy_config
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
@@ -57,7 +57,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val dockerImageFormat = jsonFormat3(DockerImage.apply)
 
   implicit val modelFormat         = jsonFormat2(Model)
-  implicit val environmentFormat   = jsonFormat3(HostSelector)
+  implicit val environmentFormat   = jsonFormat3(DeploymentConfiguration)
   implicit val versionStatusFormat = enumFormat(ModelVersionStatus)
   implicit val internalModelVersionFormat  = jsonFormat12(ModelVersion.Internal.apply)
   implicit val externalModelVersionFormat  = jsonFormat6(ModelVersion.External.apply)

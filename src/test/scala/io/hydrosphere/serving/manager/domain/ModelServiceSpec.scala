@@ -18,7 +18,7 @@ import io.hydrosphere.serving.manager.domain.application.Application.GenericAppl
 import io.hydrosphere.serving.manager.domain.application.graph.Variant
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
+import io.hydrosphere.serving.manager.domain.deploy_config.HostSelectorRepository
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model._
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder

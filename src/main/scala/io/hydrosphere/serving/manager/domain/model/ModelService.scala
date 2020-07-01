@@ -16,8 +16,8 @@ import io.hydrosphere.serving.manager.domain.DomainError.{
 }
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
-import io.hydrosphere.serving.manager.domain.host_selector.{
-  HostSelector,
+import io.hydrosphere.serving.manager.domain.deploy_config.{
+  DeploymentConfiguration,
   HostSelectorRepository
 }
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
@@ -92,7 +92,7 @@ object ModelService {
                   .invalidRequest(s"Can't find host selector named $value")
               )
             )
-        case None => F.pure(none[HostSelector])
+        case None => F.pure(none[DeploymentConfiguration])
       }
 
       for {
