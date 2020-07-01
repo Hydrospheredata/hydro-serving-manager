@@ -1,11 +1,10 @@
 package io.hydrosphere.serving.manager.domain
 
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
-import io.hydrosphere.serving.manager.infrastructure.protocol.PlayJsonAdapter.formatAdapter
+import io.hydrosphere.serving.manager.infrastructure.protocol.PlayJsonAdapter._
 import skuber.Pod.{Affinity, Toleration}
 import spray.json.RootJsonFormat
 import skuber.json.format._
-import io.hydrosphere.serving.manager.infrastructure.protocol.PlayJsonAdapter._
 
 package object deploy_config {
   type NodeSelector = Map[String, String]
@@ -40,15 +39,29 @@ package object deploy_config {
     requirements: Option[Requirements],
   )
 
+  object K8sContainerConfig {
+    implicit val format: RootJsonFormat[K8sContainerConfig] = jsonFormat1(K8sContainerConfig.apply)
+  }
+
   final case class K8sPodConfig(
     nodeSelector: Option[NodeSelector],
     affinity: Option[Affinity],
     tolerations: List[Toleration],
   )
 
+  object K8sPodConfig {
+    implicit val aff: RootJsonFormat[Affinity] = formatAdapter[Affinity]
+    implicit val tol: RootJsonFormat[Toleration] = formatAdapter[Toleration]
+    implicit val format: RootJsonFormat[K8sPodConfig] = jsonFormat3(K8sPodConfig.apply)
+  }
+
   final case class K8sDeploymentConfig(
     replicaCount: Option[Int]
   )
+
+  object K8sDeploymentConfig {
+    implicit val format: RootJsonFormat[K8sDeploymentConfig] = jsonFormat1(K8sDeploymentConfig.apply)
+  }
 
   final case class DeploymentConfiguration(
     name: String,
@@ -59,8 +72,6 @@ package object deploy_config {
   )
 
   object DeploymentConfiguration {
-    implicit val aff: RootJsonFormat[Affinity] = formatAdapter[Affinity]
-    implicit val tol: RootJsonFormat[Toleration] = formatAdapter[Toleration]
     implicit val format: RootJsonFormat[DeploymentConfiguration] = jsonFormat5(DeploymentConfiguration.apply)
   }
 

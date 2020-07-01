@@ -2,7 +2,7 @@ package io.hydrosphere.serving.manager.domain
 
 import cats.Id
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, HostSelectorRepository, HostSelectorService}
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, HostSelectorRepository, DeploymentConfigurationService}
 import org.mockito.{Matchers, Mockito}
 
 class DeploymentConfigurationServiceSpec extends GenericUnitTest {

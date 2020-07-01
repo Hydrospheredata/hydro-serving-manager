@@ -5,7 +5,7 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
 import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationEvents, ApplicationRepository, ApplicationService}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.deploy_config.{HostSelectorRepository, HostSelectorService}
+import io.hydrosphere.serving.manager.domain.deploy_config.{HostSelectorRepository, DeploymentConfigurationService}
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model.{ModelRepository, ModelService}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLogRepository, BuildLoggingService, ModelVersionBuilder}
@@ -35,7 +35,7 @@ case class Repositories[F[_]](
 final case class Core[F[_]](
   repos: Repositories[F],
   buildLoggingService: BuildLoggingService[F],
-  hostSelectorService: HostSelectorService[F],
+  hostSelectorService: DeploymentConfigurationService[F],
   modelService: ModelService[F],
   versionService: ModelVersionService[F],
   modelPub: ModelVersionEvents.Publisher[F],
@@ -90,7 +90,7 @@ object Core {
         implicit val nameGen: NameGenerator[F] = NameGenerator.haiku[F]()
         implicit val modelUnpacker: ModelUnpacker[F] = ModelUnpacker.default[F]()
         implicit val modelFetcher: ModelFetcher[F] = ModelFetcher.default[F]()
-        implicit val hostSelectorService: HostSelectorService[F] = HostSelectorService[F](hostSelectorRepo)
+        implicit val hostSelectorService: DeploymentConfigurationService[F] = DeploymentConfigurationService[F](hostSelectorRepo)
         implicit val versionService: ModelVersionService[F] = ModelVersionService[F]()
         implicit val servableService: ServableService[F] = ServableService[F]()
         implicit val monitoringService: Monitoring[F] = Monitoring[F]()
