@@ -6,26 +6,12 @@ import cats.data.OptionT
 import cats.effect.Clock
 import cats.implicits._
 import cats.{Monad, MonadError}
-import io.hydrosphere.serving.manager.api.http.controller.model.{
-  ModelUploadMetadata,
-  RegisterModelRequest
-}
-import io.hydrosphere.serving.manager.domain.DomainError.{
-  InvalidRequest,
-  NotFound
-}
+import io.hydrosphere.serving.manager.api.http.controller.model._
+import io.hydrosphere.serving.manager.domain.DomainError._
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
-import io.hydrosphere.serving.manager.domain.deploy_config.{
-  DeploymentConfiguration,
-  HostSelectorRepository
-}
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
-import io.hydrosphere.serving.manager.domain.model_version.{
-  ModelVersion,
-  ModelVersionRepository,
-  ModelVersionService
-}
+import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.domain.{Contract, DomainError}
 import io.hydrosphere.serving.manager.infrastructure.storage.ModelUnpacker
@@ -61,7 +47,6 @@ object ModelService {
     modelVersionService: ModelVersionService[F],
     storageService: ModelUnpacker[F],
     appRepo: ApplicationRepository[F],
-    hostSelectorRepository: HostSelectorRepository[F],
     servableRepo: ServableRepository[F],
     fetcher: ModelFetcher[F],
     modelVersionBuilder: ModelVersionBuilder[F]
@@ -82,29 +67,15 @@ object ModelService {
       filePath: Path,
       meta: ModelUploadMetadata
     ): F[DeferredResult[F, ModelVersion.Internal]] = {
-      val maybeHostSelector = meta.hostSelectorName match {
-        case Some(value) =>
-          OptionT(hostSelectorRepository.get(value))
-            .map(_.some)
-            .getOrElseF(
-              F.raiseError(
-                DomainError
-                  .invalidRequest(s"Can't find host selector named $value")
-              )
-            )
-        case None => F.pure(none[DeploymentConfiguration])
-      }
-
       for {
         _ <- F.fromOption(
           ModelValidator.name(meta.name),
           DomainError.invalidRequest("Model name contains invalid characters")
         )
-        hs <- maybeHostSelector
         modelPath <- storageService.unpack(filePath)
         fetchResult <- fetcher.fetch(modelPath.filesPath)
         versionMetadata = ModelVersionMetadata
-          .combineMetadata(fetchResult, meta, hs)
+          .combineMetadata(fetchResult, meta)
         _ <- F.fromValidated(
           Contract
             .validateContract(versionMetadata.contract)

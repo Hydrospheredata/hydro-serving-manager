@@ -25,7 +25,7 @@ class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDr
   override def instance(name: String): F[Option[CloudInstance]] = instances.map(_.find(_.name == name))
 
 
-  override def run(name: String, modelVersionId: Long, image: DockerImage, config: Option[CloudResourceConfiguration] = None): F[CloudInstance] = {
+  override def run(name: String, modelVersionId: Long, image: DockerImage, config: Option[DeploymentConfiguration] = None): F[CloudInstance] = {
     val servable = CloudInstance(modelVersionId, name, CloudInstance.Status.Starting)
     for {
       _ <- client.runDeployment(name, servable, image, config)

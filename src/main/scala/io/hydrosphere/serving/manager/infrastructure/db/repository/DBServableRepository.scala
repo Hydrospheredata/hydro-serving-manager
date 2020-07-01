@@ -8,7 +8,6 @@ import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBDeploymentConfigurationRepository.DeploymentConfigurationRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
@@ -32,7 +31,7 @@ object DBServableRepository {
     metadata: Option[String]
   )
 
-  type JoinedServableRow = (ServableRow, ModelVersionRow, ModelRow, Option[DeploymentConfigurationRow], Option[List[String]])
+  type JoinedServableRow = (ServableRow, ModelVersionRow, ModelRow, Option[List[String]])
 
   def fromServable(s: GenericServable): ServableRow = {
     val (status, statusText, host, port) = s.status match {
@@ -52,8 +51,8 @@ object DBServableRepository {
     )
   }
 
-  def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, hsr: Option[DeploymentConfigurationRow], apps: Option[List[String]]) = {
-    val modelVersion = DBModelVersionRepository.toModelVersion(mvr, mr, hsr)
+  def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, apps: Option[List[String]]) = {
+    val modelVersion = DBModelVersionRepository.toModelVersion(mvr, mr)
     val suffix = Servable.extractSuffix(mr.name, mvr.model_version, sr.service_name)
     val status = (sr.status, sr.host, sr.port) match {
       case ("Serving", Some(host), Some(port)) => Servable.Serving(sr.status_text, host, port)
@@ -82,7 +81,6 @@ object DBServableRepository {
          |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
          | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
          | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |""".stripMargin.query[JoinedServableRow]
 
   def upsertQ(sr: ServableRow) =
@@ -110,7 +108,6 @@ object DBServableRepository {
          |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
          | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
          | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |   WHERE service_name = $name
       """.stripMargin.query[JoinedServableRow]
 
@@ -120,7 +117,6 @@ object DBServableRepository {
           |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
           | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
           | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-          | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
           |  WHERE """.stripMargin ++ Fragments.in(fr"service_name", names)
     frag.query[JoinedServableRow]
   }
@@ -130,7 +126,6 @@ object DBServableRepository {
          |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
          | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
          | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         | LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |   WHERE hydro_serving.servable.model_version_id = $versionId
       """.stripMargin.query[JoinedServableRow]
   }

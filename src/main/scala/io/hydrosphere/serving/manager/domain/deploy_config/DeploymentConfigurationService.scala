@@ -12,7 +12,7 @@ trait DeploymentConfigurationService[F[_]] {
 
   def delete(name: String): F[DeploymentConfiguration]
 
-  def get(name: String): F[Option[DeploymentConfiguration]]
+  def get(name: String): F[DeploymentConfiguration]
 }
 
 object DeploymentConfigurationService {
@@ -24,11 +24,14 @@ object DeploymentConfigurationService {
         case None => hsRepo.create(dc)
       }
 
-    override def get(name: String): F[Option[DeploymentConfiguration]] = hsRepo.get(name)
+    override def get(name: String): F[DeploymentConfiguration] = {
+      OptionT(hsRepo.get(name))
+        .getOrElseF(F.raiseError(DomainError.notFound(s"DeploymentConfiguration ${name} not found")))
+    }
 
     override def delete(name: String): F[DeploymentConfiguration] =
       for {
-        dc <- OptionT(get(name)).getOrElseF(F.raiseError(DomainError.notFound(s"Can't find DeploymentConfiguration with name=$name")))
+        dc <- get(name)
         _ <- hsRepo.delete(dc.name)
       } yield dc
 

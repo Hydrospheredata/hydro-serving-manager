@@ -8,6 +8,7 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver._
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, DeploymentConfigurationService}
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
@@ -24,27 +25,30 @@ trait ServableService[F[_]] {
 
   def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String, String]): F[List[GenericServable]]
 
-  def findAndDeploy(name: String, version: Long, configuration: Option[CloudResourceConfiguration], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
+  def findAndDeploy(name: String, version: Long, deployConfigName: Option[String], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 
-  def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
+  def findAndDeploy(modelId: Long, deployConfigName: Option[String], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 
   def stop(name: String): F[GenericServable]
 
-  def deploy(modelVersion: ModelVersion.Internal, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
+  def deploy(modelVersion: ModelVersion.Internal, deployConfig: Option[DeploymentConfiguration], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 }
 
 object ServableService extends Logging {
-  def filterByName(name: String) = { (x: List[GenericServable]) =>
-    x.filter(_.fullName == name)
+  type ServableFiler = List[GenericServable] => List[GenericServable]
+
+  def filterByName(name: String): ServableFiler = {
+    _.filter(_.fullName == name)
   }
 
-  def filterByVersionId(versionId: Long) = { (x: List[GenericServable]) =>
-    x.filter(_.modelVersion.id == versionId)
+  def filterByVersionId(versionId: Long): ServableFiler = {
+    _.filter(_.modelVersion.id == versionId)
   }
 
-  def filterByMetadata(metadata: Map[String, String]) = { (x: List[GenericServable]) =>
-    x.filter(s => s.metadata.toSet.subsetOf(metadata.toSet))
+  def filterByMetadata(metadata: Map[String, String]): ServableFiler = {
+    _.filter(s => s.metadata.toSet.subsetOf(metadata.toSet))
   }
+
 
   def apply[F[_]]()(
     implicit F: Concurrent[F],
@@ -57,7 +61,8 @@ object ServableService extends Logging {
     versionRepository: ModelVersionRepository[F],
     monitor: ServableMonitor[F],
     servableDH: ServableEvents.Publisher[F],
-    monitoringRepository: MonitoringRepository[F]
+    monitoringRepository: MonitoringRepository[F],
+    deploymentConfigService: DeploymentConfigurationService[F],
   ): ServableService[F] = new ServableService[F] {
     override def all(): F[List[Servable.GenericServable]] = {
       servableRepository.all()
@@ -75,7 +80,7 @@ object ServableService extends Logging {
       } yield finalFilter(servables)
     }
 
-    override def deploy(modelVersion:  ModelVersion.Internal, config: Option[CloudResourceConfiguration], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
+    override def deploy(modelVersion: ModelVersion.Internal, deployConfig: Option[DeploymentConfiguration], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
         _ <- modelVersion.status match {
           case ModelVersionStatus.Released => F.unit
@@ -85,7 +90,7 @@ object ServableService extends Logging {
         d <- Deferred[F, GenericServable]
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata)
         _ <- servableRepository.upsert(initServable)
-        _ <- awaitServable(initServable, config)
+        _ <- awaitServable(initServable, deployConfig)
           .flatMap(d.complete)
           .onError {
             case NonFatal(ex) =>
@@ -97,7 +102,7 @@ object ServableService extends Logging {
       } yield DeferredResult(initServable, d)
     }
 
-    def awaitServable(servable: GenericServable, config: Option[CloudResourceConfiguration]): F[GenericServable] = {
+    def awaitServable(servable: GenericServable, config: Option[DeploymentConfiguration]): F[GenericServable] = {
       for {
         _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, config)
         servableDef <- monitor.monitor(servable)
@@ -135,7 +140,7 @@ object ServableService extends Logging {
       } yield servable
     }
 
-    override def findAndDeploy(name: String, version: Long, config: Option[CloudResourceConfiguration], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
+    override def findAndDeploy(name: String, version: Long, configName: Option[String], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
         abstractVersion <- OptionT(versionRepository.get(name, version))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model $name:$version doesn't exist")))
@@ -147,23 +152,25 @@ object ServableService extends Logging {
               .invalidRequest(s"Deployment of external model is unavailable. modelVersionId=${x.id} name=${x.fullName}")
               .raiseError[F, ModelVersion.Internal]
         }
-        servable <- deploy(internalVersion, config, metadata)
+        maybeConfig <- configName.traverse(deploymentConfigService.get)
+        servable <- deploy(internalVersion, maybeConfig, metadata)
       } yield servable
     }
 
-    override def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
+    override def findAndDeploy(modelId: Long, configName: Option[String], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
         abstractVersion <- OptionT(versionRepository.get(modelId))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model id=$modelId doesn't exist")))
         internalVersion <- abstractVersion match {
           case x: ModelVersion.Internal =>
             x.pure[F]
-          case x:  ModelVersion.External =>
+          case x: ModelVersion.External =>
             DomainError
               .invalidRequest(s"Deployment of external model is unavailable. modelVersionId=${x.id} name=${x.fullName}")
               .raiseError[F, ModelVersion.Internal]
         }
-        servable <- deploy(internalVersion, metadata)
+        maybeConfig <- configName.traverse(deploymentConfigService.get)
+        servable <- deploy(internalVersion, maybeConfig, metadata)
       } yield servable
     }
 

@@ -14,13 +14,12 @@ case class ModelVersionMetadata(
   modelName: String,
   contract: ModelContract,
   runtime: DockerImage,
-  hostSelector: Option[DeploymentConfiguration],
   installCommand: Option[String],
   metadata: Map[String, String]
 )
 
 object ModelVersionMetadata {
-  def combineMetadata(fetcherResult: Option[FetcherResult], upload: ModelUploadMetadata, hs: Option[DeploymentConfiguration]): ModelVersionMetadata = {
+  def combineMetadata(fetcherResult: Option[FetcherResult], upload: ModelUploadMetadata): ModelVersionMetadata = {
     val contract = upload.contract
       .orElse(fetcherResult.map(_.modelContract))
       .getOrElse(ModelContract.defaultInstance)
@@ -31,7 +30,6 @@ object ModelVersionMetadata {
       modelName = upload.name,
       contract = contract,
       runtime = upload.runtime,
-      hostSelector = hs,
       installCommand = upload.installCommand,
       metadata = metadata
     )

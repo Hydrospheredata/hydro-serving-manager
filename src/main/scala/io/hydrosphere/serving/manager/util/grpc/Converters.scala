@@ -51,7 +51,6 @@ object Converters {
           id = imv.id,
           version = imv.modelVersion,
           status = imv.status.toString,
-          selector = imv.hostSelector.map(s => grpc.entities.HostSelector(s.id, s.name)),
           model = Some(grpc.entities.Model(imv.model.id, imv.model.name)),
           contract = Some(imv.modelContract),
           image = Some(grpc.entities.DockerImage(imv.image.name, imv.image.tag)),

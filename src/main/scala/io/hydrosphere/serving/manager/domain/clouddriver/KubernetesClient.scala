@@ -6,6 +6,7 @@ import akka.stream.scaladsl.Source
 import cats.effect._
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import org.apache.logging.log4j.scala.Logging
@@ -23,7 +24,8 @@ trait KubernetesClient[F[_]] {
   def services: F[List[skuber.Service]]
   def deployments: F[List[Deployment]]
   
-  def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, config: Option[CloudResourceConfiguration]): F[Deployment]
+  def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, config: Option[DeploymentConfiguration]): F[Deployment]
+
   def runService(name: String, servable: CloudInstance): F[skuber.Service]
   
   def removeDeployment(name: String): F[Unit]
@@ -51,35 +53,40 @@ object KubernetesClient {
       AsyncUtil.futureAsync(underlying.list[DeploymentList]).map(_.toList)
     }
 
-    override def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, crc: Option[CloudResourceConfiguration]): F[Deployment] = {
+    override def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, crc: Option[DeploymentConfiguration]): F[Deployment] = {
       import LabelSelector.dsl._
 
       val hpaConf = crc.flatMap(_.hpa)
-      val dep = crc.flatMap(_.deployment)
+      val depConf = crc.flatMap(_.deployment)
+      val podConf = crc.flatMap(_.pod)
+      val containerConf = crc.flatMap(_.container)
+
       val dockerRepoHost = dockerRepoConf.pullHost.getOrElse(dockerRepoConf.host)
       val image = dockerImage.replaceUser(dockerRepoHost).toTry.get
-      var podSpec = Pod.Spec(
-        affinity = dep.map(_.affinity),
-        tolerations = dep.map(_.tolerations).getOrElse(List.empty)
-      ).addImagePullSecretRef(config.kubeRegistrySecretName)
-
-      dep.map(_.nodeSelector).foreach { ns =>
-        ns.map(kv => podSpec = podSpec.addNodeSelector(kv))
-      }
 
       var container = Container("model", image.fullName)
         .exposePort(DefaultConstants.DEFAULT_APP_PORT)
         .withImagePullPolicy(PullPolicy.Always)
         .setEnvVar(DefaultConstants.ENV_APP_PORT, DefaultConstants.DEFAULT_APP_PORT.toString)
 
-      dep.map(_.requirements.requests).foreach{ req =>
+      val containerReqs = containerConf.flatMap(_.requirements)
+      containerReqs.flatMap(_.requests).foreach{ req =>
         container = container.addResourceRequest("cpu", req.cpu)
         container = container.addResourceRequest("memory", req.memory)
       }
 
-      dep.map(_.requirements.limits).foreach{ req =>
+      containerReqs.flatMap(_.limits).foreach{ req =>
         container = container.addResourceLimit("cpu", req.cpu)
         container = container.addResourceLimit("memory", req.memory)
+      }
+
+      var podSpec = Pod.Spec(
+        affinity = podConf.flatMap(_.affinity),
+        tolerations = podConf.map(_.tolerations).getOrElse(List.empty)
+      ).addImagePullSecretRef(config.kubeRegistrySecretName)
+
+      podConf.flatMap(_.nodeSelector).foreach { ns =>
+        ns.map(kv => podSpec = podSpec.addNodeSelector(kv))
       }
 
       val podTemplate = Pod.Template.Spec(
@@ -91,6 +98,7 @@ object KubernetesClient {
           CloudDriver.Labels.ServiceName -> name,
           CloudDriver.Labels.ModelVersionId -> servable.modelVersionId.toString
         ))
+
       val deployment = apps.v1.Deployment(
         metadata = ObjectMeta(
           name = servable.name,
@@ -100,7 +108,7 @@ object KubernetesClient {
           ),
         )
       )
-        .withReplicas(dep.map(_.replicaCount).getOrElse(1))
+        .withReplicas(depConf.flatMap(_.replicaCount).getOrElse(1))
         .withTemplate(podTemplate)
         .withLabelSelector(CloudDriver.Labels.ServiceName is name)
 

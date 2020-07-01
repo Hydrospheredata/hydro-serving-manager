@@ -3,9 +3,14 @@ package io.hydrosphere.serving.manager.infrastructure.db.repository
 import cats.effect.Bracket
 import cats.implicits._
 import doobie.implicits._
+import doobie.util.Meta
 import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, DeploymentConfigurationRepository}
+import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBDeploymentConfigurationRepository._
+import org.postgresql.util.PGobject
+import spray.json._
+
+import scala.reflect.runtime.universe.TypeTag
 
 class DBDeploymentConfigurationRepository[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]) extends DeploymentConfigurationRepository[F] {
   override def create(entity: DeploymentConfiguration): F[DeploymentConfiguration] = {
@@ -26,6 +31,18 @@ class DBDeploymentConfigurationRepository[F[_]]()(implicit F: Bracket[F, Throwab
 }
 
 object DBDeploymentConfigurationRepository {
+  def jsonToPG(jsValue: JsValue): PGobject = {
+    val o = new PGobject
+    o.setType("json")
+    o.setValue(jsValue.compactPrint)
+    o
+  }
+  implicit val jsonMeta: Meta[JsValue] = Meta.Advanced.other[PGobject]("json").timap[JsValue](
+    obj => obj.getValue.parseJson)(
+    json => jsonToPG(json)
+  )
+
+  implicit def jsonFormatMeta[T](implicit reader: JsonReader[T], writer: JsonWriter[T], ev: TypeTag[T]): Meta[T] = jsonMeta.timap[T](reader.read)(writer.write)
 
   def allQ: doobie.Query0[DeploymentConfiguration] = sql"SELECT * FROM hydro_serving.deployment_configuration".query[DeploymentConfiguration]
 

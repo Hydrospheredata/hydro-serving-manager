@@ -4,7 +4,6 @@ import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.graph._
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstance
-import io.hydrosphere.serving.manager.domain.deploy_config
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
@@ -28,7 +27,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       val Stopped  = "stopped"
     }
 
-    override def read(json: JsValue): clouddriver.CloudInstance.Status = {
+    override def read(json: JsValue): CloudInstance.Status = {
       val obj = json.asJsObject
       obj.fields.get("type") match {
         case Some(JsString(x)) =>
@@ -42,7 +41,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       }
     }
 
-    override def write(obj: clouddriver.CloudInstance.Status): JsValue = {
+    override def write(obj: CloudInstance.Status): JsValue = {
       obj match {
         case CloudInstance.Status.Starting => JsObject("type" -> JsString(Keys.Starting))
         case r: CloudInstance.Status.Running =>
@@ -57,9 +56,8 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val dockerImageFormat = jsonFormat3(DockerImage.apply)
 
   implicit val modelFormat         = jsonFormat2(Model)
-  implicit val environmentFormat   = jsonFormat3(DeploymentConfiguration)
   implicit val versionStatusFormat = enumFormat(ModelVersionStatus)
-  implicit val internalModelVersionFormat  = jsonFormat12(ModelVersion.Internal.apply)
+  implicit val internalModelVersionFormat  = jsonFormat11(ModelVersion.Internal.apply)
   implicit val externalModelVersionFormat  = jsonFormat6(ModelVersion.External.apply)
   implicit val modelVersionFormat = new RootJsonWriter[ModelVersion] {
     override def write(obj: ModelVersion): JsValue = {
@@ -69,25 +67,6 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       }
       JsObject(fields)
     }
-
-    //    override def read(json: JsValue): ModelVersion = {
-    //      json match {
-    //        case JsObject(fields) =>
-    //          fields.get("kind") match {
-    //            case Some(value) =>
-    //              value match {
-    //                case JsString(value) =>
-    //                  value match {
-    //                    case "Internal" => JsObject(fields.filterKeys(x => x != "kind")).convertTo[ModelVersion.Internal]
-    //                    case "External" => JsObject(fields.filterKeys(x => x != "kind")).convertTo[ModelVersion.External]
-    //                  }
-    //                case x => throw DeserializationException(s"Cannot deserialize ModelVersion with invalid 'kind' field: ${x}")
-    //              }
-    //            case None => throw DeserializationException("Cannot deserialize ModelVersion without 'kind' field")
-    //          }
-    //        case _ => throw DeserializationException("Invalid ModelVersion Json")
-    //      }
-    //    }
   }
 
   implicit val cloudServableFormat = jsonFormat3(CloudInstance.apply)

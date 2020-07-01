@@ -48,7 +48,7 @@ class DockerDriver[F[_]](
     name: String,
     modelVersionId: Long,
     image: DockerImage,
-    hostSelector: Option[DeploymentConfiguration] = None
+    deploymentConfig: Option[DeploymentConfiguration] = None
   ): F[CloudInstance] = {
     val container = Internals.mkContainerConfig(name, modelVersionId, image, config)
     for {
