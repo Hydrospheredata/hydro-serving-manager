@@ -11,7 +11,7 @@ import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurati
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBDeploymentConfigurationRepository.DeploymentConfigurationRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import spray.json._
@@ -40,9 +40,9 @@ object DBModelVersionRepository {
     is_external: Boolean
   )
 
-  type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
+  type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[DeploymentConfigurationRow])
 
-  def toModelVersion(mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow]): ModelVersion = {
+  def toModelVersion(mvr: ModelVersionRow, mr: ModelRow, hsr: Option[DeploymentConfigurationRow]): ModelVersion = {
     val image = DockerImage(
       name = mvr.image_name,
       tag = mvr.image_tag,

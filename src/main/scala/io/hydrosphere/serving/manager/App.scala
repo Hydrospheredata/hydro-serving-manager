@@ -64,7 +64,7 @@ object App {
         implicit val rng = rngF
         implicit val cd = cloudDriver
         implicit val itx = tx
-        implicit val hsRepo = DBHostSelectorRepository.make()
+        implicit val hsRepo = DBDeploymentConfigurationRepository.make()
         implicit val modelRepo = DBModelRepository.make()
         implicit val modelVersionRepo = DBModelVersionRepository.make()
         implicit val servableRepo = DBServableRepository.make()

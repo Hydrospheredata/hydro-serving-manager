@@ -8,7 +8,7 @@ import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBDeploymentConfigurationRepository.DeploymentConfigurationRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
@@ -32,7 +32,7 @@ object DBServableRepository {
     metadata: Option[String]
   )
 
-  type JoinedServableRow = (ServableRow, ModelVersionRow, ModelRow, Option[HostSelectorRow], Option[List[String]])
+  type JoinedServableRow = (ServableRow, ModelVersionRow, ModelRow, Option[DeploymentConfigurationRow], Option[List[String]])
 
   def fromServable(s: GenericServable): ServableRow = {
     val (status, statusText, host, port) = s.status match {
@@ -52,7 +52,7 @@ object DBServableRepository {
     )
   }
 
-  def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow], apps: Option[List[String]]) = {
+  def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, hsr: Option[DeploymentConfigurationRow], apps: Option[List[String]]) = {
     val modelVersion = DBModelVersionRepository.toModelVersion(mvr, mr, hsr)
     val suffix = Servable.extractSuffix(mr.name, mvr.model_version, sr.service_name)
     val status = (sr.status, sr.host, sr.port) match {
