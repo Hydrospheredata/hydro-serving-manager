@@ -24,7 +24,7 @@ trait ServableService[F[_]] {
 
   def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String, String]): F[List[GenericServable]]
 
-  def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
+  def findAndDeploy(name: String, version: Long, configuration: Option[CloudResourceConfiguration], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 
   def findAndDeploy(modelId: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]]
 
@@ -75,7 +75,7 @@ object ServableService extends Logging {
       } yield finalFilter(servables)
     }
 
-    override def deploy(modelVersion:  ModelVersion.Internal, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
+    override def deploy(modelVersion:  ModelVersion.Internal, config: Option[CloudResourceConfiguration], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
         _ <- modelVersion.status match {
           case ModelVersionStatus.Released => F.unit
@@ -85,7 +85,7 @@ object ServableService extends Logging {
         d <- Deferred[F, GenericServable]
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata)
         _ <- servableRepository.upsert(initServable)
-        _ <- awaitServable(initServable)
+        _ <- awaitServable(initServable, config)
           .flatMap(d.complete)
           .onError {
             case NonFatal(ex) =>
@@ -97,9 +97,9 @@ object ServableService extends Logging {
       } yield DeferredResult(initServable, d)
     }
 
-    def awaitServable(servable: GenericServable): F[GenericServable] = {
+    def awaitServable(servable: GenericServable, config: Option[CloudResourceConfiguration]): F[GenericServable] = {
       for {
-        _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, servable.modelVersion.hostSelector)
+        _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, config)
         servableDef <- monitor.monitor(servable)
         resultServable <- servableDef.get
         _ <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))
@@ -135,7 +135,7 @@ object ServableService extends Logging {
       } yield servable
     }
 
-    override def findAndDeploy(name: String, version: Long, metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
+    override def findAndDeploy(name: String, version: Long, config: Option[CloudResourceConfiguration], metadata: Map[String, String]): F[DeferredResult[F, GenericServable]] = {
       for {
         abstractVersion <- OptionT(versionRepository.get(name, version))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Model $name:$version doesn't exist")))
@@ -147,7 +147,7 @@ object ServableService extends Logging {
               .invalidRequest(s"Deployment of external model is unavailable. modelVersionId=${x.id} name=${x.fullName}")
               .raiseError[F, ModelVersion.Internal]
         }
-        servable <- deploy(internalVersion, metadata)
+        servable <- deploy(internalVersion, config, metadata)
       } yield servable
     }
 
