@@ -11,7 +11,7 @@ import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application._
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.{DeploymentVersionVariant, PipelineStage}
 import io.hydrosphere.serving.manager.domain.application.graph._
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.{GenericServable, OkServable}
@@ -49,7 +49,7 @@ object DBApplicationRepository {
             val variants = stage.modelVariants.traverse { m =>
               versions.get(m.modelVersion.id)
                 .toRight(UsingModelVersionIsMissing(ar, adapterGraph.asLeft))
-                .map(Variant(_, m.weight))
+                .map(DeploymentVersionVariant(_, m.weight, None))
             }
             variants.map(PipelineStage(_, signature))
           }
@@ -61,7 +61,7 @@ object DBApplicationRepository {
             val variants = stage.modelVariants.traverse { m =>
               versions.get(m.modelVersion.id)
                 .toRight(UsingModelVersionIsMissing(ar, adapterGraph.asLeft))
-                .map(Variant(_, m.weight))
+                .map(DeploymentVersionVariant(_, m.weight, None))
             }
             variants.map(PipelineStage(_, signature))
           }
@@ -80,7 +80,7 @@ object DBApplicationRepository {
                       case _ => IncompatibleExecutionGraphError(ar).asLeft
                     }
                     version <- versions.get(r.item.modelVersion.id).toRight(UsingModelVersionIsMissing(ar, adapterGraph.asRight))
-                    v = Variant(version, s.weight)
+                    v = DeploymentVersionVariant(version, s.weight, None)
                   } yield v -> r
                 }
                 variants.map { lst =>

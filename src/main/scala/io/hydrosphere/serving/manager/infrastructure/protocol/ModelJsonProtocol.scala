@@ -2,7 +2,7 @@ package io.hydrosphere.serving.manager.infrastructure.protocol
 
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.graph._
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.{DeploymentVersionVariant, PipelineStage}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstance
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -73,7 +73,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
 
   implicit def variantFormat[T: JsonFormat] = jsonFormat2(Variant.apply[T])
 
-  implicit val modelVariant   = jsonFormat2(ModelVariant.apply)
+  implicit val modelVariant   = jsonFormat2(DeploymentModelVariant.apply)
   implicit val versionStage   = jsonFormat2(VersionStage.apply)
   implicit val versionAdapter = jsonFormat1(VersionGraphAdapter.apply)
 
@@ -138,6 +138,7 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
     }
   }
 
+  implicit val deploymentVersionFormat         = jsonFormat3(DeploymentVersionVariant.apply)
   implicit val applicationStageFormat          = jsonFormat2(PipelineStage.apply)
   implicit val applicationKafkaStreamingFormat = jsonFormat4(ApplicationKafkaStream)
   implicit val execNode = jsonFormat2(ExecutionNode.apply)

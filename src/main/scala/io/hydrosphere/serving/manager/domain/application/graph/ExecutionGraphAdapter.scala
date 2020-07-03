@@ -3,6 +3,7 @@ package io.hydrosphere.serving.manager.domain.application.graph
 import cats.data.NonEmptyList
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
 
@@ -12,19 +13,25 @@ case class VersionGraphAdapter(
   stages: NonEmptyList[VersionStage]
 ) extends ExecutionGraphAdapter
 case class VersionStage(
-  modelVariants: NonEmptyList[ModelVariant],
+  modelVariants: NonEmptyList[DeploymentModelVariant],
   signature: ModelSignature
 )
-case class ModelVariant(
+case class DeploymentModelVariant(
   modelVersion: ModelVersion.Internal,
-  weight: Int
+  weight: Int,
+  deploymentConfig: Option[DeploymentConfiguration] = None
 )
 
 case class ServableGraphAdapter(
   stages: NonEmptyList[ServableStage],
 ) extends ExecutionGraphAdapter
+case class ServableVariant(
+  item: String,
+  weight: Int,
+  deploymentConfig: Option[DeploymentConfiguration] = None,
+)
 case class ServableStage(
-  modelVariants: NonEmptyList[Variant[String]],
+  modelVariants: NonEmptyList[ServableVariant],
   signature: ModelSignature
 )
 
@@ -33,7 +40,7 @@ object ExecutionGraphAdapter {
     VersionGraphAdapter(
       pipeline.map { s =>
         VersionStage(
-          modelVariants = s.modelVariants.map(v => ModelVariant(v.item, v.weight)),
+          modelVariants = s.modelVariants.map(v => DeploymentModelVariant(v.item, v.weight)),
           signature = s.signature
         )
       }

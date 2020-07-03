@@ -8,8 +8,10 @@ import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.application.Application.{AssemblingApp, GenericApplication}
+import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.DeploymentVersionVariant
 import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Node, Variant, VersionGraphComposer}
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationService
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
@@ -32,7 +34,8 @@ object ApplicationDeployer extends Logging {
     versionRepository: ModelVersionRepository[F],
     applicationRepository: ApplicationRepository[F],
     graphComposer: VersionGraphComposer,
-    discoveryHub: ApplicationEvents.Publisher[F]
+    discoveryHub: ApplicationEvents.Publisher[F],
+    deploymentConfigService: DeploymentConfigurationService[F]
   ): ApplicationDeployer[F] = {
     new ApplicationDeployer[F] {
       override def deploy(
@@ -76,9 +79,8 @@ object ApplicationDeployer extends Logging {
               variants <- f.modelVariants.traverse { m =>
                 for {
                   version <- OptionT(versionRepository.get(m.modelVersionId))
-                    .map(Variant(_, m.weight))
                     .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find modelversion $m")))
-                  internalVersion <- version.item match {
+                  internalVersion <- version match {
                     case imv:  ModelVersion.Internal =>
                       imv.pure[F]
                     case emv:  ModelVersion.External =>
@@ -87,11 +89,14 @@ object ApplicationDeployer extends Logging {
                   _ <- internalVersion.status match {
                     case ModelVersionStatus.Released => F.unit
                     case x =>
-                      F.raiseError[Unit](DomainError.invalidRequest(s"Can't deploy non-released ModelVersion: ${version.item.fullName} - $x"))
+                      F.raiseError[Unit](DomainError.invalidRequest(s"Can't deploy non-released ModelVersion: ${version.fullName} - $x"))
                   }
-                } yield version.copy(item = internalVersion)
+                  deploymentConfig <- m.deploymentConfigName.traverse(deploymentConfigService.get)
+                } yield {
+                  DeploymentVersionVariant(internalVersion, m.weight, deploymentConfig)
+                }
               }
-            } yield Node(variants)
+            } yield variants
           }
           graphOrError = graphComposer.compose(versions)
           graph <- F.fromEither(graphOrError)
@@ -134,7 +139,7 @@ object ApplicationDeployer extends Logging {
               variants <- stage.modelVariants.traverse { i =>
                 for {
                   _ <- F.delay(logger.debug(s"Deploying ${i.item.fullName}"))
-                  result <- servableService.deploy(i.item, Map.empty)  // NOTE maybe infer some app-specific labels?
+                  result <- servableService.deploy(i.item, i.deploymentConfig, Map.empty)  // NOTE maybe infer some app-specific labels?
                   servable <- result.completed.get
                   okServable <- servable.status match {
                     case _: Servable.Serving =>

@@ -6,16 +6,23 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationValidator
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.VersionPipeline
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
 trait VersionGraphComposer {
-  def compose(nodes: NonEmptyList[Node[ModelVersion.Internal]]): Either[DomainError, VersionPipeline]
+  def compose(nodes: NonEmptyList[NonEmptyList[DeploymentModelVariant]]): Either[DomainError, VersionPipeline]
 }
 
 object VersionGraphComposer {
 
+  case class DeploymentVersionVariant(
+    item: ModelVersion.Internal,
+    weight: Int,
+    deploymentConfig: Option[DeploymentConfiguration]
+  )
+
   case class PipelineStage(
-    modelVariants: NonEmptyList[Variant[ModelVersion.Internal]],
+    modelVariants: NonEmptyList[DeploymentVersionVariant],
     signature: ModelSignature
   )
 
@@ -24,18 +31,18 @@ object VersionGraphComposer {
   def default: VersionGraphComposer = {
     new VersionGraphComposer {
       override def compose(
-        nodes: NonEmptyList[Node[ModelVersion.Internal]]
+        nodes: NonEmptyList[NonEmptyList[DeploymentVersionVariant]]
       ): Either[DomainError, VersionPipeline] = {
         nodes match {
-          case NonEmptyList(singleStage, Nil) if singleStage.variants.length == 1 =>
-            inferSimpleApp(singleStage.variants.head) // don't perform checks
+          case NonEmptyList(singleStage, Nil) if singleStage.length == 1 =>
+            inferSimpleApp(singleStage.head) // don't perform checks
           case stages =>
             inferPipelineApp(stages)
         }
       }
 
       private def inferSimpleApp(
-        version: Variant[ModelVersion.Internal]
+        version: DeploymentVersionVariant
       ): Either[DomainError, VersionPipeline] = {
         for {
           signature <- Either.fromOption(
@@ -45,7 +52,7 @@ object VersionGraphComposer {
         } yield {
           val stages = NonEmptyList.of(
             PipelineStage(
-              modelVariants = NonEmptyList.of(Variant(version.item, 100)), // 100 since this is the only service in the app
+              modelVariants = NonEmptyList.of(version.copy(weight = 100)), // 100 since this is the only service in the app
               signature = signature,
             )
           )
@@ -54,16 +61,16 @@ object VersionGraphComposer {
       }
 
       private def inferPipelineApp(
-        stages: NonEmptyList[Node[ModelVersion.Internal]]
+        stages: NonEmptyList[NonEmptyList[DeploymentVersionVariant]]
       ): Either[DomainError, VersionPipeline] = {
         val parsedStages = stages.traverse { stage =>
-          val stageWeight = stage.variants.map(_.weight).foldLeft(0)(_ + _)
+          val stageWeight = stage.map(_.weight).foldLeft(0)(_ + _)
           if (stageWeight == 100) {
             for {
               stageSig <- ApplicationValidator
-                .inferStageSignature(stage.variants.map(_.item).toList)
+                .inferStageSignature(stage.map(_.item).toList)
             } yield {
-              PipelineStage(modelVariants = stage.variants, signature = stageSig)
+              PipelineStage(modelVariants = stage, signature = stageSig)
             }
           } else {
             Left(
