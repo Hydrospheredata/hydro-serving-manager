@@ -93,7 +93,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       )
       val app = Application(1, "test", None, Application.Assembling, ModelSignature.defaultInstance, Nil, appGraph)
       val appDeployer = new ApplicationDeployer[IO] {
-        override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream]): IO[DeferredResult[IO, GenericApplication]] = {
+        override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream], meta: Map[String, String]): IO[DeferredResult[IO, GenericApplication]] = {
           DeferredResult.completed(app)
         }
       }
@@ -237,7 +237,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       )
       val app = Application(1, "test", None, Application.Assembling, ModelSignature.defaultInstance, Nil, appGraph)
       val appDeployer = new ApplicationDeployer[IO] {
-        override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream]): IO[DeferredResult[IO, GenericApplication]] = {
+        override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream], meta: Map[String, String]): IO[DeferredResult[IO, GenericApplication]] = {
           DeferredResult.completed(app)
         }
       }
