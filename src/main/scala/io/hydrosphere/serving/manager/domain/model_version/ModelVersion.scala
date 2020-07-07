@@ -2,6 +2,7 @@ package io.hydrosphere.serving.manager.domain.model_version
 
 import java.time.Instant
 
+import io.hydrosphere.serving.manager.grpc.entities.MonitoringConfiguration
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -17,6 +18,7 @@ sealed trait ModelVersion extends Product with Serializable {
   def model: Model
   def metadata: Map[String, String]
   def fullName: String
+  def monitoringConfiguration: Option[MonitoringConfiguration]
 }
 
 object ModelVersion {
@@ -33,7 +35,8 @@ object ModelVersion {
     hostSelector: Option[HostSelector],
     status: ModelVersionStatus,
     installCommand: Option[String],
-    metadata: Map[String, String]
+    metadata: Map[String, String],
+    monitoringConfiguration: Option[MonitoringConfiguration],
   ) extends ModelVersion {
     def fullName: String = s"${model.name}:$modelVersion"
   }
@@ -45,6 +48,7 @@ object ModelVersion {
     modelContract: ModelContract,
     model: Model,
     metadata: Map[String, String],
+    monitoringConfiguration: Option[MonitoringConfiguration],
   ) extends ModelVersion {
     def fullName: String = s"${model.name}:$modelVersion"
   }
