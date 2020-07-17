@@ -59,6 +59,7 @@ object ModelVersionBuilder {
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
           metadata = metadata.metadata,
+          monitoringConfiguration = metadata.monitoringConfiguration
         )
         modelVersion <- modelVersionRepository.create(mv)
       } yield mv.copy(id = modelVersion.id)
