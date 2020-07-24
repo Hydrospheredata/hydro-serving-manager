@@ -14,6 +14,7 @@ import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, ModelVersionBuilder}
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DockerProgress
@@ -58,7 +59,8 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           runtime = DockerImage("run", "time"),
           hostSelector = None,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )
 
         val imageRepo = new ImageRepository[IO] {
@@ -147,7 +149,8 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           runtime = DockerImage("run", "time"),
           hostSelector = None,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )
 
         val dc = new DockerdClient[IO] {

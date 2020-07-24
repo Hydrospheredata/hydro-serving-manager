@@ -9,6 +9,7 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 
 import scala.collection.mutable.ListBuffer
 
@@ -40,7 +41,8 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )))
       )
       val versionService = ModelVersionService.apply[IO]()(
@@ -66,7 +68,8 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )))
       )
       val versionService = ModelVersionService.apply[IO]()(
@@ -95,7 +98,8 @@ class ModelVersionServiceSpec extends GenericUnitTest {
               hostSelector = None,
               status = ModelVersionStatus.Assembling,
               installCommand = None,
-              metadata = Map.empty
+              metadata = Map.empty,
+              MonitoringConfiguration(5)
             )
           )
         }
@@ -162,7 +166,8 @@ class ModelVersionServiceSpec extends GenericUnitTest {
               hostSelector = None,
               status = ModelVersionStatus.Assembling,
               installCommand = None,
-              metadata = Map.empty
+              metadata = Map.empty,
+              monitoringConfiguration = MonitoringConfiguration(5)
             )))
           )
           val versionService = ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null, null)

@@ -4,7 +4,6 @@ import cats.effect.Bracket
 import cats.implicits._
 import doobie._
 import doobie.implicits._
-import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
@@ -18,8 +17,11 @@ import spray.json._
 import java.time.Instant
 
 import cats.data.NonEmptyList
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
+import io.hydrosphere.serving.manager.util.SprayDoobie._
 
 object DBModelVersionRepository {
+
   final case class ModelVersionRow(
     model_version_id: Long,
     model_id: Long,
@@ -37,7 +39,8 @@ object DBModelVersionRepository {
     profile_types: Option[String],
     install_command: Option[String],
     metadata: Option[String],
-    is_external: Boolean
+    is_external: Boolean,
+    monitoring_configuration: MonitoringConfiguration
   )
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
@@ -65,7 +68,8 @@ object DBModelVersionRepository {
         modelVersion = mvr.model_version,
         modelContract = contract,
         model = model,
-        metadata = metadata
+        metadata = metadata,
+        monitoringConfiguration = mvr.monitoring_configuration
       )
     } else {
       ModelVersion.Internal(
@@ -87,6 +91,7 @@ object DBModelVersionRepository {
         status = ModelVersionStatus.withName(mvr.status),
         installCommand = mvr.install_command,
         metadata = metadata,
+        monitoringConfiguration = mvr.monitoring_configuration,
       )
     }
   }
@@ -111,9 +116,10 @@ object DBModelVersionRepository {
           profile_types = None,
           install_command = mv.installCommand,
           metadata = if(mv.metadata.nonEmpty) {mv.metadata.toJson.compactPrint.some} else None,
-          is_external = false
+          is_external = false,
+          monitoring_configuration = mv.monitoringConfiguration
         )
-      case ModelVersion.External(id, created, modelVersion, modelContract, model, metadata) =>
+      case ModelVersion.External(id, created, modelVersion, modelContract, model, metadata, monitoring_configuration) =>
         ModelVersionRow(
           model_version_id = id,
           model_id = model.id,
@@ -131,7 +137,8 @@ object DBModelVersionRepository {
           profile_types = None,
           install_command = None,
           metadata = if(metadata.nonEmpty) {metadata.toJson.compactPrint.some} else None,
-          is_external = true
+          is_external = true,
+          monitoring_configuration = monitoring_configuration
         )
     }
   }
@@ -212,7 +219,8 @@ object DBModelVersionRepository {
          | status,
          | install_command,
          | metadata,
-         | is_external
+         | is_external,
+         | monitoring_configuration
          | ) VALUES (
          | ${mv.model_id},
          | ${mv.host_selector},
@@ -228,7 +236,8 @@ object DBModelVersionRepository {
          | ${mv.status},
          | ${mv.install_command},
          | ${mv.metadata},
-         | ${mv.is_external}
+         | ${mv.is_external},
+         | ${mv.monitoring_configuration}
          |)""".stripMargin.update
   }
 
@@ -248,7 +257,8 @@ object DBModelVersionRepository {
          | runtime_version = ${mv.runtime_version},
          | status = ${mv.status},
          | install_command = ${mv.install_command},
-         | metadata = ${mv.metadata}
+         | metadata = ${mv.metadata},
+         | monitoring_configuration = ${mv.monitoring_configuration}
          | WHERE model_version_id = ${mv.model_version_id}""".stripMargin.update
   }
 

@@ -23,6 +23,7 @@ import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model._
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
@@ -119,7 +120,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )
 
         val uploadFile = Paths.get("123123")
@@ -129,7 +131,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelectorName = None,
           contract = Some(contract),
           profileTypes = None,
-          installCommand = None
+          installCommand = None,
+          monitoringConfiguration = MonitoringConfiguration(5)
         )
 
         val modelRepo = mock[ModelRepository[IO]]
@@ -212,14 +215,16 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )
         val upload = ModelUploadMetadata(
           name = modelName,
           runtime = modelRuntime,
           hostSelectorName = None,
           contract = Some(contract),
-          profileTypes = None
+          profileTypes = None,
+          monitoringConfiguration = MonitoringConfiguration(5)
         )
         println(upload)
 
@@ -274,7 +279,8 @@ class ModelServiceSpec extends GenericUnitTest {
           contract = None,
           profileTypes = Some(Map("a" -> DataProfileType.IMAGE)),
           installCommand = Some("echo hello"),
-          metadata = Some(Map("author" -> "me"))
+          metadata = Some(Map("author" -> "me")),
+          MonitoringConfiguration(5)
         )
         val res = ModelVersionMetadata.combineMetadata(fetched, uploaded, None)
         assert(res.modelName === "upload-name")
@@ -301,7 +307,8 @@ class ModelServiceSpec extends GenericUnitTest {
           contract = None,
           profileTypes = Some(Map("a" -> DataProfileType.IMAGE)),
           installCommand = Some("echo hello"),
-          metadata = Some(Map("author" -> "me", "overriden" -> "true"))
+          metadata = Some(Map("author" -> "me", "overriden" -> "true")),
+          MonitoringConfiguration(5)
         )
         val res = ModelVersionMetadata.combineMetadata(fetched, uploaded, None)
         assert(res.modelName === "upload-name")
@@ -328,7 +335,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )
         val app = Application(
           id = 1,
@@ -353,7 +361,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )
         val servable = Servable(
           modelVersion = servableFailedVersion,
@@ -375,7 +384,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )
         val okVersion2 = ModelVersion.Internal(
           id = 4,
@@ -389,7 +399,8 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty
+          metadata = Map.empty,
+          MonitoringConfiguration(5)
         )
         val modelRepo = new ModelRepository[IO] {
           override def create(entity: Model): IO[Model] = ???

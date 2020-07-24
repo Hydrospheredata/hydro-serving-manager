@@ -59,8 +59,8 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   implicit val modelFormat         = jsonFormat2(Model)
   implicit val environmentFormat   = jsonFormat3(HostSelector)
   implicit val versionStatusFormat = enumFormat(ModelVersionStatus)
-  implicit val internalModelVersionFormat  = jsonFormat12(ModelVersion.Internal.apply)
-  implicit val externalModelVersionFormat  = jsonFormat6(ModelVersion.External.apply)
+  implicit val internalModelVersionFormat  = jsonFormat13(ModelVersion.Internal.apply)
+  implicit val externalModelVersionFormat  = jsonFormat7(ModelVersion.External.apply)
   implicit val modelVersionFormat = new RootJsonWriter[ModelVersion] {
     override def write(obj: ModelVersion): JsValue = {
       val fields = obj match {
