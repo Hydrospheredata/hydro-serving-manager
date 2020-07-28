@@ -132,7 +132,7 @@ class ModelServiceSpec extends GenericUnitTest {
           contract = Some(contract),
           profileTypes = None,
           installCommand = None,
-          monitoringConfiguration = MonitoringConfiguration(5)
+          monitoringConfiguration = MonitoringConfiguration()
         )
 
         val modelRepo = mock[ModelRepository[IO]]

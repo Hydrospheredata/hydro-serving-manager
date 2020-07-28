@@ -46,7 +46,7 @@ class ServableSpec extends GenericUnitTest {
     modelContract = ModelContract.defaultInstance,
     model = Model(1, "name"),
     metadata = Map.empty,
-    MonitoringConfiguration(5)
+    MonitoringConfiguration()
   )
   val mv = ModelVersion.Internal(
     id = 10,
@@ -61,7 +61,7 @@ class ServableSpec extends GenericUnitTest {
     status = ModelVersionStatus.Released,
     installCommand = None,
     metadata = Map.empty,
-    MonitoringConfiguration(5)
+    MonitoringConfiguration()
   )
   val servable = Servable(mv, "test", Servable.Starting("Init", None, None), Nil)
 

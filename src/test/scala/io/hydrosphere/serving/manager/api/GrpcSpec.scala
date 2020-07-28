@@ -39,7 +39,7 @@ class GrpcSpec extends GenericUnitTest {
           status = ModelVersionStatus.Assembling,
           installCommand = None,
           metadata = Map.empty,
-          MonitoringConfiguration(5)
+          MonitoringConfiguration()
         )
       ))
       when(versionService.get(1000)).thenReturn(IO.raiseError(new IllegalArgumentException("1000")))

@@ -6,8 +6,12 @@ import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtoc
 
 import spray.json._
 
+object BatchSize {
+  val defaultValue: Int = 100
+}
+
 case class MonitoringConfiguration(
-  batch_size: Int
+  batch_size: Int = BatchSize.defaultValue
 ) {
   def toGrpc: GMonitoringConfiguration = grpc.entities.MonitoringConfiguration(this.batch_size)
 }
@@ -15,4 +19,3 @@ case class MonitoringConfiguration(
 object MonitoringConfiguration {
   implicit val js1: RootJsonFormat[MonitoringConfiguration] = jsonFormat1(MonitoringConfiguration.apply)
 }
-
