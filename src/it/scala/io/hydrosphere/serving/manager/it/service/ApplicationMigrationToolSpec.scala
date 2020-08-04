@@ -1,4 +1,4 @@
-package io.hydrosphere.serving.manager.domain.application
+package io.hydrosphere.serving.manager.it.service
 
 import java.time.Instant
 
@@ -9,10 +9,9 @@ import cats.implicits._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.application.graph.Variant
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.application.migrations.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
+import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -20,7 +19,6 @@ import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
-import io.hydrosphere.serving.manager.infrastructure.db.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository._
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -35,29 +33,26 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       val data2 = ApplicationRow(1, "test", None, "Ready", "", graph, Nil, Nil, None, Nil, None)
       val removedApps = ListBuffer.empty[Long]
       val appsRepo = new ApplicationRepository[IO] {
-        override def create(entity: GenericApplication): IO[GenericApplication] = ???
+        override def create(entity: Application): IO[Application] = ???
 
-        override def get(id: Long): IO[Option[GenericApplication]] = ???
+        override def get(id: Long): IO[Option[Application]] = ???
 
-        override def get(name: String): IO[Option[GenericApplication]] = ???
+        override def get(name: String): IO[Option[Application]] = ???
 
-        override def update(value: GenericApplication): IO[Int] = ???
+        override def update(value: Application): IO[Int] = ???
 
         override def delete(id: Long): IO[Int] = IO(removedApps += id).as(1)
 
-        override def all(): IO[List[GenericApplication]] = {
+        override def all(): IO[List[Application]] = {
           IO.fromEither {
             List(data1, data2)
-              .traverse(x => DBApplicationRepository.toApplication(x, Map.empty, Map.empty).toValidatedNec)
-              .leftMap(errors => AppDBSchemaErrors(errors.toList)).toEither
+              .traverse(x => DBApplicationRepository.toApplication(x, Map.empty, Map.empty, Map.empty))
           }
         }
 
-        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[Application]] = ???
 
-        override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
-
-        override def updateRow(row: ApplicationRow): IO[Int] = ???
+        override def findServableUsage(servableName: String): IO[List[Application]] = ???
       }
       val cd = CloudInstance(1, "aaa", CloudInstance.Status.Running("host", 9090))
       val removed = ListBuffer.empty[String]
@@ -76,24 +71,43 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
 
         override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
-      val modelVersion = ModelVersion.Internal(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
-        ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,
-        ModelVersionStatus.Released, None, Map.empty
+      val modelVersion = ModelVersion.Internal(
+        id = 1,
+        image = DockerImage("asd", "asd"),
+        created = Instant.now(),
+        finished = None,
+        modelVersion = 1,
+        modelContract = ModelContract.defaultInstance,
+        runtime = DockerImage("rrr", "rrr"),
+        model = Model(1, "aaa"),
+        status = ModelVersionStatus.Released,
+        installCommand = None,
+        metadata = Map.empty
       )
-      val appGraph = NonEmptyList.of(
-        PipelineStage(
-          modelVariants = NonEmptyList.of(
-            Variant(
-              item = modelVersion,
-              weight = 100
-            )
-          ),
-          signature = ModelSignature.defaultInstance
+      val appGraph = ApplicationGraph(
+        NonEmptyList.of(
+          ApplicationStage(
+            variants = NonEmptyList.of(
+              ApplicationServable(
+                modelVersion = modelVersion,
+                weight = 100,
+              )
+            ),
+            signature = ModelSignature.defaultInstance
+          )
         )
       )
-      val app = Application(1, "test", None, Application.Assembling, ModelSignature.defaultInstance, Nil, appGraph)
+      val app = Application(
+        id = 1,
+        name = "test",
+        namespace = None,
+        status = Application.Assembling,
+        statusMessage = None,
+        signature = ModelSignature.defaultInstance,
+        kafkaStreaming = Nil,
+        graph = appGraph)
       val appDeployer = new ApplicationDeployer[IO] {
-        override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream]): IO[DeferredResult[IO, GenericApplication]] = {
+        override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream]): IO[DeferredResult[IO, Application]] = {
           DeferredResult.completed(app)
         }
       }
@@ -105,7 +119,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         override def get(names: Seq[String]): IO[List[GenericServable]] = ???
         override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
-      val mt = ApplicationMigrationTool.default[IO](appsRepo, cloudDriver, appDeployer, serviceRepo)
+      val mt = ApplicationMigrationTool.default[IO](appsRepo, null, cloudDriver, appDeployer, serviceRepo)
       mt.getAndRevive().unsafeRunSync()
       assert(removed.nonEmpty, "instancesremoved")
       assert(removedApps.nonEmpty, "appsremoved")
@@ -167,7 +181,6 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         modelContract = ModelContract.defaultInstance,
         runtime = DockerImage("", ""),
         model = Model(1, "aaaa"),
-        hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
         metadata = Map.empty
@@ -180,29 +193,26 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       val data2 = ApplicationRow(2, "test", None, "Ready", "", graph, Nil, Nil, None, Nil, None)
       val updatedRows = ListBuffer.empty[ApplicationRow]
       val appsRepo = new ApplicationRepository[IO] {
-        override def create(entity: GenericApplication): IO[GenericApplication] = ???
+        override def create(entity: Application): IO[Application] = ???
 
-        override def get(id: Long): IO[Option[GenericApplication]] = ???
+        override def get(id: Long): IO[Option[Application]] = ???
 
-        override def get(name: String): IO[Option[GenericApplication]] = ???
+        override def get(name: String): IO[Option[Application]] = ???
 
-        override def update(value: GenericApplication): IO[Int] = ???
+        override def update(value: Application): IO[Int] = ???
 
         override def delete(id: Long): IO[Int] = ???
 
-        override def all(): IO[List[GenericApplication]] = {
+        override def all(): IO[List[Application]] = {
           IO.fromEither {
             List(data1, data2)
-              .traverse(x => DBApplicationRepository.toApplication(x, Map.empty, sMap).toValidatedNec)
-              .leftMap(errors => AppDBSchemaErrors(errors.filter(_.isInstanceOf[UsingModelVersionIsMissing]).toList)).toEither
+              .traverse(x => DBApplicationRepository.toApplication(x, Map.empty, sMap, Map.empty))
           }
         }
 
-        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[Application]] = ???
 
-        override def updateRow(row: ApplicationRow): IO[Int] = IO(updatedRows += row).as(1)
-
-        override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
+        override def findServableUsage(servableName: String): IO[List[Application]] = ???
       }
       val cd = CloudInstance(1, "aaa", CloudInstance.Status.Running("host", 9090))
       val cloudDriver = new CloudDriver[IO] {
@@ -221,23 +231,25 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
       }
       val modelVersion = ModelVersion.Internal(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
-        ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,
+        ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"),
         ModelVersionStatus.Released, None, Map.empty
       )
-      val appGraph = NonEmptyList.of(
-        PipelineStage(
-          modelVariants = NonEmptyList.of(
-            Variant(
-              item = modelVersion,
-              weight = 100
-            )
-          ),
-          signature = ModelSignature.defaultInstance
+      val appGraph = ApplicationGraph(
+        NonEmptyList.of(
+          ApplicationStage(
+            variants = NonEmptyList.of(
+              ApplicationServable(
+                modelVersion = modelVersion,
+                weight = 100,
+              )
+            ),
+            signature = ModelSignature.defaultInstance
+          )
         )
       )
-      val app = Application(1, "test", None, Application.Assembling, ModelSignature.defaultInstance, Nil, appGraph)
+      val app = Application(1, "test", None, Application.Assembling, None, ModelSignature.defaultInstance, Nil, appGraph)
       val appDeployer = new ApplicationDeployer[IO] {
-        override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream]): IO[DeferredResult[IO, GenericApplication]] = {
+        override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream]): IO[DeferredResult[IO, Application]] = {
           DeferredResult.completed(app)
         }
       }
@@ -249,7 +261,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         override def get(names: Seq[String]): IO[List[GenericServable]] = IO(sMap.values.toList)
         override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
-      val mt = ApplicationMigrationTool.default[IO](appsRepo, cloudDriver, appDeployer, serviceRepo)
+      val mt = ApplicationMigrationTool.default[IO](appsRepo, null, cloudDriver, appDeployer, serviceRepo)
       mt.getAndRevive().unsafeRunSync()
       println(updatedRows.map(_.used_model_versions))
       assert(!updatedRows.exists(_.used_model_versions.isEmpty))

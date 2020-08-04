@@ -9,8 +9,9 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.application.Application
-import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Variant}
+import io.hydrosphere.serving.manager.domain.application.graph.ExecutionNode
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.application.migrations.{ExecutionNode, Variant}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
@@ -84,7 +85,7 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
         ),
         signature = ModelSignature.defaultInstance,
         kafkaStreaming = List.empty,
-        versionGraph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(mv1, 100)), ModelSignature.defaultInstance))
+        graph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(mv1, 100)), ModelSignature.defaultInstance))
       )
       val result = app.core.repos.appRepo.create(application).unsafeRunSync()
       println(result)

@@ -15,7 +15,6 @@ import scala.language.reflectiveCalls
 import scala.util.Try
 
 trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with Logging {
-
   implicit object AnyJsonFormat extends JsonFormat[Any] {
     def write(any: Any): JsValue = any match {
       case n: Int => JsNumber(n)
@@ -41,7 +40,7 @@ trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with 
     }
   }
 
-  implicit val uuidFormat = new RootJsonFormat[UUID] {
+  implicit val uuidFormat: RootJsonFormat[UUID] = new RootJsonFormat[UUID] {
     override def write(obj: UUID): JsValue = JsString(obj.toString)
 
     override def read(json: JsValue): UUID = {
@@ -52,25 +51,23 @@ trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with 
     }
   }
 
-  implicit val throwableWriter = new RootJsonFormat[Throwable] {
+  implicit val throwableWriter: RootJsonFormat[Throwable] = new RootJsonFormat[Throwable] {
     override def write(obj: Throwable): JsValue = JsString(obj.getMessage)
 
     override def read(json: JsValue): Throwable = throw DeserializationException("Can't deserealize exceptions")
   }
 
-  implicit def nonEmptyListFormat[T: JsonFormat] = new RootJsonFormat[NonEmptyList[T]] {
-    override def read(json: JsValue): NonEmptyList[T] = json match {
-      case JsArray(elems) =>
-        val parsedElems = elems.map(_.convertTo[T]).toList
-        NonEmptyList.fromList(parsedElems) match {
-          case Some(r) => r
-          case None => throw DeserializationException("An array is required to be non-empty")
-        }
-      case _ => throw DeserializationException("Incorrect JSON. A non-empty array is expected.")
+  implicit def nonEmptyListFormat[T: JsonFormat]: RootJsonFormat[NonEmptyList[T]] = new RootJsonFormat[NonEmptyList[T]] {
+    override def read(json: JsValue): NonEmptyList[T] = {
+      val list = json.convertTo[List[T]]
+      NonEmptyList.fromList(list) match {
+        case Some(r) => r
+        case None => throw DeserializationException("An array is required to be non-empty")
+      }
     }
 
     override def write(obj: NonEmptyList[T]): JsValue = {
-      JsArray(obj.map(_.toJson).toList.toVector)
+      obj.toList.toJson
     }
   }
 

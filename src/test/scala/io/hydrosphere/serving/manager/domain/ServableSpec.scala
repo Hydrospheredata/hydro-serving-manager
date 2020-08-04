@@ -13,10 +13,9 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, DeploymentConfigurationService}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
@@ -24,7 +23,6 @@ import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, 
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableMonitor.MonitoringEntry
 import io.hydrosphere.serving.manager.domain.servable._
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.ApplicationRow
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
@@ -56,7 +54,6 @@ class ServableSpec extends GenericUnitTest {
     modelContract = ModelContract.defaultInstance,
     runtime = DockerImage("runtime", "tag"),
     model = Model(1, "name"),
-    hostSelector = None,
     status = ModelVersionStatus.Released,
     installCommand = None,
     metadata = Map.empty
@@ -302,6 +299,13 @@ class ServableSpec extends GenericUnitTest {
   }
 
   describe("CRUD") {
+    def depConfService = new DeploymentConfigurationService[IO] {
+      override def all(): IO[List[DeploymentConfiguration]] = ???
+      override def create(deploymentConfiguration: DeploymentConfiguration): IO[DeploymentConfiguration] = ???
+      override def delete(name: String): IO[DeploymentConfiguration] = ???
+      override def get(name: String): IO[DeploymentConfiguration] = ???
+    }
+
     it("should not deploy an external ModelVersion") {
       val cloudDriver = new CloudDriver[IO] {
         override def instances: IO[List[CloudInstance]] = ???
@@ -340,15 +344,14 @@ class ServableSpec extends GenericUnitTest {
         override def publish(t: DiscoveryEvent[GenericServable, String]): IO[Unit] = IO.unit
       }
       val appRepo = new ApplicationRepository[IO] {
-        override def create(entity: GenericApplication): IO[GenericApplication] = ???
-        override def get(id: Long): IO[Option[GenericApplication]] = ???
-        override def get(name: String): IO[Option[GenericApplication]] = ???
-        override def update(value: GenericApplication): IO[Int] = ???
-        override def updateRow(row: ApplicationRow): IO[Int] = ???
+        override def create(entity: Application): IO[Application] = ???
+        override def get(id: Long): IO[Option[Application]] = ???
+        override def get(name: String): IO[Option[Application]] = ???
+        override def update(value: Application): IO[Int] = ???
         override def delete(id: Long): IO[Int] = ???
-        override def all(): IO[List[GenericApplication]] = ???
-        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
-        override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
+        override def all(): IO[List[Application]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[Application]] = ???
+        override def findServableUsage(servableName: String): IO[List[Application]] = ???
       }
 
       val monitoringRepo = new MonitoringRepository[IO] {
@@ -359,8 +362,8 @@ class ServableSpec extends GenericUnitTest {
         override def delete(id: String): IO[Unit] = ???
       }
 
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, monitoringRepo)
-      val deployResult = service.findAndDeploy(1, Map.empty).attempt.unsafeRunSync()
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, monitoringRepo, depConfService)
+      val deployResult = service.findAndDeploy(1, None, Map.empty).attempt.unsafeRunSync()
       deployResult.left.value should be (DomainError.invalidRequest(s"Deployment of external model is unavailable. modelVersionId=${externalMv.id} name=${externalMv.fullName}"))
     }
 
@@ -426,18 +429,17 @@ class ServableSpec extends GenericUnitTest {
         }
       }
       val appRepo = new ApplicationRepository[IO] {
-        override def create(entity: GenericApplication): IO[GenericApplication] = ???
-        override def get(id: Long): IO[Option[GenericApplication]] = ???
-        override def get(name: String): IO[Option[GenericApplication]] = ???
-        override def update(value: GenericApplication): IO[Int] = ???
-        override def updateRow(row: ApplicationRow): IO[Int] = ???
+        override def create(entity: Application): IO[Application] = ???
+        override def get(id: Long): IO[Option[Application]] = ???
+        override def get(name: String): IO[Option[Application]] = ???
+        override def update(value: Application): IO[Int] = ???
         override def delete(id: Long): IO[Int] = ???
-        override def all(): IO[List[GenericApplication]] = ???
-        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
-        override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
+        override def all(): IO[List[Application]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[Application]] = ???
+        override def findServableUsage(servableName: String): IO[List[Application]] = ???
       }
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, null)
-      val result = service.deploy(mv, Map.empty).unsafeRunSync().completed.get.unsafeRunSync()
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, null, depConfService)
+      val result = service.deploy(mv, None, Map.empty).unsafeRunSync().completed.get.unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty
       monitorState should not be empty
@@ -456,7 +458,6 @@ class ServableSpec extends GenericUnitTest {
         modelContract = ModelContract.defaultInstance,
         runtime = DockerImage("runtime", "tag"),
         model = Model(1, "test-model"),
-        hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
         metadata = Map.empty
@@ -526,17 +527,16 @@ class ServableSpec extends GenericUnitTest {
         }
       }
       val appRepo = new ApplicationRepository[IO] {
-        override def create(entity: GenericApplication): IO[GenericApplication] = ???
-        override def get(id: Long): IO[Option[GenericApplication]] = ???
-        override def get(name: String): IO[Option[GenericApplication]] = ???
-        override def update(value: GenericApplication): IO[Int] = ???
-        override def updateRow(row: ApplicationRow): IO[Int] = ???
+        override def create(entity: Application): IO[Application] = ???
+        override def get(id: Long): IO[Option[Application]] = ???
+        override def get(name: String): IO[Option[Application]] = ???
+        override def update(value: Application): IO[Int] = ???
         override def delete(id: Long): IO[Int] = ???
-        override def all(): IO[List[GenericApplication]] = ???
-        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
-        override def findServableUsage(servableName: String): IO[List[GenericApplication]] = IO(Nil)
+        override def all(): IO[List[Application]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[Application]] = ???
+        override def findServableUsage(servableName: String): IO[List[Application]] = IO(Nil)
       }
-      val service = ServableService[IO]()(Concurrent[IO],timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, null)
+      val service = ServableService[IO]()(Concurrent[IO],timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, null, depConfService)
       val result = service.stop("test-model-1-delete-me").unsafeRunSync()
       assert(result.modelVersion === mv)
       driverState should not be empty
@@ -553,7 +553,6 @@ class ServableSpec extends GenericUnitTest {
         modelContract = ModelContract.defaultInstance,
         runtime = DockerImage("runtime", "tag"),
         model = Model(1, "test-model"),
-        hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
         metadata = Map.empty
@@ -623,19 +622,18 @@ class ServableSpec extends GenericUnitTest {
         }
       }
       val appRepo = new ApplicationRepository[IO] {
-        override def create(entity: GenericApplication): IO[GenericApplication] = ???
-        override def get(id: Long): IO[Option[GenericApplication]] = ???
-        override def get(name: String): IO[Option[GenericApplication]] = ???
-        override def update(value: GenericApplication): IO[Int] = ???
-        override def updateRow(row: ApplicationRow): IO[Int] = ???
+        override def create(entity: Application): IO[Application] = ???
+        override def get(id: Long): IO[Option[Application]] = ???
+        override def get(name: String): IO[Option[Application]] = ???
+        override def update(value: Application): IO[Int] = ???
         override def delete(id: Long): IO[Int] = ???
-        override def all(): IO[List[GenericApplication]] = ???
-        override def findServableUsage(servableName: String): IO[List[GenericApplication]] = IO {
-          List(Application(1, "test", None, Application.Ready(null), ModelSignature.defaultInstance, Nil, null, Map.empty))
+        override def all(): IO[List[Application]] = ???
+        override def findServableUsage(servableName: String): IO[List[Application]] = IO {
+          List(Application(1, "test", None, Application.Ready, None, ModelSignature.defaultInstance, Nil, null, Map.empty))
         }
-        override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = ???
+        override def findVersionUsage(versionIdx: Long): IO[List[Application]] = ???
       }
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, null)
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cloudDriver, servableRepo, appRepo, versionRepo, monitor, dh, null, depConfService)
       val result = service.stop("test-model-1-delete-me").attempt.unsafeRunSync()
       assert(result.isLeft, result)
     }
@@ -650,7 +648,6 @@ class ServableSpec extends GenericUnitTest {
         modelContract = ModelContract.defaultInstance,
         runtime = DockerImage("runtime", "tag"),
         model = Model(1, "model"),
-        hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
         metadata = Map.empty
@@ -686,7 +683,7 @@ class ServableSpec extends GenericUnitTest {
         override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
 
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, null, servableRepo, null, null, null, null, null)
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, null, servableRepo, null, null, null, null, null, depConfService)
       val r1 = service.getFiltered(Some("model-1-kek"), None, Map.empty).unsafeRunSync()
       assert(r1 == List(s1))
       val r2 = service.getFiltered(None, Some(1), Map.empty).unsafeRunSync()
@@ -707,7 +704,6 @@ class ServableSpec extends GenericUnitTest {
         modelContract = ModelContract.defaultInstance,
         runtime = DockerImage("runtime", "tag"),
         model = Model(1, "model"),
-        hostSelector = None,
         status = ModelVersionStatus.Released,
         installCommand = None,
         metadata = Map.empty
@@ -757,9 +753,9 @@ class ServableSpec extends GenericUnitTest {
         override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
 
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cd, servableRepo, null, versionRepo, servableMonitor, servablePublisher, null)
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cd, servableRepo, null, versionRepo, servableMonitor, servablePublisher, null, depConfService)
       val metadata = Map("author" -> "me", "date" -> "now")
-      val result = service.findAndDeploy(1, metadata).unsafeRunSync()
+      val result = service.findAndDeploy(1, None, metadata).unsafeRunSync()
       assert(result.started.metadata == metadata)
       assert(result.completed.get.unsafeRunSync().metadata == metadata)
     }
@@ -774,7 +770,6 @@ class ServableSpec extends GenericUnitTest {
         modelContract = ModelContract.defaultInstance,
         runtime = DockerImage("runtime", "tag"),
         model = Model(1, "model"),
-        hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
         metadata = Map.empty
@@ -824,8 +819,8 @@ class ServableSpec extends GenericUnitTest {
         override def findForModelVersion(versionId: Long): IO[List[GenericServable]] = ???
       }
 
-      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cd, servableRepo, null, versionRepo, servableMonitor, servablePublisher, null)
-      val result = service.findAndDeploy(1, Map.empty).attempt.unsafeRunSync()
+      val service = ServableService[IO]()(Concurrent[IO], timer, nameGen, uuidGen, cd, servableRepo, null, versionRepo, servableMonitor, servablePublisher, null, depConfService)
+      val result = service.findAndDeploy(1, None, Map.empty).attempt.unsafeRunSync()
       assert(result.isLeft)
     }
   }

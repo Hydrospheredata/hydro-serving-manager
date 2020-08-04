@@ -2,8 +2,7 @@ package io.hydrosphere.serving.manager
 
 import cats.effect._
 import cats.implicits._
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
-import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationEvents, ApplicationRepository, ApplicationService}
+import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationEvents, ApplicationRepository, ApplicationService, GraphComposer}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfigurationRepository, DeploymentConfigurationService}
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
@@ -95,7 +94,6 @@ object Core {
         implicit val servableService: ServableService[F] = ServableService[F]()
         implicit val monitoringService: Monitoring[F] = Monitoring[F]()
         implicit val versionBuilder: ModelVersionBuilder[F] = ModelVersionBuilder()
-        implicit val graphComposer: VersionGraphComposer = VersionGraphComposer.default
         for {
           gc <- ServableGC.empty[F](1.hour)
         } yield {

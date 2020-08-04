@@ -1,8 +1,7 @@
 package io.hydrosphere.serving.manager.infrastructure.protocol
 
 import io.hydrosphere.serving.manager.domain.application._
-import io.hydrosphere.serving.manager.domain.application.graph._
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.{DeploymentVersionVariant, PipelineStage}
+import io.hydrosphere.serving.manager.domain.application.migrations._
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstance
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -71,12 +70,6 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
 
   implicit val cloudServableFormat = jsonFormat3(CloudInstance.apply)
 
-  implicit def variantFormat[T: JsonFormat] = jsonFormat2(Variant.apply[T])
-
-  implicit val modelVariant   = jsonFormat2(DeploymentModelVariant.apply)
-  implicit val versionStage   = jsonFormat2(VersionStage.apply)
-  implicit val versionAdapter = jsonFormat1(VersionGraphAdapter.apply)
-
   implicit val servingSF  = jsonFormat3(Servable.Serving)
   implicit val servingNSF = jsonFormat3(Servable.NotServing)
   implicit val servingNAF = jsonFormat3(Servable.NotAvailable)
@@ -114,34 +107,9 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
   }
 
   implicit def servableFormat[T <: Servable.Status](implicit j: JsonFormat[T]) =
-    jsonFormat5(Servable.apply[T])
+    jsonFormat6(Servable.apply[T])
 
-  implicit val servableStageFormat = jsonFormat2(ServableStage.apply)
-  implicit val servableAdapter     = jsonFormat1(ServableGraphAdapter.apply)
-
-  implicit val executionGraphAdapterFormat = new RootJsonFormat[ExecutionGraphAdapter] {
-    override def read(json: JsValue): ExecutionGraphAdapter = {
-      json match {
-        case x: JsObject =>
-          Try(x.convertTo[VersionGraphAdapter])
-            .orElse(Try(x.convertTo[ServableGraphAdapter]))
-            .get
-        case x => throw DeserializationException("Invalid JSON for ExecutionGraph")
-      }
-    }
-
-    override def write(obj: ExecutionGraphAdapter): JsValue = {
-      obj match {
-        case x: VersionGraphAdapter => x.toJson
-        case x: ServableGraphAdapter => x.toJson
-      }
-    }
-  }
-
-  implicit val deploymentVersionFormat         = jsonFormat3(DeploymentVersionVariant.apply)
-  implicit val applicationStageFormat          = jsonFormat2(PipelineStage.apply)
   implicit val applicationKafkaStreamingFormat = jsonFormat4(ApplicationKafkaStream)
-  implicit val execNode = jsonFormat2(ExecutionNode.apply)
 
   implicit val cmpOp = new RootJsonFormat[ThresholdCmpOperator] {
     override def write(obj: ThresholdCmpOperator): JsValue = {

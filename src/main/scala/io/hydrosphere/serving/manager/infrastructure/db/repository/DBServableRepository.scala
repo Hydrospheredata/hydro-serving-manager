@@ -28,7 +28,8 @@ object DBServableRepository {
     host: Option[String],
     port: Option[Int],
     status: String,
-    metadata: Option[String]
+    metadata: Option[String],
+    deployment_configuration: Option[String]
   )
 
   type JoinedServableRow = (ServableRow, ModelVersionRow, ModelRow, Option[List[String]])
@@ -47,7 +48,8 @@ object DBServableRepository {
       host = host,
       port = port,
       status = status,
-      metadata = s.metadata.maybeEmpty.map(_.toJson.compactPrint)
+      metadata = s.metadata.maybeEmpty.map(_.toJson.compactPrint),
+      deployment_configuration = s.deploymentConfiguration.map(_.name)
     )
   }
 

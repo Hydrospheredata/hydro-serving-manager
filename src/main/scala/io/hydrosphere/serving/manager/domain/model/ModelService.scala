@@ -8,8 +8,7 @@ import cats.implicits._
 import cats.{Monad, MonadError}
 import io.hydrosphere.serving.manager.api.http.controller.model._
 import io.hydrosphere.serving.manager.domain.DomainError._
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
+import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
@@ -114,7 +113,7 @@ object ModelService {
     def checkIfNoApps(versions: Seq[ModelVersion]): F[Unit] = {
 
       def _checkApps(
-        usedApps: Seq[Seq[GenericApplication]]
+        usedApps: Seq[Seq[Application]]
       ): Either[DomainError, Unit] = {
         val allApps = usedApps.flatten.map(_.name)
         if (allApps.isEmpty) {

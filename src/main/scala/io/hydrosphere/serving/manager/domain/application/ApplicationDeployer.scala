@@ -7,9 +7,6 @@ import cats.effect.implicits._
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
-import io.hydrosphere.serving.manager.domain.application.Application.{AssemblingApp, GenericApplication}
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.DeploymentVersionVariant
-import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Node, Variant, VersionGraphComposer}
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationService
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
@@ -23,7 +20,7 @@ trait ApplicationDeployer[F[_]] {
     name: String,
     executionGraph: ExecutionGraphRequest,
     kafkaStreaming: List[ApplicationKafkaStream]
-  ): F[DeferredResult[F, GenericApplication]]
+  ): F[DeferredResult[F, Application]]
 }
 
 object ApplicationDeployer extends Logging {
@@ -33,7 +30,6 @@ object ApplicationDeployer extends Logging {
     servableService: ServableService[F],
     versionRepository: ModelVersionRepository[F],
     applicationRepository: ApplicationRepository[F],
-    graphComposer: VersionGraphComposer,
     discoveryHub: ApplicationEvents.Publisher[F],
     deploymentConfigService: DeploymentConfigurationService[F]
   ): ApplicationDeployer[F] = {
@@ -42,13 +38,13 @@ object ApplicationDeployer extends Logging {
         name: String,
         executionGraph: ExecutionGraphRequest,
         kafkaStreaming: List[ApplicationKafkaStream]
-      ): F[DeferredResult[F, GenericApplication]] = {
+      ): F[DeferredResult[F, Application]] = {
         for {
           composedApp <- composeApp(name, None, executionGraph, kafkaStreaming)
           repoApp <- applicationRepository.create(composedApp)
           _ <- discoveryHub.update(repoApp)
           app = composedApp.copy(id = repoApp.id)
-          df <- Deferred[F, GenericApplication]
+          df <- Deferred[F, Application]
           _ <- (for {
             genericApp <- startServices(app)
             _ <- F.delay(logger.debug("App services started. All ok."))
@@ -57,7 +53,7 @@ object ApplicationDeployer extends Logging {
             _ <- df.complete(genericApp)
           } yield ())
             .handleErrorWith { x =>
-              val failedApp = app.copy(status = Application.Failed(Option(x.getMessage)))
+              val failedApp = app.copy(status = Application.Failed, statusMessage = Option(x.getMessage))
               F.delay(logger.error(s"Error while buidling application $failedApp", x)) >>
                 applicationRepository.update(failedApp) >>
                 df.complete(failedApp).attempt.void
@@ -71,7 +67,7 @@ object ApplicationDeployer extends Logging {
         namespace: Option[String],
         executionGraph: ExecutionGraphRequest,
         kafkaStreaming: List[ApplicationKafkaStream]
-      ): F[AssemblingApp] = {
+      ): F[Application] = {
         for {
           _ <- checkApplicationName(name)
           versions <- executionGraph.stages.traverse { f =>
@@ -93,22 +89,28 @@ object ApplicationDeployer extends Logging {
                   }
                   deploymentConfig <- m.deploymentConfigName.traverse(deploymentConfigService.get)
                 } yield {
-                  DeploymentVersionVariant(internalVersion, m.weight, deploymentConfig)
+                  ApplicationServable(
+                    modelVersion = internalVersion,
+                    weight = m.weight,
+                    requiredDeploymentConfig = deploymentConfig,
+                    servable = None
+                  )
                 }
               }
             } yield variants
           }
-          graphOrError = graphComposer.compose(versions)
-          graph <- F.fromEither(graphOrError)
+          graphOrError <- F.fromEither(GraphComposer.compose(versions))
+          (graph, contract) = graphOrError
         } yield
           Application(
             id = 0,
             name = name,
             namespace = namespace,
-            signature = graph.pipelineSignature,
+            signature = contract,
             kafkaStreaming = kafkaStreaming,
             status = Application.Assembling,
-            versionGraph = graph.stages
+            statusMessage = None,
+            graph = graph
           )
       }
 
@@ -132,14 +134,14 @@ object ApplicationDeployer extends Logging {
         } yield name
       }
 
-      private def startServices(app: AssemblingApp) = {
+      private def startServices(app: Application) = {
         for {
-          deployedServables <- app.versionGraph.traverse { stage =>
+          deployedStages <- app.graph.stages.traverse { stage =>
             for {
-              variants <- stage.modelVariants.traverse { i =>
+              variants <- stage.variants.traverse { i =>
                 for {
-                  _ <- F.delay(logger.debug(s"Deploying ${i.item.fullName}"))
-                  result <- servableService.deploy(i.item, i.deploymentConfig, Map.empty)  // NOTE maybe infer some app-specific labels?
+                  _ <- F.delay(logger.debug(s"Deploying ${i.modelVersion.fullName}"))
+                  result <- servableService.deploy(i.modelVersion, i.requiredDeploymentConfig, Map.empty)  // NOTE maybe infer some app-specific labels?
                   servable <- result.completed.get
                   okServable <- servable.status match {
                     case _: Servable.Serving =>
@@ -151,11 +153,11 @@ object ApplicationDeployer extends Logging {
                     case Servable.Starting(msg, _, _) =>
                       F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
                   }
-                } yield Variant(okServable, i.weight)
+                } yield i.copy(servable = okServable.some)
               }
-            } yield ExecutionNode(variants, stage.signature)
+            } yield ApplicationStage(variants, stage.signature)
           }
-          finishedApp = app.copy(status = Application.Ready(deployedServables))
+          finishedApp = app.copy(status = Application.Ready, graph = ApplicationGraph(deployedStages))
         } yield finishedApp
       }
     }

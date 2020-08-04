@@ -1,7 +1,9 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
+import cats.data.NonEmptyList
 import cats.effect.Bracket
 import cats.implicits._
+import doobie.Fragments
 import doobie.implicits._
 import doobie.util.Meta
 import doobie.util.transactor.Transactor
@@ -62,6 +64,11 @@ object DBDeploymentConfigurationRepository {
     |)""".stripMargin.update
 
   def getByNameQ(name: String): doobie.Query0[DeploymentConfiguration] = sql"SELECT * FROM hydro_serving.deployment_configuration WHERE name = $name".query[DeploymentConfiguration]
+
+  def getManyQ(names: NonEmptyList[String]): doobie.Query0[DeploymentConfiguration] = {
+    val frag = fr"SELECT * FROM hydro_serving.deployment_configuration WHERE " ++ Fragments.in(fr"service_name", names)
+    frag.query[DeploymentConfiguration]
+  }
 
   def deleteQ(name: String): doobie.Update0 = sql"DELETE FROM hydro_serving.deployment_configuration WHERE name = $name".update
 }

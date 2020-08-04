@@ -9,3 +9,5 @@ CREATE TABLE hydro_serving.deployment_configuration(
     deployment JSON,
     hpa JSON
 );
+
+ALTER TABLE hydro_serving.servable ADD COLUMN deployment_configuration VARCHAR(255) REFERENCES deployment_configuration(name);

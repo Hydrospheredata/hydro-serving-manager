@@ -56,7 +56,6 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           modelName = model.name,
           contract = ModelContract.defaultInstance,
           runtime = DockerImage("run", "time"),
-          hostSelector = None,
           installCommand = None,
           metadata = Map.empty
         )
@@ -145,7 +144,6 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           modelName = model.name,
           contract = ModelContract.defaultInstance,
           runtime = DockerImage("run", "time"),
-          hostSelector = None,
           installCommand = None,
           metadata = Map.empty
         )
