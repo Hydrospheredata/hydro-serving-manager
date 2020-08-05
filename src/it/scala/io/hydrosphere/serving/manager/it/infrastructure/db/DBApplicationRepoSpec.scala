@@ -12,6 +12,7 @@ import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Variant}
 import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
@@ -31,7 +32,8 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
     runtime = dummyImage,
     contract = ModelContract(
       predict = signature.some
-    ).some
+    ).some,
+    monitoringConfiguration = Some(MonitoringConfiguration())
   )
   var mv1: ModelVersion.Internal = _
   var servable: Servable.OkServable = _

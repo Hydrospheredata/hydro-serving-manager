@@ -13,5 +13,5 @@ case class ModelUploadMetadata(
   profileTypes: Option[Map[String, DataProfileType]] = None,
   installCommand: Option[String] = None,
   metadata: Option[Map[String, String]] = None,
-  monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration()
+  monitoringConfiguration: Option[MonitoringConfiguration]
 )

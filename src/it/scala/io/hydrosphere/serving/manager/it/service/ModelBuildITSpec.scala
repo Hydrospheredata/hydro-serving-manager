@@ -7,6 +7,7 @@ import com.spotify.docker.client.messages.ContainerConfig
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionStatus
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 
 import scala.concurrent.duration._
@@ -20,7 +21,8 @@ class ModelBuildITSpec extends FullIntegrationSpec {
     runtime = DockerImage(
       name = "hydrosphere/serving-runtime-dummy",
       tag = "latest"
-    )
+    ),
+    monitoringConfiguration = Some(MonitoringConfiguration())
   )
 
   describe("Model serivce") {

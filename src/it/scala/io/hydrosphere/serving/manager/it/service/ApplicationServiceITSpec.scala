@@ -10,6 +10,7 @@ import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 import org.scalatest.BeforeAndAfterAll
@@ -26,21 +27,24 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
     runtime = dummyImage,
     contract = Some(ModelContract(
       predict = Some(signature)
-    ))
+    )),
+    monitoringConfiguration = Some(MonitoringConfiguration())
   )
   private val upload2 = ModelUploadMetadata(
     name = "m2",
     runtime = dummyImage,
     contract = Some(ModelContract(
       predict = Some(signature)
-    ))
+    )),
+    monitoringConfiguration = Some(MonitoringConfiguration())
   )
   private val upload3 = ModelUploadMetadata(
     name = "m3",
     runtime = dummyImage,
     contract = Some(ModelContract(
       predict = Some(signature)
-    ))
+    )),
+    monitoringConfiguration = Some(MonitoringConfiguration())
   )
 
   var mv1: ModelVersion.Internal = _

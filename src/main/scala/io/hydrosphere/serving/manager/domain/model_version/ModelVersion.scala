@@ -19,7 +19,7 @@ sealed trait ModelVersion extends Product with Serializable {
   def model: Model
   def metadata: Map[String, String]
   def fullName: String
-  def monitoringConfiguration: MonitoringConfiguration
+  def monitoringConfiguration: Option[MonitoringConfiguration]
 }
 
 object ModelVersion {
@@ -37,7 +37,7 @@ object ModelVersion {
     status: ModelVersionStatus,
     installCommand: Option[String],
     metadata: Map[String, String],
-    monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration(),
+    monitoringConfiguration: Option[MonitoringConfiguration],
   ) extends ModelVersion {
     def fullName: String = s"${model.name}:$modelVersion"
   }
@@ -49,7 +49,7 @@ object ModelVersion {
     modelContract: ModelContract,
     model: Model,
     metadata: Map[String, String],
-    monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration(),
+    monitoringConfiguration: Option[MonitoringConfiguration],
   ) extends ModelVersion {
     def fullName: String = s"${model.name}:$modelVersion"
   }

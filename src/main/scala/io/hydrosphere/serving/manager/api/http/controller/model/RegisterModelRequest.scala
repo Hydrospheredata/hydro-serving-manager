@@ -7,5 +7,5 @@ case class RegisterModelRequest(
   name: String,
   contract: ModelContract,
   metadata: Option[Map[String, String]] = None,
-  monitoringConfiguration: MonitoringConfiguration
+  monitoringConfiguration: Option[MonitoringConfiguration]
 )

@@ -58,7 +58,8 @@ object Converters {
           imageSha = imv.image.sha256.getOrElse(""),
           runtime = grpc.entities.DockerImage(imv.runtime.name, imv.runtime.tag).some,
           metadata = imv.metadata,
-          monitoringConfiguration = imv.monitoringConfiguration.toGrpc.some
+          // FIXME: make grpc
+          monitoringConfiguration = Option(grpc.entities.MonitoringConfiguration(batchSize=imv.monitoringConfiguration.get.batch_size))
         )
       case emv: ModelVersion.External =>
         grpc.entities.ModelVersion(
@@ -68,7 +69,8 @@ object Converters {
           model = emv.model.toGrpc.some,
           contract = emv.modelContract.some,
           metadata = emv.metadata,
-          monitoringConfiguration = emv.monitoringConfiguration.toGrpc.some
+          // FIXME: make grpc
+          monitoringConfiguration = Option(grpc.entities.MonitoringConfiguration(batchSize=emv.monitoringConfiguration.get.batch_size))
         )
     }
   }

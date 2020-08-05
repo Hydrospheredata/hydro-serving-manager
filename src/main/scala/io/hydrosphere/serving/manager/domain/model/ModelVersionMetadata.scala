@@ -18,7 +18,7 @@ case class ModelVersionMetadata(
   hostSelector: Option[HostSelector],
   installCommand: Option[String],
   metadata: Map[String, String],
-  monitoringConfiguration: MonitoringConfiguration
+  monitoringConfiguration: Option[MonitoringConfiguration]
 )
 
 object ModelVersionMetadata {

@@ -40,7 +40,7 @@ object DBModelVersionRepository {
     install_command: Option[String],
     metadata: Option[String],
     is_external: Boolean,
-    monitoring_configuration: MonitoringConfiguration = MonitoringConfiguration()
+    monitoring_configuration: Option[MonitoringConfiguration]
   )
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
@@ -145,12 +145,15 @@ object DBModelVersionRepository {
 
   def toModelVersionT = (toModelVersion _).tupled
 
+  implicit val han = LogHandler.jdkLogHandler
+
+
   def allQ: doobie.Query0[JoinedModelVersionRow] = {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |  LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
-         |""".stripMargin.query[JoinedModelVersionRow]
+         |""".stripMargin.queryWithLogHandler[JoinedModelVersionRow](LogHandler.jdkLogHandler)
   }
 
   def getQ(id: Long): doobie.Query0[JoinedModelVersionRow] = {
@@ -159,7 +162,7 @@ object DBModelVersionRepository {
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE hydro_serving.model_version.model_version_id = $id
-         |""".stripMargin.query[JoinedModelVersionRow]
+         |""".stripMargin.queryWithLogHandler[JoinedModelVersionRow](LogHandler.jdkLogHandler)
   }
 
   def getQ(name: String, version: Long): doobie.Query0[JoinedModelVersionRow] = {
@@ -168,7 +171,7 @@ object DBModelVersionRepository {
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE hydro_serving.model.name = $name AND model_version = $version
-         |""".stripMargin.query[JoinedModelVersionRow]
+         |""".stripMargin.queryWithLogHandler[JoinedModelVersionRow](LogHandler.jdkLogHandler)
   }
 
   def listVersionsQ(modelId: Long): doobie.Query0[JoinedModelVersionRow] = {
@@ -177,7 +180,7 @@ object DBModelVersionRepository {
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE hydro_serving.model_version.model_id = $modelId
-         |""".stripMargin.query[JoinedModelVersionRow]
+         |""".stripMargin.queryWithLogHandler[JoinedModelVersionRow](LogHandler.jdkLogHandler)
   }
 
   def findVersionsQ(versionIdx: NonEmptyList[Long]): doobie.Query0[JoinedModelVersionRow] = {
@@ -188,7 +191,7 @@ object DBModelVersionRepository {
           |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
           |  WHERE """.stripMargin
     val fullQ = q ++ Fragments.in(fr"hydro_serving.model_version.model_version_id", versionIdx)
-    fullQ.query[JoinedModelVersionRow]
+    fullQ.queryWithLogHandler[JoinedModelVersionRow](LogHandler.jdkLogHandler)
   }
 
   def lastModelVersionQ(modelId: Long): doobie.Query0[JoinedModelVersionRow] = {
@@ -199,7 +202,7 @@ object DBModelVersionRepository {
          |  WHERE hydro_serving.model_version.model_id = $modelId
          |  ORDER BY hydro_serving.model_version.model_version DESC
          |  LIMIT 1
-         |""".stripMargin.query[JoinedModelVersionRow]
+         |""".stripMargin.queryWithLogHandler[JoinedModelVersionRow](LogHandler.jdkLogHandler)
   }
 
   def insertQ(mv: ModelVersionRow): doobie.Update0 = {

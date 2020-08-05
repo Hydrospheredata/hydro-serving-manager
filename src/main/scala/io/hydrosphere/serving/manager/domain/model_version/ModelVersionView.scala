@@ -23,7 +23,7 @@ case class ModelVersionView(
   runtime: Option[DockerImage],
   hostSelector: Option[HostSelector],
   isExternal: Boolean,
-  monitoringConfiguration: MonitoringConfiguration
+  monitoringConfiguration: Option[MonitoringConfiguration]
 )
 
 object ModelVersionView {
