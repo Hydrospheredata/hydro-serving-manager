@@ -10,6 +10,8 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersionStatus.Mo
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import java.time.LocalDateTime
 
+import spray.json.JsValue
+
 sealed trait ModelVersion extends Product with Serializable {
   def id: Long
   def modelContract: ModelContract
@@ -17,6 +19,7 @@ sealed trait ModelVersion extends Product with Serializable {
   def model: Model
   def metadata: Map[String, String]
   def fullName: String
+  def monitoringConfiguration: JsValue
 }
 
 object ModelVersion {
@@ -33,7 +36,8 @@ object ModelVersion {
     hostSelector: Option[HostSelector],
     status: ModelVersionStatus,
     installCommand: Option[String],
-    metadata: Map[String, String]
+    metadata: Map[String, String],
+    monitoringConfiguration: JsValue
   ) extends ModelVersion {
     def fullName: String = s"${model.name}:$modelVersion"
   }
@@ -45,6 +49,7 @@ object ModelVersion {
     modelContract: ModelContract,
     model: Model,
     metadata: Map[String, String],
+    monitoringConfiguration: JsValue
   ) extends ModelVersion {
     def fullName: String = s"${model.name}:$modelVersion"
   }

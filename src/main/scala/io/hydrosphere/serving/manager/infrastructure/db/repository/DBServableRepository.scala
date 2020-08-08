@@ -18,6 +18,7 @@ import cats.data.OptionT
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import spray.json._
+import io.hydrosphere.serving.manager.util.SprayDoobie._
 
 
 object DBServableRepository {

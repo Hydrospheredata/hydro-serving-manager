@@ -3,6 +3,8 @@ package io.hydrosphere.serving.manager.domain.model_build
 import java.nio.file.Path
 import java.time.Instant
 
+import spray.json._
+import DefaultJsonProtocol._ // if you don't supply your own Protocol (see below)
 import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
@@ -59,6 +61,7 @@ object ModelVersionBuilder {
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
           metadata = metadata.metadata,
+          monitoringConfiguration =  """{ "some": "JSON source" }""".parseJson
         )
         modelVersion <- modelVersionRepository.create(mv)
       } yield mv.copy(id = modelVersion.id)

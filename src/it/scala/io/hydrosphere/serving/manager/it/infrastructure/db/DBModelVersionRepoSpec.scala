@@ -11,6 +11,8 @@ import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelV
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
+import spray.json._
+import DefaultJsonProtocol._
 
 class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor
@@ -36,7 +38,8 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       profile_types = None,
       install_command = Some("echo 123"),
       metadata = Some("{}"),
-      is_external = false
+      is_external = false,
+      monitoring_configuration = """{ "some": "JSON source" }""".parseJson
     )
     it("should have valid queries") {
       check(DBModelVersionRepository.allQ)
@@ -59,7 +62,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
     }
 
     it("should insert a external version") {
-      val ev = ModelVersion.External(0, Instant.now(), 1337, ModelContract.defaultInstance, model, Map.empty)
+      val ev = ModelVersion.External(0, Instant.now(), 1337, ModelContract.defaultInstance, model, Map.empty, """{ "some": "JSON source" }""".parseJson)
       val q = for {
         result <- app.core.repos.versionRepo.create(ev)
         got <- app.core.repos.versionRepo.get(result.id)
@@ -146,7 +149,8 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
         hostSelector = None,
         status = ModelVersionStatus.Released,
         installCommand = Some("echo 123"),
-        metadata = Map("author" -> "me")
+        metadata = Map("author" -> "Ben"),
+        monitoringConfiguration = """{ "some": "JSON source" }""".parseJson
       )
     }
     f.unsafeRunSync()

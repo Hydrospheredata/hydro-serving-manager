@@ -2,6 +2,8 @@ package io.hydrosphere.serving.manager.domain.model
 
 import java.nio.file.Path
 
+import spray.json._
+import DefaultJsonProtocol._ // if you don't supply your own Protocol (see below)
 import cats.data.OptionT
 import cats.effect.Clock
 import cats.implicits._
@@ -157,6 +159,7 @@ object ModelService {
           modelContract = modelReq.contract,
           model = parentModel,
           metadata = modelReq.metadata.getOrElse(Map.empty),
+          monitoringConfiguration = """{ "some": "JSON source" }""".parseJson
         )
         ver <- modelVersionRepository.create(mv)
       } yield mv.copy(id = ver.id)

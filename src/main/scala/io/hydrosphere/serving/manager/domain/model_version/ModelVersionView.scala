@@ -2,11 +2,14 @@ package io.hydrosphere.serving.manager.domain.model_version
 
 import java.time.Instant
 
+import spray.json._
+import DefaultJsonProtocol._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
+import spray.json.JsValue
 
 case class ModelVersionView(
   id: Long,
@@ -21,7 +24,8 @@ case class ModelVersionView(
   image: Option[DockerImage],
   runtime: Option[DockerImage],
   hostSelector: Option[HostSelector],
-  isExternal: Boolean
+  isExternal: Boolean,
+  monitoringConfiguration: JsValue
 )
 
 object ModelVersionView {
@@ -41,9 +45,10 @@ object ModelVersionView {
           status = internalMV.status.toString,
           applications = applications.map(_.name),
           metadata = internalMV.metadata,
-          isExternal = false
+          isExternal = false,
+          monitoringConfiguration =  """{ "some": "JSON source" }""".parseJson
         )
-      case ModelVersion.External(id, created, modelVersion, modelContract, model, metadata) =>
+      case ModelVersion.External(id, created, modelVersion, modelContract, model, metadata, monitoringConfiguration) =>
         ModelVersionView(
           id = id,
           image = None,
@@ -57,7 +62,8 @@ object ModelVersionView {
           status = ModelVersionStatus.Released.toString,
           applications = Nil,
           metadata = metadata,
-          isExternal = true
+          isExternal = true,
+          monitoringConfiguration =  """{ "some": "JSON source" }""".parseJson
         )
     }
   }

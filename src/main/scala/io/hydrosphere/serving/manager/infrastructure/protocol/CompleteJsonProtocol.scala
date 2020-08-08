@@ -39,7 +39,7 @@ trait CompleteJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol 
 
   implicit val modelUpload = jsonFormat7(ModelUploadMetadata.apply)
 
-  implicit val versionView = jsonFormat13(ModelVersionView.apply)
+  implicit val versionView = jsonFormat14(ModelVersionView.apply)
   implicit val deployModelFormat = jsonFormat3(DeployModelRequest.apply)
 
   implicit val appView = jsonFormat8(ApplicationView.apply)

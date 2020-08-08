@@ -14,6 +14,8 @@ import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository.MetricSpecRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
+import spray.json._
+import DefaultJsonProtocol._
 
 class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
   implicit val transactor = app.transactor
@@ -108,7 +110,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mvOld = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
+      mvOld = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty, """{ "some": "JSON source" }""".parseJson)
       mv <- app.core.repos.versionRepo.create(mvOld)
       mvNew = mvOld.copy(id = mv.id)
       serv = Servable(mvNew, "test-servable", Servable.Serving("ok", "here", 90), Nil, Map.empty)
