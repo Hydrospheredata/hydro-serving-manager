@@ -20,7 +20,7 @@ import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, MonitoringRepository}
+import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, MonitoringConfiguration, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableMonitor.MonitoringEntry
 import io.hydrosphere.serving.manager.domain.servable._
@@ -45,7 +45,8 @@ class ServableSpec extends GenericUnitTest {
     modelVersion = 1,
     modelContract = ModelContract.defaultInstance,
     model = Model(1, "name"),
-    metadata = Map.empty
+    metadata = Map.empty,
+    monitoringConfiguration = MonitoringConfiguration.defaultValue
   )
   val mv = ModelVersion.Internal(
     id = 10,
@@ -59,7 +60,8 @@ class ServableSpec extends GenericUnitTest {
     hostSelector = None,
     status = ModelVersionStatus.Released,
     installCommand = None,
-    metadata = Map.empty
+    metadata = Map.empty,
+    monitoringConfiguration = MonitoringConfiguration.defaultValue
   )
   val servable = Servable(mv, "test", Servable.Starting("Init", None, None), Nil)
 
@@ -459,7 +461,8 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        monitoringConfiguration = MonitoringConfiguration.defaultValue
       )
 
       val initServable = Servable(
@@ -556,7 +559,8 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        monitoringConfiguration = MonitoringConfiguration.defaultValue
       )
 
       val initServable = Servable(
@@ -653,7 +657,8 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        monitoringConfiguration = MonitoringConfiguration.defaultValue
       )
 
       val s1 = Servable(
@@ -710,7 +715,8 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Released,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        monitoringConfiguration = MonitoringConfiguration.defaultValue
       )
 
       val servableMonitor = new ServableMonitor[IO] {
@@ -777,7 +783,8 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        monitoringConfiguration = MonitoringConfiguration.defaultValue
       )
 
       val servableMonitor = new ServableMonitor[IO] {

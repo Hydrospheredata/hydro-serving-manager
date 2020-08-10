@@ -4,7 +4,7 @@ import java.nio.file.Path
 import java.time.Instant
 
 import spray.json._
-import DefaultJsonProtocol._ // if you don't supply your own Protocol (see below)
+import DefaultJsonProtocol._
 import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
@@ -14,6 +14,7 @@ import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -61,7 +62,7 @@ object ModelVersionBuilder {
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
           metadata = metadata.metadata,
-          monitoringConfiguration =  """{ "some": "JSON source" }""".parseJson
+          monitoringConfiguration =  MonitoringConfiguration.defaultValue
         )
         modelVersion <- modelVersionRepository.create(mv)
       } yield mv.copy(id = modelVersion.id)

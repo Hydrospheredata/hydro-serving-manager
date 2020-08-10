@@ -18,6 +18,7 @@ import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.ApplicationMigrationTool
@@ -78,7 +79,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       }
       val modelVersion = ModelVersion.Internal(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
         ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,
-        ModelVersionStatus.Released, None, Map.empty
+        ModelVersionStatus.Released, None, Map.empty, MonitoringConfiguration.defaultValue
       )
       val appGraph = NonEmptyList.of(
         PipelineStage(
@@ -170,7 +171,8 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty
+        metadata = Map.empty,
+        monitoringConfiguration = MonitoringConfiguration.defaultValue
       )
       val servable = Servable(mv, "kek", Servable.Serving("Ok", "host", 9090), Nil)
       val sMap = Map(
@@ -222,7 +224,7 @@ class ApplicationMigrationToolSpec extends GenericUnitTest {
       }
       val modelVersion = ModelVersion.Internal(1, DockerImage("asd", "asd"), Instant.now(), None, 1,
         ModelContract.defaultInstance, DockerImage("rrr", "rrr"), Model(1, "aaa"), None,
-        ModelVersionStatus.Released, None, Map.empty
+        ModelVersionStatus.Released, None, Map.empty, MonitoringConfiguration.defaultValue
       )
       val appGraph = NonEmptyList.of(
         PipelineStage(

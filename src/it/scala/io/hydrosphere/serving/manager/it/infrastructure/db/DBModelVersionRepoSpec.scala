@@ -8,6 +8,7 @@ import doobie.scalatest.IOChecker
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
@@ -39,7 +40,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       install_command = Some("echo 123"),
       metadata = Some("{}"),
       is_external = false,
-      monitoring_configuration = """{ "some": "JSON source" }""".parseJson
+      monitoring_configuration = MonitoringConfiguration.defaultValue
     )
     it("should have valid queries") {
       check(DBModelVersionRepository.allQ)
@@ -62,7 +63,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
     }
 
     it("should insert a external version") {
-      val ev = ModelVersion.External(0, Instant.now(), 1337, ModelContract.defaultInstance, model, Map.empty, """{ "some": "JSON source" }""".parseJson)
+      val ev = ModelVersion.External(0, Instant.now(), 1337, ModelContract.defaultInstance, model, Map.empty, MonitoringConfiguration.defaultValue)
       val q = for {
         result <- app.core.repos.versionRepo.create(ev)
         got <- app.core.repos.versionRepo.get(result.id)
@@ -149,8 +150,8 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
         hostSelector = None,
         status = ModelVersionStatus.Released,
         installCommand = Some("echo 123"),
-        metadata = Map("author" -> "Ben"),
-        monitoringConfiguration = """{ "some": "JSON source" }""".parseJson
+        metadata = Map("author" -> "me"),
+        monitoringConfiguration = MonitoringConfiguration.defaultValue
       )
     }
     f.unsafeRunSync()

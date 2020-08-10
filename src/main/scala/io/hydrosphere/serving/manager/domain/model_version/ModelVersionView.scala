@@ -46,24 +46,24 @@ object ModelVersionView {
           applications = applications.map(_.name),
           metadata = internalMV.metadata,
           isExternal = false,
-          monitoringConfiguration =  """{ "some": "JSON source" }""".parseJson
+          monitoringConfiguration =  internalMV.monitoringConfiguration
         )
-      case ModelVersion.External(id, created, modelVersion, modelContract, model, metadata, monitoringConfiguration) =>
+      case externalMV: ModelVersion.External =>
         ModelVersionView(
-          id = id,
+          id = externalMV.id,
           image = None,
-          created = created,
-          finished = Some(created),
-          modelVersion = modelVersion,
-          modelContract = modelContract,
+          created = externalMV.created,
+          finished = Some(externalMV.created),
+          modelVersion = externalMV.modelVersion,
+          modelContract = externalMV.modelContract,
           runtime = None,
-          model = model,
+          model = externalMV.model,
           hostSelector = None,
           status = ModelVersionStatus.Released.toString,
           applications = Nil,
-          metadata = metadata,
+          metadata = externalMV.metadata,
           isExternal = true,
-          monitoringConfiguration =  """{ "some": "JSON source" }""".parseJson
+          monitoringConfiguration = externalMV.monitoringConfiguration
         )
     }
   }

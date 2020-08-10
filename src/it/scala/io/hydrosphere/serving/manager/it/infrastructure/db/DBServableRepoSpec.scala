@@ -19,6 +19,7 @@ import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 import spray.json._
 import DefaultJsonProtocol._
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 
 class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor
@@ -68,7 +69,7 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty, """{ "some": "JSON source" }""".parseJson)
+      mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty, MonitoringConfiguration.defaultValue)
       mv <- app.core.repos.versionRepo.create(mv)
     } yield {
       println(s"Created: $mv")
