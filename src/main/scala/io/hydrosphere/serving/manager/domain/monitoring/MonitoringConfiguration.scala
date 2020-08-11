@@ -4,5 +4,5 @@ import spray.json._
 
 
 object MonitoringConfiguration {
-  val defaultValue: JsValue = """{ "batch_size": "100" }""".parseJson
+  val defaultValue: JsValue = """{ "batch_size": 100 }""".parseJson
 }

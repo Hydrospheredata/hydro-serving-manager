@@ -159,8 +159,7 @@ object ModelService {
           modelVersion = version,
           modelContract = modelReq.contract,
           model = parentModel,
-          metadata = modelReq.metadata.getOrElse(Map.empty),
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = modelReq.metadata.getOrElse(Map.empty)
         )
         ver <- modelVersionRepository.create(mv)
       } yield mv.copy(id = ver.id)

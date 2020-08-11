@@ -46,7 +46,7 @@ object ModelVersionView {
           applications = applications.map(_.name),
           metadata = internalMV.metadata,
           isExternal = false,
-          monitoringConfiguration =  internalMV.monitoringConfiguration
+          monitoringConfiguration = internalMV.monitoringConfiguration
         )
       case externalMV: ModelVersion.External =>
         ModelVersionView(
