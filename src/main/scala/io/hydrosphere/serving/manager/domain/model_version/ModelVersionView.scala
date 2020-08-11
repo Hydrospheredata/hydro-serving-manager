@@ -9,6 +9,7 @@ import io.hydrosphere.serving.manager.domain.application.Application.GenericAppl
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import spray.json.JsValue
 
 case class ModelVersionView(
@@ -25,7 +26,7 @@ case class ModelVersionView(
   runtime: Option[DockerImage],
   hostSelector: Option[HostSelector],
   isExternal: Boolean,
-  monitoringConfiguration: JsValue
+  monitoringConfiguration: JsValue = MonitoringConfiguration.defaultValue
 )
 
 object ModelVersionView {
