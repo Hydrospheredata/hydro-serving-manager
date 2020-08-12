@@ -12,5 +12,5 @@ object MonitoringConfiguration {
     new MonitoringConfiguration(batchSize)
   }
 
-  implicit val JSONFormat = jsonFormat1(MonitoringConfiguration.apply)
+  implicit val JSONFormat: RootJsonFormat[MonitoringConfiguration] = jsonFormat1(MonitoringConfiguration.apply)
 }
