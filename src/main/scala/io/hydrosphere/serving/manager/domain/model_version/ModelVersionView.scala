@@ -26,7 +26,7 @@ case class ModelVersionView(
   runtime: Option[DockerImage],
   hostSelector: Option[HostSelector],
   isExternal: Boolean,
-  monitoringConfiguration: JsValue = MonitoringConfiguration.defaultValue
+  monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration()
 )
 
 object ModelVersionView {

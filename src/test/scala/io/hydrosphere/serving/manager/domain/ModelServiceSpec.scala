@@ -23,7 +23,6 @@ import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model._
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
@@ -120,8 +119,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = Map.empty
         )
 
         val uploadFile = Paths.get("123123")
@@ -214,8 +212,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = Map.empty
         )
         val upload = ModelUploadMetadata(
           name = modelName,
@@ -331,8 +328,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = Map.empty
         )
         val app = Application(
           id = 1,
@@ -357,8 +353,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = Map.empty
         )
         val servable = Servable(
           modelVersion = servableFailedVersion,
@@ -380,8 +375,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = Map.empty
         )
         val okVersion2 = ModelVersion.Internal(
           id = 4,
@@ -395,8 +389,7 @@ class ModelServiceSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
-          metadata = Map.empty,
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = Map.empty
         )
         val modelRepo = new ModelRepository[IO] {
           override def create(entity: Model): IO[Model] = ???

@@ -5,7 +5,6 @@ import doobie.{Get, Put}
 import org.postgresql.util.PGobject
 import spray.json._
 
-//import scala.reflect.runtime.universe._
 
 object SprayDoobie {
   implicit val jsonGet: Get[JsValue] =
@@ -20,4 +19,5 @@ object SprayDoobie {
       o.setValue(j.compactPrint)
       o
     }
+
 }

@@ -45,8 +45,7 @@ class ServableSpec extends GenericUnitTest {
     modelVersion = 1,
     modelContract = ModelContract.defaultInstance,
     model = Model(1, "name"),
-    metadata = Map.empty,
-    monitoringConfiguration = MonitoringConfiguration.defaultValue
+    metadata = Map.empty
   )
   val mv = ModelVersion.Internal(
     id = 10,
@@ -60,8 +59,7 @@ class ServableSpec extends GenericUnitTest {
     hostSelector = None,
     status = ModelVersionStatus.Released,
     installCommand = None,
-    metadata = Map.empty,
-    monitoringConfiguration = MonitoringConfiguration.defaultValue
+    metadata = Map.empty
   )
   val servable = Servable(mv, "test", Servable.Starting("Init", None, None), Nil)
 
@@ -461,8 +459,7 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty,
-        monitoringConfiguration = MonitoringConfiguration.defaultValue
+        metadata = Map.empty
       )
 
       val initServable = Servable(
@@ -559,8 +556,7 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty,
-        monitoringConfiguration = MonitoringConfiguration.defaultValue
+        metadata = Map.empty
       )
 
       val initServable = Servable(
@@ -657,8 +653,7 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty,
-        monitoringConfiguration = MonitoringConfiguration.defaultValue
+        metadata = Map.empty
       )
 
       val s1 = Servable(
@@ -715,8 +710,7 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Released,
         installCommand = None,
-        metadata = Map.empty,
-        monitoringConfiguration = MonitoringConfiguration.defaultValue
+        metadata = Map.empty
       )
 
       val servableMonitor = new ServableMonitor[IO] {
@@ -783,8 +777,7 @@ class ServableSpec extends GenericUnitTest {
         hostSelector = None,
         status = ModelVersionStatus.Assembling,
         installCommand = None,
-        metadata = Map.empty,
-        monitoringConfiguration = MonitoringConfiguration.defaultValue
+        metadata = Map.empty
       )
 
       val servableMonitor = new ServableMonitor[IO] {

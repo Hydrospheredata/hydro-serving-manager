@@ -11,7 +11,6 @@ import io.hydrosphere.serving.manager.api.grpc.ManagerGrpcService
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionService, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.grpc.entities.{ModelVersion => ProtoModelVersion}
@@ -38,8 +37,7 @@ class GrpcSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Assembling,
           installCommand = None,
-          metadata = Map.empty,
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = Map.empty
         )
       ))
       when(versionService.get(1000)).thenReturn(IO.raiseError(new IllegalArgumentException("1000")))
@@ -78,8 +76,7 @@ class GrpcSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Assembling,
           installCommand = None,
-          metadata = Map.empty,
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = Map.empty
         ),
         ModelVersion.Internal(
           id = 2,
@@ -93,8 +90,7 @@ class GrpcSpec extends GenericUnitTest {
           hostSelector = None,
           status = ModelVersionStatus.Assembling,
           installCommand = None,
-          metadata = Map.empty,
-          monitoringConfiguration = MonitoringConfiguration.defaultValue
+          metadata = Map.empty
         )
       )))
 

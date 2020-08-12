@@ -18,7 +18,6 @@ import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.domain.servable.Servable._
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableGC, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -46,8 +45,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
     hostSelector = None,
     status = ModelVersionStatus.Released,
     installCommand = None,
-    metadata = Map.empty,
-    monitoringConfiguration = MonitoringConfiguration.defaultValue
+    metadata = Map.empty
   )
   val externalMv = ModelVersion.External(
     id = 1,
@@ -55,8 +53,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
     modelVersion = 1,
     modelContract = contract,
     model = Model(1, "model"),
-    metadata = Map.empty,
-    monitoringConfiguration = MonitoringConfiguration.defaultValue
+    metadata = Map.empty
   )
 
   describe("Application Deployer") {

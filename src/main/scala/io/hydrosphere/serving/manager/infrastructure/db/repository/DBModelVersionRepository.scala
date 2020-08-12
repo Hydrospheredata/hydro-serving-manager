@@ -7,6 +7,7 @@ import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.util.SprayDoobie._
+import io.hydrosphere.serving.manager.domain.monitoring.{MCDefault, MonitoringConfiguration}
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -21,6 +22,7 @@ import java.time.Instant
 import cats.data.NonEmptyList
 
 object DBModelVersionRepository {
+
   final case class ModelVersionRow(
     model_version_id: Long,
     model_id: Long,
@@ -39,7 +41,7 @@ object DBModelVersionRepository {
     install_command: Option[String],
     metadata: Option[String],
     is_external: Boolean,
-    monitoring_configuration: JsValue
+    monitoring_configuration: JsValue = MCDefault.JsValue
   )
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
@@ -60,6 +62,9 @@ object DBModelVersionRepository {
     )
     val contract = mvr.model_contract.parseJson.convertTo[ModelContract]
     val metadata = mvr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
+    // FIXME: import is here because otherwise it messes with above convertTo methods
+    import io.hydrosphere.serving.manager.domain.monitoring.MCProtocol._
+
     if (mvr.is_external) {
       ModelVersion.External(
         id = mvr.model_version_id,
@@ -68,7 +73,7 @@ object DBModelVersionRepository {
         modelContract = contract,
         model = model,
         metadata = metadata,
-        monitoringConfiguration = mvr.monitoring_configuration
+        monitoringConfiguration = mvr.monitoring_configuration.convertTo[MonitoringConfiguration]
 
       )
     } else {
@@ -91,12 +96,15 @@ object DBModelVersionRepository {
         status = ModelVersionStatus.withName(mvr.status),
         installCommand = mvr.install_command,
         metadata = metadata,
-        monitoringConfiguration = mvr.monitoring_configuration
+        monitoringConfiguration = mvr.monitoring_configuration.convertTo[MonitoringConfiguration]
       )
     }
   }
 
   def fromModelVersion(amv: ModelVersion): ModelVersionRow = {
+    // FIXME: import is here because otherwise it messes with other convertTo methods
+    import io.hydrosphere.serving.manager.domain.monitoring.MCProtocol._
+
     amv match {
       case mv: ModelVersion.Internal =>
         ModelVersionRow(
@@ -115,9 +123,11 @@ object DBModelVersionRepository {
           status = mv.status.toString,
           profile_types = None,
           install_command = mv.installCommand,
-          metadata = if(mv.metadata.nonEmpty) {mv.metadata.toJson.compactPrint.some} else None,
+          metadata = if (mv.metadata.nonEmpty) {
+            mv.metadata.toJson.compactPrint.some
+          } else None,
           is_external = false,
-          monitoring_configuration = mv.monitoringConfiguration
+          monitoring_configuration = mv.monitoringConfiguration.toJson
         )
       case emv: ModelVersion.External =>
         ModelVersionRow(
@@ -136,15 +146,15 @@ object DBModelVersionRepository {
           status = ModelVersionStatus.Released.toString,
           profile_types = None,
           install_command = None,
-          metadata = if(emv.metadata.nonEmpty) {emv.metadata.toJson.compactPrint.some} else None,
+          metadata = if (emv.metadata.nonEmpty) {
+            emv.metadata.toJson.compactPrint.some
+          } else None,
           is_external = true,
-          monitoring_configuration = emv.monitoringConfiguration
+          monitoring_configuration = emv.monitoringConfiguration.toJson
 
         )
     }
   }
-  implicit val han = LogHandler.jdkLogHandler
-
 
   def toModelVersionT = (toModelVersion _).tupled
 
@@ -285,13 +295,13 @@ object DBModelVersionRepository {
       for {
         id <- insertQ(fromModelVersion(entity)).withUniqueGeneratedKeys[Long]("model_version_id").transact(tx)
       } yield entity match {
-        case imv:  ModelVersion.Internal => imv.copy(id = id)
-        case emv:  ModelVersion.External => emv.copy(id = id)
+        case imv: ModelVersion.Internal => imv.copy(id = id)
+        case emv: ModelVersion.External => emv.copy(id = id)
       }
     }
 
     override def update(entity: ModelVersion): F[Int] = {
-      updateQ(fromModelVersion( entity)).run.transact(tx)
+      updateQ(fromModelVersion(entity)).run.transact(tx)
     }
 
     override def get(id: Long): F[Option[ModelVersion]] = {
