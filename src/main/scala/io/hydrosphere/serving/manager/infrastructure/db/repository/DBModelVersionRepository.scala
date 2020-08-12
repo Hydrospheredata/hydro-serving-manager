@@ -41,7 +41,7 @@ object DBModelVersionRepository {
     install_command: Option[String],
     metadata: Option[String],
     is_external: Boolean,
-    monitoring_configuration: JsValue = MonitoringConfiguration.defaultJsValue
+    monitoring_configuration: JsValue = MonitoringConfiguration().toJson
   )
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
@@ -62,8 +62,6 @@ object DBModelVersionRepository {
     )
     val contract = mvr.model_contract.parseJson.convertTo[ModelContract]
     val metadata = mvr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
-    // FIXME: import is here because otherwise it messes with above convertTo methods
-    import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfigurationProtocol._
 
     if (mvr.is_external) {
       ModelVersion.External(
@@ -102,9 +100,6 @@ object DBModelVersionRepository {
   }
 
   def fromModelVersion(amv: ModelVersion): ModelVersionRow = {
-    // FIXME: import is here because otherwise it messes with other convertTo methods
-    import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfigurationProtocol._
-
     amv match {
       case mv: ModelVersion.Internal =>
         ModelVersionRow(
