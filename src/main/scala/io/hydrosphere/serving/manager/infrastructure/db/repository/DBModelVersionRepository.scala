@@ -7,7 +7,7 @@ import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.util.SprayDoobie._
-import io.hydrosphere.serving.manager.domain.monitoring.{MCDefault, MonitoringConfiguration}
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -41,7 +41,7 @@ object DBModelVersionRepository {
     install_command: Option[String],
     metadata: Option[String],
     is_external: Boolean,
-    monitoring_configuration: JsValue = MCDefault.JsValue
+    monitoring_configuration: JsValue = MonitoringConfiguration.defaultJsValue
   )
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
@@ -63,7 +63,7 @@ object DBModelVersionRepository {
     val contract = mvr.model_contract.parseJson.convertTo[ModelContract]
     val metadata = mvr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
     // FIXME: import is here because otherwise it messes with above convertTo methods
-    import io.hydrosphere.serving.manager.domain.monitoring.MCProtocol._
+    import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfigurationProtocol._
 
     if (mvr.is_external) {
       ModelVersion.External(
@@ -103,7 +103,7 @@ object DBModelVersionRepository {
 
   def fromModelVersion(amv: ModelVersion): ModelVersionRow = {
     // FIXME: import is here because otherwise it messes with other convertTo methods
-    import io.hydrosphere.serving.manager.domain.monitoring.MCProtocol._
+    import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfigurationProtocol._
 
     amv match {
       case mv: ModelVersion.Internal =>
@@ -290,8 +290,6 @@ object DBModelVersionRepository {
     }
 
     override def create(entity: ModelVersion): F[ModelVersion] = {
-      print("hello")
-      print(entity)
       for {
         id <- insertQ(fromModelVersion(entity)).withUniqueGeneratedKeys[Long]("model_version_id").transact(tx)
       } yield entity match {

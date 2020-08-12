@@ -6,7 +6,7 @@ import io.hydrosphere.serving.manager.api.http.controller.model.{ModelUploadMeta
 import io.hydrosphere.serving.manager.api.http.controller.servable.DeployModelRequest
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionView
-import io.hydrosphere.serving.manager.domain.monitoring.MCProtocol._
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfigurationProtocol._
 import spray.json._
 
 trait CompleteJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol with ModelJsonProtocol {
