@@ -14,8 +14,7 @@ import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository.MetricSpecRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
-import spray.json._
-import DefaultJsonProtocol._
+
 
 class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
   implicit val transactor = app.transactor

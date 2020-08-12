@@ -17,8 +17,7 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRep
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository.ServableRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
-import spray.json._
-import DefaultJsonProtocol._
+
 
 class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor

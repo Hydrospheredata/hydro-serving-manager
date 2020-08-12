@@ -3,8 +3,6 @@ package io.hydrosphere.serving.manager.domain.model_build
 import java.nio.file.Path
 import java.time.Instant
 
-import spray.json._
-import DefaultJsonProtocol._
 import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
@@ -19,13 +17,13 @@ import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure
 import io.hydrosphere.serving.manager.util.DeferredResult
 import org.apache.logging.log4j.scala.Logging
 
-trait ModelVersionBuilder[F[_]]{
+trait ModelVersionBuilder[F[_]] {
   def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion.Internal]]
 }
 
 object ModelVersionBuilder {
   def apply[F[_] : Concurrent]()(
-  implicit
+    implicit
     dockerClient: DockerdClient[F],
     modelVersionRepository: ModelVersionRepository[F],
     imageRepository: ImageRepository[F],

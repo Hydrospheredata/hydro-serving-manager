@@ -11,7 +11,6 @@ import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import java.time.LocalDateTime
 
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
-import spray.json._
 
 sealed trait ModelVersion extends Product with Serializable {
   def id: Long

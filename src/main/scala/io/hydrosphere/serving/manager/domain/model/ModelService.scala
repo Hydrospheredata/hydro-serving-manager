@@ -2,8 +2,7 @@ package io.hydrosphere.serving.manager.domain.model
 
 import java.nio.file.Path
 
-import spray.json._
-import DefaultJsonProtocol._
+
 import cats.data.OptionT
 import cats.effect.Clock
 import cats.implicits._

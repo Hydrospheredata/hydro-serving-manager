@@ -2,15 +2,12 @@ package io.hydrosphere.serving.manager.domain.model_version
 
 import java.time.Instant
 
-import spray.json._
-import DefaultJsonProtocol._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
-import spray.json.JsValue
 
 case class ModelVersionView(
   id: Long,

@@ -11,8 +11,7 @@ import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelV
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
-import spray.json._
-import DefaultJsonProtocol._
+
 
 class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor
