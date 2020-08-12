@@ -6,7 +6,7 @@ case class MonitoringConfiguration(batchSize: Int)
 
 object MonitoringConfiguration {
   val defaultBatchSize: Int = 100
-  val defaultJsValue: JsValue = """{ "batch_size": 100 }""".parseJson
+  val defaultJsValue: JsValue = s"""{ "batch_size": $defaultBatchSize }""".parseJson
 
   def apply(batchSize: Int = defaultBatchSize): MonitoringConfiguration = {
     new MonitoringConfiguration(batchSize)
