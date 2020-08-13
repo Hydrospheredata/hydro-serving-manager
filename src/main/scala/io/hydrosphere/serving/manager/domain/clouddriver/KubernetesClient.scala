@@ -1,6 +1,4 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
-import java.util.concurrent.Executors
-
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
@@ -55,7 +53,7 @@ object KubernetesClient {
       import LabelSelector.dsl._
       
       val dockerRepoHost = dockerRepoConf.pullHost.getOrElse(dockerRepoConf.host)
-      val image = dockerImage.replaceUser(dockerRepoHost).toTry.get
+      val image = dockerImage.replaceHost(dockerRepoHost).toTry.get
       var podSpec = Pod.Spec().addImagePullSecretRef(config.kubeRegistrySecretName) 
       if (hostSelector.isDefined) {
         hostSelector.get.nodeSelector.foreach(kv => podSpec = podSpec.addNodeSelector(kv))
