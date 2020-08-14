@@ -15,7 +15,10 @@ case class DockerImage(
   def fullName: String = name + ":" + tag
 
   def replaceHost(host: String): Either[Throwable, DockerImage] = name match {
-    case DockerImage.referenceRegexp(_, _, capturedName, _, _) => DockerImage(s"$host/$capturedName", tag, sha256).asRight
+    case DockerImage.referenceRegexp(_, _, capturedName, _, _) => host match {
+      case DockerImage.referenceRegexp(_, capturedHost, _, _, _) => DockerImage(s"$capturedHost/$capturedName", tag, sha256).asRight
+      case _ => DockerImage(capturedName, tag, sha256).asRight
+    }
     case x => new Exception(s"Can't parse image name $x").asLeft
   }
 }
