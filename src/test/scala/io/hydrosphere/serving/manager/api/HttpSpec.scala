@@ -13,7 +13,7 @@ class HttpSpec extends GenericUnitTest {
   describe("DeploymentConfiguraion API") {
     it("should return a json") {
       val container = K8sContainerConfig(
-        requirements = Requirements(
+        resources = Requirements(
           limits = Requirement(
             cpu = "2",
             memory = "2g"

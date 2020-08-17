@@ -36,7 +36,7 @@ package object deploy_config {
   }
 
   final case class K8sContainerConfig(
-    requirements: Option[Requirements],
+    resources: Option[Requirements],
   )
 
   object K8sContainerConfig {

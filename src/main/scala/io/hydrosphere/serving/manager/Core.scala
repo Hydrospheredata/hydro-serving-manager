@@ -32,6 +32,7 @@ case class Repositories[F[_]](
 )
 
 final case class Core[F[_]](
+  deployer: ApplicationDeployer[F],
   repos: Repositories[F],
   buildLoggingService: BuildLoggingService[F],
   deploymentConfigService: DeploymentConfigurationService[F],
@@ -104,6 +105,7 @@ object Core {
 
           val repos = Repositories(appRepo, deploymentConfigRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo, monitoringRepo)
           Core(
+            deployer = appDeployer,
             repos = repos,
             buildLoggingService = buildLoggingService,
             deploymentConfigService = deploymentConfigService,

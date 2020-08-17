@@ -6,7 +6,7 @@ import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfigurat
 import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOperation, ApiResponse, ApiResponses}
 import javax.ws.rs.Path
 
-@Path("/monitoring/metricspec")
+@Path("/deployment_configuration")
 @Api(produces = "application/json", tags = Array("Metric Specifications"))
 class DeploymentConfigController[F[_]: Effect](
   deploymentConfigService: DeploymentConfigurationService[F]
@@ -17,7 +17,7 @@ class DeploymentConfigController[F[_]: Effect](
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "MetricSpec", response = classOf[DeploymentConfiguration], responseContainer = "List"),
   ))
-  val listAll: Route = pathPrefix("deployment-config") {
+  val listAll: Route = path("deployment_configuration") {
     get {
       completeF(deploymentConfigService.all())
     }
@@ -32,7 +32,7 @@ class DeploymentConfigController[F[_]: Effect](
     new ApiResponse(code = 200, message = "DeploymentConfiguration", response = classOf[DeploymentConfiguration]),
     new ApiResponse(code = 404, message = "NotFound"),
   ))
-  val getByName: Route = pathPrefix("deployment-config" / Segment) { name =>
+  val getByName: Route = pathPrefix("deployment_configuration" / Segment) { name =>
     get {
       completeF(deploymentConfigService.get(name))
     }
@@ -47,7 +47,7 @@ class DeploymentConfigController[F[_]: Effect](
     new ApiResponse(code = 200, message = "DeploymentConfiguration", response = classOf[DeploymentConfiguration]),
     new ApiResponse(code = 404, message = "NotFound"),
   ))
-  val deleteByName: Route = pathPrefix("deployment-config" / Segment) { name =>
+  val deleteByName: Route = pathPrefix("deployment_configuration" / Segment) { name =>
     delete {
       completeF(deploymentConfigService.delete(name))
     }
@@ -63,7 +63,7 @@ class DeploymentConfigController[F[_]: Effect](
     new ApiResponse(code = 200, message = "DeploymentConfiguration", response = classOf[DeploymentConfiguration]),
     new ApiResponse(code = 400, message = "BadRequest"),
   ))
-  val create: Route = pathPrefix("deployment-config") {
+  val create: Route = pathPrefix("deployment_configuration") {
     post {
       entity(as[DeploymentConfiguration]) { config =>
         completeF(deploymentConfigService.create(config))
@@ -71,5 +71,5 @@ class DeploymentConfigController[F[_]: Effect](
     }
   }
 
-  val routes: Route = listAll ~ getByName ~ deleteByName ~ create
+  val routes: Route = getByName ~ deleteByName ~ create ~ listAll
 }

@@ -14,6 +14,7 @@ import io.hydrosphere.serving.manager.api.http.controller.model.{ExternalModelCo
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
 import io.hydrosphere.serving.manager.api.http.controller.{DeploymentConfigController, HostSelectorController, MonitoringController, SwaggerDocController}
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
+import io.hydrosphere.serving.manager.domain.application.migrations.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.infrastructure.db.Database
@@ -34,6 +35,7 @@ case class App[F[_]](
   grpcServer: GrpcServer[F],
   httpServer: HttpServer[F],
   transactor: Transactor[F],
+  migrationTool: ApplicationMigrationTool[F]
 )
 
 object App {
@@ -74,6 +76,11 @@ object App {
 
         Resource.liftF(Core.make[F]())
       }
+      migrator = {
+        implicit val tx1 = tx
+        ApplicationMigrationTool
+          .default(core.repos.appRepo, core.repos.versionRepo, cloudDriver, core.deployer, core.repos.servableRepo)
+      }
       grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
       discoveryService = new GrpcServingDiscovery[F](core.appSub, core.servableSub, core.monitoringSub , core.appService, core.servableService, core.repos.monitoringRepository)
       grpc = GrpcServer.default(config, grpcService, discoveryService)
@@ -112,6 +119,6 @@ object App {
         externalModelRoutes = externalModelController.routes,
         deploymentConfRoutes = depConfController.routes
       )
-    } yield App(config, core, grpc, http, tx)
+    } yield App(config, core, grpc, http, tx, migrator)
   }
 }

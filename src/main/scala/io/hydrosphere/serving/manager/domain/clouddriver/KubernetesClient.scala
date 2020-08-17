@@ -69,7 +69,7 @@ object KubernetesClient {
         .withImagePullPolicy(PullPolicy.Always)
         .setEnvVar(DefaultConstants.ENV_APP_PORT, DefaultConstants.DEFAULT_APP_PORT.toString)
 
-      val containerReqs = containerConf.flatMap(_.requirements)
+      val containerReqs = containerConf.flatMap(_.resources)
       containerReqs.flatMap(_.requests).foreach{ req =>
         container = container.addResourceRequest("cpu", req.cpu)
         container = container.addResourceRequest("memory", req.memory)

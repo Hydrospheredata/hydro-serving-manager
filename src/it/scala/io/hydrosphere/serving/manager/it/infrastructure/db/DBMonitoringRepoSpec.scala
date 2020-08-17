@@ -108,7 +108,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mvOld = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
+      mvOld = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, ModelVersionStatus.Released, None, Map.empty)
       mv <- app.core.repos.versionRepo.create(mvOld)
       mvNew = mvOld.copy(id = mv.id)
       serv = Servable(mvNew, "test-servable", Servable.Serving("ok", "here", 90), Nil, Map.empty)

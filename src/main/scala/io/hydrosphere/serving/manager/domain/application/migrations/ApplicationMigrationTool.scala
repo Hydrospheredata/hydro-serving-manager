@@ -119,7 +119,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
                 }.toMap
               }
             _ <- makeAppFromOldAdapter(appRow, versions, servables) match {
-              case Right(_) => F.unit
+              case Right(x) => appsRepo.update(x).void
               case Left(IncompatibleExecutionGraphError(app)) => restoreServables(app).void
               case Left(UsingModelVersionIsMissing(app, graph)) => restoreVersions(app, graph).void
               case Left(UsingServableIsMissing(app, _)) => restoreServables(app).void

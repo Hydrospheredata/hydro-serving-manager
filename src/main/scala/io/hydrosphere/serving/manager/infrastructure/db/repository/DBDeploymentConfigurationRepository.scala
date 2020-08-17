@@ -44,7 +44,12 @@ object DBDeploymentConfigurationRepository {
     json => jsonToPG(json)
   )
 
-  implicit def jsonFormatMeta[T](implicit reader: JsonReader[T], writer: JsonWriter[T], ev: TypeTag[T]): Meta[T] = jsonMeta.timap[T](reader.read)(writer.write)
+  def jsonFormatMeta[T](implicit reader: JsonReader[T], writer: JsonWriter[T], ev: TypeTag[T]): Meta[T] = jsonMeta.timap[T](reader.read)(writer.write)
+
+  implicit val containerMeta = jsonFormatMeta[K8sContainerConfig]
+  implicit val podMeta = jsonFormatMeta[K8sPodConfig]
+  implicit val deploymentMeta = jsonFormatMeta[K8sDeploymentConfig]
+  implicit val hpaMeta = jsonFormatMeta[K8sHorizontalPodAutoscalerConfig]
 
   def allQ: doobie.Query0[DeploymentConfiguration] = sql"SELECT * FROM hydro_serving.deployment_configuration".query[DeploymentConfiguration]
 
@@ -60,13 +65,13 @@ object DBDeploymentConfigurationRepository {
     | ${entity.container},
     | ${entity.pod},
     | ${entity.deployment},
-    | ${entity.hpa},
+    | ${entity.hpa}
     |)""".stripMargin.update
 
   def getByNameQ(name: String): doobie.Query0[DeploymentConfiguration] = sql"SELECT * FROM hydro_serving.deployment_configuration WHERE name = $name".query[DeploymentConfiguration]
 
   def getManyQ(names: NonEmptyList[String]): doobie.Query0[DeploymentConfiguration] = {
-    val frag = fr"SELECT * FROM hydro_serving.deployment_configuration WHERE " ++ Fragments.in(fr"service_name", names)
+    val frag = fr"SELECT * FROM hydro_serving.deployment_configuration WHERE " ++ Fragments.in(fr"name", names)
     frag.query[DeploymentConfiguration]
   }
 
