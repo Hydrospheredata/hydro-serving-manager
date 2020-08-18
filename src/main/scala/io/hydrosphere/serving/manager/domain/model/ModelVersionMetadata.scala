@@ -6,7 +6,7 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.FetcherResult
 
@@ -14,13 +14,12 @@ case class ModelVersionMetadata(
   modelName: String,
   contract: ModelContract,
   runtime: DockerImage,
-  hostSelector: Option[HostSelector],
   installCommand: Option[String],
   metadata: Map[String, String]
 )
 
 object ModelVersionMetadata {
-  def combineMetadata(fetcherResult: Option[FetcherResult], upload: ModelUploadMetadata, hs: Option[HostSelector]): ModelVersionMetadata = {
+  def combineMetadata(fetcherResult: Option[FetcherResult], upload: ModelUploadMetadata): ModelVersionMetadata = {
     val contract = upload.contract
       .orElse(fetcherResult.map(_.modelContract))
       .getOrElse(ModelContract.defaultInstance)
@@ -31,7 +30,6 @@ object ModelVersionMetadata {
       modelName = upload.name,
       contract = contract,
       runtime = upload.runtime,
-      hostSelector = hs,
       installCommand = upload.installCommand,
       metadata = metadata
     )

@@ -8,6 +8,7 @@ import io.grpc.stub.StreamObserver
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.grpc.ManagerGrpcService
+import io.hydrosphere.serving.manager.domain.deploy_config
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionService, ModelVersionStatus}
@@ -34,7 +35,6 @@ class GrpcSpec extends GenericUnitTest {
           modelContract = ModelContract.defaultInstance,
           runtime = DockerImage("asd", "asd"),
           model = Model(1, "asd"),
-          hostSelector = None,
           status = ModelVersionStatus.Assembling,
           installCommand = None,
           metadata = Map.empty
@@ -44,11 +44,11 @@ class GrpcSpec extends GenericUnitTest {
       val s = new ServableService[IO] {
         def all(): IO[List[Servable.GenericServable]] = ???
         def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-        def findAndDeploy(name: String, version: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-        def findAndDeploy(modelId: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         def stop(name: String): IO[GenericServable] = ???
         def get(name: String): IO[GenericServable] = ???
-        def deploy(modelVersion: ModelVersion.Internal, metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(name: String, version: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(modelId: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def deploy(modelVersion: ModelVersion.Internal, deployConfig: Option[deploy_config.DeploymentConfiguration], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
       }
       val grpcApi = new ManagerGrpcService(versionService, s)
 
@@ -73,7 +73,6 @@ class GrpcSpec extends GenericUnitTest {
           modelContract = ModelContract.defaultInstance,
           runtime = DockerImage("asd", "asd"),
           model = Model(1, "asd"),
-          hostSelector = None,
           status = ModelVersionStatus.Assembling,
           installCommand = None,
           metadata = Map.empty
@@ -87,7 +86,6 @@ class GrpcSpec extends GenericUnitTest {
           modelContract = ModelContract.defaultInstance,
           runtime = DockerImage("asd", "asd"),
           model = Model(1, "asd"),
-          hostSelector = None,
           status = ModelVersionStatus.Assembling,
           installCommand = None,
           metadata = Map.empty
@@ -105,11 +103,11 @@ class GrpcSpec extends GenericUnitTest {
       val s = new ServableService[IO] {
         def all(): IO[List[Servable.GenericServable]] = ???
         def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-        def findAndDeploy(name: String, version: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-        def findAndDeploy(modelId: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         def stop(name: String): IO[GenericServable] = ???
-        def deploy(modelVersion: ModelVersion.Internal, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         def get(name: String): IO[GenericServable] = ???
+        def findAndDeploy(name: String, version: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(modelId: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def deploy(modelVersion: ModelVersion.Internal, deployConfig: Option[deploy_config.DeploymentConfiguration], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
       }
       val grpcApi = new ManagerGrpcService(versionService, s)
       grpcApi.getAllVersions(Empty(), observer)
@@ -132,11 +130,11 @@ class GrpcSpec extends GenericUnitTest {
       val s = new ServableService[IO] {
         def all(): IO[List[Servable.GenericServable]] = ???
         def getFiltered(name: Option[String], versionId: Option[Long], metadata: Map[String,String]): IO[List[Servable.GenericServable]] = ???
-        def findAndDeploy(name: String, version: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
-        def findAndDeploy(modelId: Long, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         def stop(name: String): IO[GenericServable] = ???
-        def deploy(modelVersion: ModelVersion.Internal, metdata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         def get(name: String): IO[GenericServable] = ???
+        def findAndDeploy(name: String, version: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def findAndDeploy(modelId: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
+        def deploy(modelVersion: ModelVersion.Internal, deployConfig: Option[deploy_config.DeploymentConfiguration], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
       }
       val grpcApi = new ManagerGrpcService(versionRepo, s)
       grpcApi.getAllVersions(Empty(), observer)

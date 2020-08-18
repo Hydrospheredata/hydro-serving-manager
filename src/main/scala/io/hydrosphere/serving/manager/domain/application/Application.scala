@@ -2,31 +2,56 @@ package io.hydrosphere.serving.manager.domain.application
 
 import cats.data.NonEmptyList
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
-import io.hydrosphere.serving.manager.domain.application.graph.ExecutionNode
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 
-case class Application[+T <: Application.Status](
+case class ApplicationKafkaStream(
+  sourceTopic: String,
+  destinationTopic: String,
+  consumerId: Option[String],
+  errorTopic: Option[String]
+)
+
+case class ApplicationServable(
+  modelVersion: ModelVersion.Internal,
+  weight: Int,
+  servable: Option[GenericServable] = None,
+  requiredDeploymentConfig: Option[DeploymentConfiguration] = None
+)
+case class ApplicationStage(variants: NonEmptyList[ApplicationServable], signature: ModelSignature)
+
+case class ApplicationGraph(stages: NonEmptyList[ApplicationStage])
+
+case class Application(
   id: Long,
   name: String,
   namespace: Option[String],
-  status: T,
+  status: Application.Status,
+  statusMessage: Option[String] = None,
   signature: ModelSignature,
   kafkaStreaming: List[ApplicationKafkaStream],
-  versionGraph: NonEmptyList[PipelineStage],
+  graph: ApplicationGraph,
   metadata: Map[String, String] = Map.empty
 )
 
 object Application {
   sealed trait Status extends Product with Serializable
 
+  object Status {
+    def fromString(name: String): Option[Status] = {
+      name match {
+        case "Assembling" => Some(Application.Assembling)
+        case "Ready" => Some(Application.Ready)
+        case "Failed" => Some(Application.Failed)
+        case _ => None
+      }
+    }
+  }
+
   case object Assembling extends Status
 
-  case class Failed(reason: Option[String]) extends Status
+  case object Failed extends Status
 
-  case class Ready(stages: NonEmptyList[ExecutionNode]) extends Status
-
-  type GenericApplication = Application[Status]
-  type AssemblingApp = Application[Assembling.type]
-  type FailedApp = Application[Failed]
-  type ReadyApp = Application[Ready]
+  case object Ready extends Status
 }

@@ -3,7 +3,6 @@ package io.hydrosphere.serving.manager.api.http.controller.application
 import cats.effect.Effect
 import cats.syntax.all._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.requests.{CreateApplicationRequest, UpdateApplicationRequest}
 import io.swagger.annotations._
@@ -18,7 +17,7 @@ class ApplicationController[F[_]: Effect](
   @Path("/")
   @ApiOperation(value = "applications", notes = "applications", nickname = "applications", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Application", response = classOf[GenericApplication], responseContainer = "List"),
+    new ApiResponse(code = 200, message = "Application", response = classOf[Application], responseContainer = "List"),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def listAll = path("application") {
@@ -37,7 +36,7 @@ class ApplicationController[F[_]: Effect](
     new ApiImplicitParam(name = "appName", required = true, dataType = "string", paramType = "path", value = "name")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Application", response = classOf[GenericApplication], responseContainer = "List"),
+    new ApiResponse(code = 200, message = "Application", response = classOf[Application], responseContainer = "List"),
     new ApiResponse(code = 404, message = "Not Found"),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
@@ -58,7 +57,7 @@ class ApplicationController[F[_]: Effect](
       dataTypeClass = classOf[CreateApplicationRequest], paramType = "body")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Application", response = classOf[GenericApplication]),
+    new ApiResponse(code = 200, message = "Application", response = classOf[Application]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def create = path("application") {
@@ -80,7 +79,7 @@ class ApplicationController[F[_]: Effect](
       dataTypeClass = classOf[UpdateApplicationRequest], paramType = "body")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Application", response = classOf[GenericApplication]),
+    new ApiResponse(code = 200, message = "Application", response = classOf[Application]),
     new ApiResponse(code = 500, message = "Internal server error")
   ))
   def update = pathPrefix("application") {

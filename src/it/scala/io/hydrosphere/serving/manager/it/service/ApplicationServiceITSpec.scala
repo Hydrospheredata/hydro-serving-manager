@@ -71,13 +71,12 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           servables <- app.core.repos.servableRepo.all()
         } yield {
           assert(started.name === "simple-app")
-          assert(finished.status.isInstanceOf[Application.Ready], finished.status)
+          assert(finished.status.isInstanceOf[Application.Ready.type], finished.status)
           assert(started.signature.inputs === mv1.modelContract.predict.get.inputs)
           assert(started.signature.outputs === mv1.modelContract.predict.get.outputs)
-          val status = finished.status.asInstanceOf[Application.Ready]
-          val models = status.stages.flatMap(_.variants)
+          val models = finished.graph.stages.flatMap(_.variants)
           assert(models.head.weight === 100)
-          assert(models.head.item.modelVersion.id === mv1.id)
+          assert(models.head.modelVersion.id === mv1.id)
           logger.debug(s"Servables: $servables")
           assert(servables.nonEmpty)
         }
@@ -114,14 +113,13 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
         } yield {
           println(app)
           assert(app.started.name === appRequest.name)
-          val status = finished.status.asInstanceOf[Application.Ready]
-          val services = status.stages.flatMap(_.variants)
+          val services = finished.graph.stages.flatMap(_.variants)
           val service1 = services.head
           val service2 = services.tail.head
           assert(service1.weight === 60)
-          assert(service1.item.modelVersion.id === mv1.id)
+          assert(service1.modelVersion.id === mv1.id)
           assert(service2.weight === 40)
-          assert(service2.item.modelVersion.id === mv1.id)
+          assert(service2.modelVersion.id === mv1.id)
         }
       }
     }

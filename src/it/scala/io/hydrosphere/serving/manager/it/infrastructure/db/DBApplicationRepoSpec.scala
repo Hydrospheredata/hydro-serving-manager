@@ -8,9 +8,7 @@ import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
-import io.hydrosphere.serving.manager.domain.application.Application
-import io.hydrosphere.serving.manager.domain.application.graph.{ExecutionNode, Variant}
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
+import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationGraph, ApplicationServable, ApplicationStage}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
@@ -42,7 +40,7 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
       application_name = "test",
       namespace = Some("namespace"),
       status = "Ready",
-      application_contract = ModelContract.defaultInstance.toString(),
+      application_contract = ModelContract.defaultInstance.toProtoString,
       execution_graph = "",
       used_servables = List("asd", "q123"),
       kafka_streams = List("azxcxz"),
@@ -74,17 +72,10 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
         id = 0,
         name = "repo-spec-app",
         namespace = None,
-        status = Application.Ready(
-          NonEmptyList.of(
-            ExecutionNode(
-              NonEmptyList.of(Variant(servable, 100)),
-              ModelSignature.defaultInstance
-            )
-          )
-        ),
+        status = Application.Ready,
         signature = ModelSignature.defaultInstance,
         kafkaStreaming = List.empty,
-        versionGraph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(mv1, 100)), ModelSignature.defaultInstance))
+        graph = ApplicationGraph(NonEmptyList.of(ApplicationStage(NonEmptyList.of(ApplicationServable(mv1, 100)), ModelSignature.defaultInstance)))
       )
       val result = app.core.repos.appRepo.create(application).unsafeRunSync()
       println(result)

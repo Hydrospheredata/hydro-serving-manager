@@ -37,7 +37,6 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           modelContract = ModelContract.defaultInstance,
           runtime = DockerImage("asd", "asd"),
           model = Model(1, "asd"),
-          hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
           metadata = Map.empty
@@ -63,7 +62,6 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           modelContract = ModelContract.defaultInstance,
           runtime = DockerImage("asd", "asd"),
           model = Model(1, "asd"),
-          hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
           metadata = Map.empty
@@ -92,7 +90,6 @@ class ModelVersionServiceSpec extends GenericUnitTest {
               modelContract = ModelContract.defaultInstance,
               runtime = DockerImage("", ""),
               model = Model(1, "aaaa"),
-              hostSelector = None,
               status = ModelVersionStatus.Assembling,
               installCommand = None,
               metadata = Map.empty
@@ -159,7 +156,6 @@ class ModelVersionServiceSpec extends GenericUnitTest {
               modelContract = ModelContract.defaultInstance,
               runtime = DockerImage("", ""),
               model = Model(1, "aaaa"),
-              hostSelector = None,
               status = ModelVersionStatus.Assembling,
               installCommand = None,
               metadata = Map.empty

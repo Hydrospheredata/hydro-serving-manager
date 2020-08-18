@@ -14,11 +14,7 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.application.graph.Variant
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer.PipelineStage
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelectorRepository
+import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationGraph, ApplicationRepository, ApplicationServable, ApplicationStage}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model._
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
@@ -116,7 +112,6 @@ class ModelServiceSpec extends GenericUnitTest {
           modelContract = contract,
           runtime = modelRuntime,
           model = model,
-          hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
           metadata = Map.empty
@@ -152,7 +147,6 @@ class ModelServiceSpec extends GenericUnitTest {
         val modelVersionService = mock[ModelVersionService[IO]]
         when(modelVersionService.getNextModelVersion(1)).thenReturn(IO(1L))
         val modelVersionRepository = mock[ModelVersionRepository[IO]]
-        val selectorRepo = mock[HostSelectorRepository[IO]]
 
         val fetcher = new ModelFetcher[IO] {
           override def fetch(path: Path) = IO(None)
@@ -165,7 +159,6 @@ class ModelServiceSpec extends GenericUnitTest {
           modelVersionService = modelVersionService,
           storageService = storageMock,
           appRepo = null,
-          hostSelectorRepository = selectorRepo,
           fetcher = fetcher,
           modelVersionBuilder = versionBuilder,
           servableRepo = null,
@@ -209,7 +202,6 @@ class ModelServiceSpec extends GenericUnitTest {
           modelContract = contract,
           runtime = modelRuntime,
           model = model,
-          hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
           metadata = Map.empty
@@ -250,7 +242,6 @@ class ModelServiceSpec extends GenericUnitTest {
           modelVersionService = null,
           storageService = storageMock,
           appRepo = null,
-          hostSelectorRepository = null,
           fetcher = fetcher,
           modelVersionBuilder = versionService,
           servableRepo = null,
@@ -276,11 +267,10 @@ class ModelServiceSpec extends GenericUnitTest {
           installCommand = Some("echo hello"),
           metadata = Some(Map("author" -> "me"))
         )
-        val res = ModelVersionMetadata.combineMetadata(fetched, uploaded, None)
+        val res = ModelVersionMetadata.combineMetadata(fetched, uploaded)
         assert(res.modelName === "upload-name")
         assert(res.runtime === DockerImage("test", "test"))
         assert(res.contract === ModelContract.defaultInstance)
-        assert(res.hostSelector === None)
         assert(res.installCommand === Some("echo hello"))
         assert(res.metadata === Map("author" -> "me"))
       }
@@ -303,11 +293,10 @@ class ModelServiceSpec extends GenericUnitTest {
           installCommand = Some("echo hello"),
           metadata = Some(Map("author" -> "me", "overriden" -> "true"))
         )
-        val res = ModelVersionMetadata.combineMetadata(fetched, uploaded, None)
+        val res = ModelVersionMetadata.combineMetadata(fetched, uploaded)
         assert(res.modelName === "upload-name")
         assert(res.runtime === DockerImage("test", "test"))
         assert(res.contract === contract)
-        assert(res.hostSelector === None)
         assert(res.installCommand === Some("echo hello"))
         assert(res.metadata === Map("author" -> "me", "overriden" -> "true", "f" -> "123"))
       }
@@ -325,7 +314,6 @@ class ModelServiceSpec extends GenericUnitTest {
           modelContract = ModelContract.defaultInstance,
           runtime = dummyImage,
           model = appFailedModel,
-          hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
           metadata = Map.empty
@@ -334,10 +322,11 @@ class ModelServiceSpec extends GenericUnitTest {
           id = 1,
           name = "app",
           namespace = None,
-          status = Application.Failed(None),
+          status = Application.Failed,
+          statusMessage = None,
           signature = ModelSignature.defaultInstance,
           kafkaStreaming = Nil,
-          versionGraph = NonEmptyList.of(PipelineStage(NonEmptyList.of(Variant(appFailedVersion, 100)), ModelSignature.defaultInstance))
+          graph = ApplicationGraph(NonEmptyList.of(ApplicationStage(NonEmptyList.of(ApplicationServable(appFailedVersion, 100)), ModelSignature.defaultInstance)))
         )
 
         val servableFailedModel = Model(2, "servable-failing")
@@ -350,7 +339,6 @@ class ModelServiceSpec extends GenericUnitTest {
           modelContract = ModelContract.defaultInstance,
           runtime = dummyImage,
           model = servableFailedModel,
-          hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
           metadata = Map.empty
@@ -372,7 +360,6 @@ class ModelServiceSpec extends GenericUnitTest {
           modelContract = ModelContract.defaultInstance,
           runtime = dummyImage,
           model = okModel,
-          hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
           metadata = Map.empty
@@ -386,7 +373,6 @@ class ModelServiceSpec extends GenericUnitTest {
           modelContract = ModelContract.defaultInstance,
           runtime = dummyImage,
           model = okModel,
-          hostSelector = None,
           status = ModelVersionStatus.Released,
           installCommand = None,
           metadata = Map.empty
@@ -407,20 +393,19 @@ class ModelServiceSpec extends GenericUnitTest {
           override def delete(id: Long): IO[Int] = IO.pure(1)
         }
         val appRepo = new ApplicationRepository[IO] {
-          override def create(entity: GenericApplication): IO[GenericApplication] = ???
-          override def get(id: Long): IO[Option[GenericApplication]] = ???
-          override def get(name: String): IO[Option[GenericApplication]] = ???
-          override def update(value: GenericApplication): IO[Int] = ???
-          override def updateRow(row: DBApplicationRepository.ApplicationRow): IO[Int] = ???
+          override def create(entity: Application): IO[Application] = ???
+          override def get(id: Long): IO[Option[Application]] = ???
+          override def get(name: String): IO[Option[Application]] = ???
+          override def update(value: Application): IO[Int] = ???
           override def delete(id: Long): IO[Int] = ???
-          override def all(): IO[List[GenericApplication]] = ???
-          override def findVersionUsage(versionIdx: Long): IO[List[GenericApplication]] = {
+          override def all(): IO[List[Application]] = ???
+          override def findVersionUsage(versionIdx: Long): IO[List[Application]] = {
             versionIdx match {
               case appFailedModel.id => IO(app :: Nil)
               case _ => IO.pure(Nil)
             }
           }
-          override def findServableUsage(servableName: String): IO[List[GenericApplication]] = ???
+          override def findServableUsage(servableName: String): IO[List[Application]] = ???
         }
         val servableRepo = new ServableRepository[IO] {
           override def all(): IO[List[GenericServable]] = ???
@@ -469,7 +454,6 @@ class ModelServiceSpec extends GenericUnitTest {
           servableRepo = servableRepo,
           modelVersionService = modelVersionService,
           storageService = null,
-          hostSelectorRepository = null,
           fetcher = null,
           modelVersionBuilder = null,
           modelVersionRepository = null
