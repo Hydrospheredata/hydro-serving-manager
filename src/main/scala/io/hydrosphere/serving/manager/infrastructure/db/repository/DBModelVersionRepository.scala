@@ -7,11 +7,9 @@ import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import spray.json._
@@ -23,7 +21,6 @@ object DBModelVersionRepository {
   final case class ModelVersionRow(
     model_version_id: Long,
     model_id: Long,
-    host_selector: Option[Long],
     created_timestamp: Instant,
     finished_timestamp: Option[Instant],
     model_version: Long,
@@ -40,9 +37,9 @@ object DBModelVersionRepository {
     is_external: Boolean
   )
 
-  type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
+  type JoinedModelVersionRow = (ModelVersionRow, ModelRow)
 
-  def toModelVersion(mvr: ModelVersionRow, mr: ModelRow, hsr: Option[HostSelectorRow]): ModelVersion = {
+  def toModelVersion(mvr: ModelVersionRow, mr: ModelRow): ModelVersion = {
     val image = DockerImage(
       name = mvr.image_name,
       tag = mvr.image_tag,
@@ -77,13 +74,6 @@ object DBModelVersionRepository {
         modelContract = contract,
         runtime = runtime,
         model = model,
-        hostSelector = hsr.map { h =>
-          HostSelector(
-            id = h.host_selector_id,
-            name = h.name,
-            nodeSelector = h.node_selector
-          )
-        },
         status = ModelVersionStatus.withName(mvr.status),
         installCommand = mvr.install_command,
         metadata = metadata,
@@ -97,7 +87,6 @@ object DBModelVersionRepository {
         ModelVersionRow(
           model_version_id = mv.id,
           model_id = mv.model.id,
-          host_selector = mv.hostSelector.map(_.id),
           created_timestamp = mv.created,
           finished_timestamp = mv.finished,
           model_version = mv.modelVersion,
@@ -117,7 +106,6 @@ object DBModelVersionRepository {
         ModelVersionRow(
           model_version_id = id,
           model_id = model.id,
-          host_selector = None,
           created_timestamp = created,
           finished_timestamp = Some(created),
           model_version = modelVersion,
@@ -142,7 +130,6 @@ object DBModelVersionRepository {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         |  LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |""".stripMargin.query[JoinedModelVersionRow]
   }
 
@@ -150,7 +137,6 @@ object DBModelVersionRepository {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE hydro_serving.model_version.model_version_id = $id
          |""".stripMargin.query[JoinedModelVersionRow]
   }
@@ -159,7 +145,6 @@ object DBModelVersionRepository {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE hydro_serving.model.name = $name AND model_version = $version
          |""".stripMargin.query[JoinedModelVersionRow]
   }
@@ -168,7 +153,6 @@ object DBModelVersionRepository {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE hydro_serving.model_version.model_id = $modelId
          |""".stripMargin.query[JoinedModelVersionRow]
   }
@@ -178,7 +162,6 @@ object DBModelVersionRepository {
       fr"""
           |SELECT * FROM hydro_serving.model_version
           | LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-          |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
           |  WHERE """.stripMargin
     val fullQ = q ++ Fragments.in(fr"hydro_serving.model_version.model_version_id", versionIdx)
     fullQ.query[JoinedModelVersionRow]
@@ -188,7 +171,6 @@ object DBModelVersionRepository {
     sql"""
          |SELECT * FROM hydro_serving.model_version
          |  LEFT JOIN hydro_serving.model ON hydro_serving.model_version.model_id = hydro_serving.model.model_id
-         |	LEFT JOIN hydro_serving.host_selector ON hydro_serving.model_version.host_selector = hydro_serving.host_selector.host_selector_id
          |  WHERE hydro_serving.model_version.model_id = $modelId
          |  ORDER BY hydro_serving.model_version.model_version DESC
          |  LIMIT 1
@@ -199,7 +181,6 @@ object DBModelVersionRepository {
     sql"""
          |INSERT INTO hydro_serving.model_version (
          | model_id,
-         | host_selector,
          | created_timestamp,
          | finished_timestamp,
          | model_version,
@@ -215,7 +196,6 @@ object DBModelVersionRepository {
          | is_external
          | ) VALUES (
          | ${mv.model_id},
-         | ${mv.host_selector},
          | ${mv.created_timestamp},
          | ${mv.finished_timestamp},
          | ${mv.model_version},
@@ -236,7 +216,6 @@ object DBModelVersionRepository {
     sql"""
          |UPDATE hydro_serving.model_version SET
          | model_id = ${mv.model_id},
-         | host_selector = ${mv.host_selector},
          | created_timestamp = ${mv.created_timestamp},
          | finished_timestamp = ${mv.finished_timestamp},
          | model_version = ${mv.model_version},

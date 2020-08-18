@@ -10,11 +10,11 @@ import io.hydrosphere.serving.manager.api.grpc.{GrpcServer, GrpcServingDiscovery
 import io.hydrosphere.serving.manager.api.http.HttpServer
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationController
 import io.hydrosphere.serving.manager.api.http.controller.events.SSEController
-import io.hydrosphere.serving.manager.api.http.controller.host_selector.HostSelectorController
 import io.hydrosphere.serving.manager.api.http.controller.model.{ExternalModelController, ModelController}
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
-import io.hydrosphere.serving.manager.api.http.controller.{MonitoringController, SwaggerDocController}
+import io.hydrosphere.serving.manager.api.http.controller.{DeploymentConfigController, HostSelectorController, MonitoringController, SwaggerDocController}
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
+import io.hydrosphere.serving.manager.domain.application.migrations.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.infrastructure.db.Database
@@ -35,6 +35,7 @@ case class App[F[_]](
   grpcServer: GrpcServer[F],
   httpServer: HttpServer[F],
   transactor: Transactor[F],
+  migrationTool: ApplicationMigrationTool[F]
 )
 
 object App {
@@ -64,7 +65,7 @@ object App {
         implicit val rng = rngF
         implicit val cd = cloudDriver
         implicit val itx = tx
-        implicit val hsRepo = DBHostSelectorRepository.make()
+        implicit val hsRepo = new DBDeploymentConfigurationRepository()
         implicit val modelRepo = DBModelRepository.make()
         implicit val modelVersionRepo = DBModelVersionRepository.make()
         implicit val servableRepo = DBServableRepository.make()
@@ -74,6 +75,11 @@ object App {
         implicit val imageRepo = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
 
         Resource.liftF(Core.make[F]())
+      }
+      migrator = {
+        implicit val tx1 = tx
+        ApplicationMigrationTool
+          .default(core.repos.appRepo, core.repos.versionRepo, cloudDriver, core.deployer, core.repos.servableRepo)
       }
       grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
       discoveryService = new GrpcServingDiscovery[F](core.appSub, core.servableSub, core.monitoringSub , core.appService, core.servableService, core.repos.monitoringRepository)
@@ -88,15 +94,17 @@ object App {
         core.buildLoggingService
       )
       appController = new ApplicationController[F](core.appService)
-      hsController = new HostSelectorController[F](core.hostSelectorService)
+      hsController = new HostSelectorController[F]
       servableController = new ServableController[F](core.servableService, cloudDriver)
       sseController = new SSEController[F](core.appSub, core.modelSub, core.servableSub, core.monitoringSub)
       monitoringController = new MonitoringController[F](core.monitoringService, core.repos.monitoringRepository)
+      depConfController = new DeploymentConfigController(core.deploymentConfigService)
 
       apiClasses = modelController.getClass ::
         appController.getClass :: hsController.getClass ::
         servableController.getClass:: sseController.getClass ::
-        monitoringController.getClass :: externalModelController.getClass :: Nil
+        monitoringController.getClass :: externalModelController.getClass ::
+        depConfController.getClass :: Nil
       swaggerController = new SwaggerDocController(apiClasses.toSet, "2")
 
       http = HttpServer.akkaBased(
@@ -108,8 +116,9 @@ object App {
         servableRoutes = servableController.routes,
         sseRoutes = sseController.routes,
         monitoringRoutes = monitoringController.routes,
-        externalModelRoutes = externalModelController.routes
+        externalModelRoutes = externalModelController.routes,
+        deploymentConfRoutes = depConfController.routes
       )
-    } yield App(config, core, grpc, http, tx)
+    } yield App(config, core, grpc, http, tx, migrator)
   }
 }

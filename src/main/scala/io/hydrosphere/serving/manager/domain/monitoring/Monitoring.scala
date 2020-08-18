@@ -50,7 +50,7 @@ object Monitoring extends Logging {
           "metric-spec-target-id" -> mvTarget.id.toString,
           "metric-spec-target-name" -> mvTarget.fullName
         )
-        monitorServable <- servableService.deploy(mvMonitor, servableMetadata)
+        monitorServable <- servableService.deploy(mvMonitor, ???, servableMetadata) //TODO specify what dep config to use
         deployedSpec = spec.copy(config = spec.config.copy(servable = monitorServable.started.some))
         _ <- repo.upsert(deployedSpec)
         _ <- pub.update(deployedSpec)

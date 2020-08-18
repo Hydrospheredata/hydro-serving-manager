@@ -1,24 +1,21 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.ApplicationRow
 
 trait ApplicationRepository[F[_]] {
-  def create(entity: GenericApplication): F[GenericApplication]
+  def create(entity: Application): F[Application]
 
-  def get(id: Long): F[Option[GenericApplication]]
+  def get(id: Long): F[Option[Application]]
 
-  def get(name: String): F[Option[GenericApplication]]
+  def get(name: String): F[Option[Application]]
 
-  def update(value: GenericApplication): F[Int]
-
-  def updateRow(row: ApplicationRow): F[Int]  // NB: not good, need to provide low-level API for Application tool
+  def update(value: Application): F[Int]
 
   def delete(id: Long): F[Int]
 
-  def all(): F[List[GenericApplication]]
+  def all(): F[List[Application]]
 
-  def findVersionUsage(versionIdx: Long): F[List[GenericApplication]]
+  def findVersionUsage(versionIdx: Long): F[List[Application]]
 
-  def findServableUsage(servableName: String): F[List[GenericApplication]]
+  def findServableUsage(servableName: String): F[List[Application]]
 }

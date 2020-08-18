@@ -25,6 +25,10 @@ class ManagerGrpcService[F[_]](
   servableService: ServableService[F]
 )(implicit F: Effect[F]) extends ManagerService {
 
+  def nonEmptyString(str: String): Option[String] = {
+    if (str.trim.nonEmpty) Some(str) else None
+  }
+
   override def getAllVersions(request: Empty, responseObserver: StreamObserver[grpc.entities.ModelVersion]): Unit = {
     val fAction = versionService.all().map { versions =>
       versions.foreach { v =>
@@ -52,8 +56,8 @@ class ManagerGrpcService[F[_]](
     val flow = for {
       res <- request.modelVersion match {
         case ModelVersion.Empty => F.raiseError[DeferredResult[F, GenericServable]](DomainError.invalidRequest("model version is not specified"))
-        case ModelVersion.VersionId(value) => servableService.findAndDeploy(value, request.metadata)
-        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version, request.metadata)
+        case ModelVersion.VersionId(value) => servableService.findAndDeploy(value, nonEmptyString(request.deploymentConfigName), request.metadata)
+        case ModelVersion.Fullname(value) => servableService.findAndDeploy(value.name, value.version, nonEmptyString(request.deploymentConfigName), request.metadata)
       }
       _ <- F.delay(responseObserver.onNext(Converters.fromServable(res.started)))
       completed <- res.completed.get

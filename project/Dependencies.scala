@@ -2,12 +2,12 @@ import sbt._
 
 object Dependencies {
   val akkaVersion = "2.5.14"
-  val akkaHttpVersion = "10.1.3"
+  val akkaHttpVersion = "10.1.9"
   val log4j2Version = "2.8.2"
   val postgresqlVersion = "42.1.4"
   val scalaTestVersion = "3.0.3"
   val awsSdkVersion = "1.11.312"
-  val servingGrpcScala = "2.3.0"
+  val servingGrpcScala = "2.3.1"
   val catsV = "1.2.0"
   val envoyDataPlaneApi = "v1.6.0_1"
 
@@ -21,7 +21,7 @@ object Dependencies {
     "com.amazonaws" % "aws-java-sdk-route53" % awsSdkVersion
   )
 
-  lazy val kubernetesDependencies = Seq("io.skuber" %% "skuber" % "2.1.0")
+  lazy val kubernetesDependencies = Seq("io.skuber" %% "skuber" % "2.4.0")
 
   lazy val akkaDependencies = Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,

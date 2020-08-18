@@ -55,7 +55,6 @@ object ModelVersionBuilder {
           modelContract = metadata.contract,
           runtime = metadata.runtime,
           model = model,
-          hostSelector = metadata.hostSelector,
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
           metadata = metadata.metadata,
