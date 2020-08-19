@@ -9,10 +9,11 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.requests.{ExecutionGraphRequest, ModelVariantRequest, PipelineStageRequest}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, DeploymentConfigurationRepository}
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
+import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBGraph}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository._
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import org.apache.logging.log4j.scala.Logging
@@ -70,8 +71,12 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
       }
   }
 
-  def makeAppFromOldAdapter(ar: ApplicationRow, versions: Map[Long, ModelVersion.Internal], servables: Map[String, GenericServable]): Either[AppDBSchemaError, Application] = {
-    DBApplicationRepository.toApplication(ar, versions, servables, Map.empty) match {
+  def makeAppFromOldAdapter(
+    ar: ApplicationRow,
+    versions: Map[Long, ModelVersion.Internal],
+    servables: Map[String, GenericServable],
+  ): Either[AppDBSchemaError, Option[Application]] = {
+    Try(ar.execution_graph.parseJson.convertTo[DBGraph]).toEither match {
       case Left(value) =>
         logger.debug(value)
         for {
@@ -94,9 +99,9 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
           statusMessage = ar.status_message,
           graph = statusAndGraph._2,
           metadata = ar.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
-        )
-      case Right(value) =>
-        value.asRight
+        ).some
+      case Right(_) =>
+        None.asRight
     }
 
   }
@@ -128,7 +133,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
                 }.toMap
               }
             _ <- makeAppFromOldAdapter(appRow, versions, servables) match {
-              case Right(x) => appsRepo.update(x).void
+              case Right(x) => x.traverse(appsRepo.update).void
               case Left(IncompatibleExecutionGraphError(app)) => restoreServables(app).void
               case Left(UsingModelVersionIsMissing(app, graph)) => restoreVersions(app, graph).void
               case Left(UsingServableIsMissing(app, _)) => restoreServables(app).void
