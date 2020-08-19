@@ -41,7 +41,7 @@ object DBModelVersionRepository {
     install_command: Option[String],
     metadata: Option[String],
     is_external: Boolean,
-    monitoring_configuration: JsValue = MonitoringConfiguration().toJson
+    monitoring_configuration: JsValue
   )
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow, Option[HostSelectorRow])
