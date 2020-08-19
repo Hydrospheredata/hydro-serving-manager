@@ -11,9 +11,8 @@ import io.grpc.stub.StreamObserver
 import io.hydrosphere.serving.discovery.serving.ServingDiscoveryGrpc.ServingDiscovery
 import io.hydrosphere.serving.discovery.serving.{ApplicationDiscoveryEvent, MetricSpecDiscoveryEvent, ServableDiscoveryEvent}
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent.{Initial, ItemRemove, ItemUpdate}
-import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationEvents, ApplicationService}
-import io.hydrosphere.serving.manager.domain.monitoring.{MetricSpecEvents, Monitoring, MonitoringRepository}
+import io.hydrosphere.serving.manager.domain.monitoring.{MetricSpecEvents, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableService}
 import io.hydrosphere.serving.manager.util.grpc.Converters
 import org.apache.logging.log4j.scala.Logging
@@ -37,8 +36,8 @@ class GrpcServingDiscovery[F[_]](
       for {
         apps <- appService.all()
         initEvents = apps.grouped(10).toList.map { batch =>
-          val converted = batch.filter(_.status.isInstanceOf[Application.Ready]).map { x =>
-            Converters.fromApp(x.asInstanceOf[ReadyApp])
+          val converted = batch.filter(_.status.isInstanceOf[Application.Ready.type]).map { x =>
+            Converters.fromApp(x)
           }
           ApplicationDiscoveryEvent(added = converted)
         }
@@ -51,8 +50,8 @@ class GrpcServingDiscovery[F[_]](
           case Initial =>
             ApplicationDiscoveryEvent()
           case ItemUpdate(items) =>
-            val okApps = items.filter(_.status.isInstanceOf[Application.Ready]).map { x =>
-              Converters.fromApp(x.asInstanceOf[ReadyApp])
+            val okApps = items.filter(_.status.isInstanceOf[Application.Ready.type]).map { x =>
+              Converters.fromApp(x)
             }
             ApplicationDiscoveryEvent(added = okApps)
           case ItemRemove(items) => ApplicationDiscoveryEvent(removedIds = items.map(_.toString))

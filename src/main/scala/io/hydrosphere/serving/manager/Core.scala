@@ -2,10 +2,9 @@ package io.hydrosphere.serving.manager
 
 import cats.effect._
 import cats.implicits._
-import io.hydrosphere.serving.manager.domain.application.graph.VersionGraphComposer
-import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationEvents, ApplicationRepository, ApplicationService}
+import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationEvents, ApplicationRepository, ApplicationService, GraphComposer}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.host_selector.{HostSelectorRepository, HostSelectorService}
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfigurationRepository, DeploymentConfigurationService}
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model.{ModelRepository, ModelService}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLogRepository, BuildLoggingService, ModelVersionBuilder}
@@ -24,18 +23,19 @@ import scala.concurrent.duration._
 
 case class Repositories[F[_]](
   appRepo: ApplicationRepository[F],
-  hsRepo: HostSelectorRepository[F],
+  hsRepo: DeploymentConfigurationRepository[F],
   modelRepo: ModelRepository[F],
   versionRepo: ModelVersionRepository[F],
   servableRepo: ServableRepository[F],
   buildLogRepo: BuildLogRepository[F],
-  monitoringRepository: MonitoringRepository[F]
+  monitoringRepository: MonitoringRepository[F],
 )
 
 final case class Core[F[_]](
+  deployer: ApplicationDeployer[F],
   repos: Repositories[F],
   buildLoggingService: BuildLoggingService[F],
-  hostSelectorService: HostSelectorService[F],
+  deploymentConfigService: DeploymentConfigurationService[F],
   modelService: ModelService[F],
   versionService: ModelVersionService[F],
   modelPub: ModelVersionEvents.Publisher[F],
@@ -48,7 +48,7 @@ final case class Core[F[_]](
   servableSub: ServableEvents.Subscriber[F],
   monitoringService: Monitoring[F],
   monitoringPub: MetricSpecEvents.Publisher[F],
-  monitoringSub: MetricSpecEvents.Subscriber[F]
+  monitoringSub: MetricSpecEvents.Subscriber[F],
 )
 
 object Core {
@@ -66,7 +66,7 @@ object Core {
     imageRepository: ImageRepository[F],
     modelRepo: ModelRepository[F],
     modelVersionRepo: ModelVersionRepository[F],
-    hostSelectorRepo: HostSelectorRepository[F],
+    deploymentConfigRepo: DeploymentConfigurationRepository[F],
     servableRepo: ServableRepository[F],
     appRepo: ApplicationRepository[F],
     buildLogsRepo: BuildLogRepository[F],
@@ -90,12 +90,11 @@ object Core {
         implicit val nameGen: NameGenerator[F] = NameGenerator.haiku[F]()
         implicit val modelUnpacker: ModelUnpacker[F] = ModelUnpacker.default[F]()
         implicit val modelFetcher: ModelFetcher[F] = ModelFetcher.default[F]()
-        implicit val hostSelectorService: HostSelectorService[F] = HostSelectorService[F](hostSelectorRepo)
+        implicit val deploymentConfigService: DeploymentConfigurationService[F] = DeploymentConfigurationService[F](deploymentConfigRepo)
         implicit val versionService: ModelVersionService[F] = ModelVersionService[F]()
         implicit val servableService: ServableService[F] = ServableService[F]()
         implicit val monitoringService: Monitoring[F] = Monitoring[F]()
         implicit val versionBuilder: ModelVersionBuilder[F] = ModelVersionBuilder()
-        implicit val graphComposer: VersionGraphComposer = VersionGraphComposer.default
         for {
           gc <- ServableGC.empty[F](1.hour)
         } yield {
@@ -104,11 +103,12 @@ object Core {
           implicit val appService: ApplicationService[F] = ApplicationService[F]()
           implicit val modelService: ModelService[F] = ModelService[F]()
 
-          val repos = Repositories(appRepo, hostSelectorRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo, monitoringRepo)
+          val repos = Repositories(appRepo, deploymentConfigRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo, monitoringRepo)
           Core(
+            deployer = appDeployer,
             repos = repos,
             buildLoggingService = buildLoggingService,
-            hostSelectorService = hostSelectorService,
+            deploymentConfigService = deploymentConfigService,
             modelService = modelService,
             versionService = versionService,
             modelPub = modelPub,

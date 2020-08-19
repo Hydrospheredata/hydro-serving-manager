@@ -3,8 +3,7 @@ package io.hydrosphere.serving.manager.domain.model_version
 import java.time.Instant
 
 import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain.application.Application.GenericApplication
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
@@ -21,13 +20,12 @@ case class ModelVersionView(
   applications: List[String],
   image: Option[DockerImage],
   runtime: Option[DockerImage],
-  hostSelector: Option[HostSelector],
   isExternal: Boolean,
   monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration()
 )
 
 object ModelVersionView {
-  def fromVersion(amv: ModelVersion, applications: List[GenericApplication]): ModelVersionView = {
+  def fromVersion(amv: ModelVersion, applications: List[Application]): ModelVersionView = {
     amv match {
       case internalMV: ModelVersion.Internal =>
         ModelVersionView(
@@ -39,7 +37,6 @@ object ModelVersionView {
           modelContract = internalMV.modelContract,
           runtime = Some(internalMV.runtime),
           model = internalMV.model,
-          hostSelector = internalMV.hostSelector,
           status = internalMV.status.toString,
           applications = applications.map(_.name),
           metadata = internalMV.metadata,
@@ -56,7 +53,6 @@ object ModelVersionView {
           modelContract = externalMV.modelContract,
           runtime = None,
           model = externalMV.model,
-          hostSelector = None,
           status = ModelVersionStatus.Released.toString,
           applications = Nil,
           metadata = externalMV.metadata,

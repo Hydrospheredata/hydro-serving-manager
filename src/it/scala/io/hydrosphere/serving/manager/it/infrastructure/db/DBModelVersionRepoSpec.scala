@@ -23,7 +23,6 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
     val row = ModelVersionRow(
       model_version_id = 1,
       model_id = 1,
-      host_selector = Some(2),
       created_timestamp = time,
       finished_timestamp = Some(time),
       model_version = 1337,
@@ -144,7 +143,6 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
         modelContract = ModelContract.defaultInstance,
         runtime = dummyImage,
         model = model,
-        hostSelector = None,
         status = ModelVersionStatus.Released,
         installCommand = Some("echo 123"),
         metadata = Map("author" -> "me")

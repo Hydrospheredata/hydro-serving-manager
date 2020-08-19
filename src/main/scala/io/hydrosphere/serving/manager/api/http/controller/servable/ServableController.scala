@@ -2,14 +2,11 @@ package io.hydrosphere.serving.manager.api.http.controller.servable
 
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
-import cats.data.OptionT
 import cats.effect.Effect
 import cats.implicits._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
-import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import io.hydrosphere.serving.manager.domain.servable.{ServableRepository, ServableService}
+import io.hydrosphere.serving.manager.domain.servable.ServableService
 import io.swagger.annotations._
 import javax.ws.rs.Path
 
@@ -93,7 +90,7 @@ class ServableController[F[_]: Effect](
     post {
       entity(as[DeployModelRequest]) { r =>
         completeF {
-          servableService.findAndDeploy(r.modelName, r.version, r.metadata.getOrElse(Map.empty))
+          servableService.findAndDeploy(r.modelName, r.version, r.deploymentConfigName, r.metadata.getOrElse(Map.empty))
             .map(x => ServableView.fromServable(x.started))
         }
       }

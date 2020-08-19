@@ -26,7 +26,7 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
 
   describe("Queries") {
     it("should have correct queries") {
-      val row = ServableRow("name", 123, "status_text", Some("host"), Some(123), "status", None)
+      val row = ServableRow("name", 123, "status_text", Some("host"), Some(123), "status", None, None)
       check(DBServableRepository.allQ)
       check(DBServableRepository.getManyQ(NonEmptyList.of("123", "test")))
       check(DBServableRepository.deleteQ("delete-me"))
@@ -67,7 +67,7 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, None, ModelVersionStatus.Released, None, Map.empty)
+      mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, ModelVersionStatus.Released, None, Map.empty)
       mv <- app.core.repos.versionRepo.create(mv)
     } yield {
       println(s"Created: $mv")
