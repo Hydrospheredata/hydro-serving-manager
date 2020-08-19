@@ -98,7 +98,7 @@ object App {
       servableController = new ServableController[F](core.servableService, cloudDriver)
       sseController = new SSEController[F](core.appSub, core.modelSub, core.servableSub, core.monitoringSub)
       monitoringController = new MonitoringController[F](core.monitoringService, core.repos.monitoringRepository)
-      depConfController = new DeploymentConfigController(core.deploymentConfigService)
+      depConfController = new DeploymentConfigController[F](core.deploymentConfigService)
 
       apiClasses = modelController.getClass ::
         appController.getClass :: hsController.getClass ::
