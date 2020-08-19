@@ -17,8 +17,7 @@ class ApplicationController[F[_]: Effect](
   @Path("/")
   @ApiOperation(value = "applications", notes = "applications", nickname = "applications", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Application", response = classOf[Application], responseContainer = "List"),
-    new ApiResponse(code = 500, message = "Internal server error")
+    new ApiResponse(code = 200, message = "Application", response = classOf[ApplicationView], responseContainer = "List"),
   ))
   def listAll = path("application") {
     get {
@@ -36,9 +35,8 @@ class ApplicationController[F[_]: Effect](
     new ApiImplicitParam(name = "appName", required = true, dataType = "string", paramType = "path", value = "name")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Application", response = classOf[Application], responseContainer = "List"),
+    new ApiResponse(code = 200, message = "Application", response = classOf[ApplicationView], responseContainer = "List"),
     new ApiResponse(code = 404, message = "Not Found"),
-    new ApiResponse(code = 500, message = "Internal server error")
   ))
   def getApp = path("application" / Segment) { appName =>
     get {
@@ -57,8 +55,7 @@ class ApplicationController[F[_]: Effect](
       dataTypeClass = classOf[CreateApplicationRequest], paramType = "body")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Application", response = classOf[Application]),
-    new ApiResponse(code = 500, message = "Internal server error")
+    new ApiResponse(code = 200, message = "Application", response = classOf[ApplicationView]),
   ))
   def create = path("application") {
     post {
@@ -79,8 +76,7 @@ class ApplicationController[F[_]: Effect](
       dataTypeClass = classOf[UpdateApplicationRequest], paramType = "body")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Application", response = classOf[Application]),
-    new ApiResponse(code = 500, message = "Internal server error")
+    new ApiResponse(code = 200, message = "Application", response = classOf[ApplicationView]),
   ))
   def update = pathPrefix("application") {
     put {
@@ -101,7 +97,6 @@ class ApplicationController[F[_]: Effect](
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Application Deleted"),
-    new ApiResponse(code = 500, message = "Internal server error")
   ))
   def deleteApplicationByName = delete {
     path("application" / Segment) { appName =>
@@ -120,8 +115,7 @@ class ApplicationController[F[_]: Effect](
     new ApiImplicitParam(name = "applicationName", required = true, dataType = "string", paramType = "path", value = "name"),
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Any", response = classOf[Seq[Any]]),
-    new ApiResponse(code = 500, message = "Internal server error")
+    new ApiResponse(code = 200, message = "Any"),
   ))
   def generateInputsForApp = pathPrefix("application" / "generateInputs" / Segment) { appName =>
     get {
