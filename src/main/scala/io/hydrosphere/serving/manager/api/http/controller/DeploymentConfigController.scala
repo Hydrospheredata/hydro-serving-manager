@@ -7,7 +7,7 @@ import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOper
 import javax.ws.rs.Path
 
 @Path("/deployment_configuration")
-@Api(produces = "application/json", tags = Array("Metric Specifications"))
+@Api(produces = "application/json", tags = Array("DeploymentConfigurations"))
 class DeploymentConfigController[F[_]: Effect](
   deploymentConfigService: DeploymentConfigurationService[F]
 ) extends AkkaHttpControllerDsl {
@@ -15,7 +15,7 @@ class DeploymentConfigController[F[_]: Effect](
   @Path("/")
   @ApiOperation(value = "listAll", notes = "listAll", nickname = "listAll", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "MetricSpec", response = classOf[DeploymentConfiguration], responseContainer = "List"),
+    new ApiResponse(code = 200, message = "DeploymentConfiguration", response = classOf[DeploymentConfiguration], responseContainer = "List"),
   ))
   val listAll: Route = path("deployment_configuration") {
     get {
