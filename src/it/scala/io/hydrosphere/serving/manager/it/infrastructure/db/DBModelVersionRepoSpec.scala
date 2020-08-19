@@ -8,6 +8,8 @@ import doobie.scalatest.IOChecker
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
+import spray.json._
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
@@ -36,7 +38,8 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       profile_types = None,
       install_command = Some("echo 123"),
       metadata = Some("{}"),
-      is_external = false
+      is_external = false,
+      monitoring_configuration = MonitoringConfiguration().toJson
     )
     it("should have valid queries") {
       check(DBModelVersionRepository.allQ)
