@@ -9,10 +9,11 @@ import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.requests.{ExecutionGraphRequest, ModelVariantRequest, PipelineStageRequest}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, DeploymentConfigurationRepository}
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
+import io.hydrosphere.serving.manager.infrastructure.db.repository.{DBApplicationRepository, DBGraph}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository._
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 import org.apache.logging.log4j.scala.Logging
@@ -29,12 +30,14 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
   case class IncompatibleExecutionGraphError(app: ApplicationRow) extends AppDBSchemaError
   case class UsingModelVersionIsMissing(app: ApplicationRow, graph: Either[VersionGraphAdapter, ServableGraphAdapter]) extends AppDBSchemaError
   case class UsingServableIsMissing(app: ApplicationRow, servableName: String) extends AppDBSchemaError
-  case class InvalidApplicationSchema(app: ApplicationRow) extends AppDBSchemaError
+  case class InvalidApplicationSchema(app: ApplicationRow, ex: Option[Throwable] = None) extends AppDBSchemaError {
+    override def getMessage: String = s"${ex.map(_.getMessage)} happened for ${app}"
+  }
 
   def tryConvertVersionAdapter(ar: ApplicationRow, versions: Map[Long, ModelVersion.Internal]): Either[AppDBSchemaError, ApplicationGraph] = {
     Try(ar.execution_graph.parseJson.convertTo[VersionGraphAdapter])
       .toEither
-      .leftMap(_ => InvalidApplicationSchema(ar))
+      .leftMap(e => InvalidApplicationSchema(ar, e.some))
       .flatMap { adapterGraph =>
         val mappedStages = adapterGraph.stages.traverse { stage =>
           val signature = stage.signature
@@ -52,7 +55,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
   def tryConvertExecutionAdapter(ar: ApplicationRow, versions: Map[Long, ModelVersion.Internal], servables: Map[String, GenericServable]): Either[AppDBSchemaError, ApplicationGraph] = {
     Try(ar.execution_graph.parseJson.convertTo[ServableGraphAdapter])
       .toEither
-      .leftMap(_ => InvalidApplicationSchema(ar))
+      .leftMap(e => InvalidApplicationSchema(ar, e.some))
       .flatMap { adapterGraph =>
         val stages = adapterGraph.stages.traverse { stage =>
           val variants = stage.modelVariants.traverse { s =>
@@ -68,28 +71,39 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
       }
   }
 
-  def makeAppFromOldAdapter(ar: ApplicationRow, versions: Map[Long, ModelVersion.Internal], servables: Map[String, GenericServable]): Either[AppDBSchemaError, Application] = {
-    for {
-      statusAndGraph <- ar.status match {
-        case "Assembling" =>
-          tryConvertVersionAdapter(ar, versions).map(Application.Assembling -> _)
-        case "Failed" =>
-          tryConvertVersionAdapter(ar, versions).map(Application.Failed -> _)
-        case "Ready" =>
-          tryConvertExecutionAdapter(ar, versions, servables).map(Application.Ready -> _)
-        case _ => InvalidApplicationSchema(ar).asLeft
-      }
-    } yield Application(
-      id = ar.id,
-      name = ar.application_name,
-      signature = ModelSignature.fromAscii(ar.application_contract),
-      kafkaStreaming = ar.kafka_streams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
-      namespace = ar.namespace,
-      status = statusAndGraph._1,
-      statusMessage = ar.status_message,
-      graph = statusAndGraph._2,
-      metadata = ar.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
-    )
+  def makeAppFromOldAdapter(
+    ar: ApplicationRow,
+    versions: Map[Long, ModelVersion.Internal],
+    servables: Map[String, GenericServable],
+  ): Either[AppDBSchemaError, Option[Application]] = {
+    Try(ar.execution_graph.parseJson.convertTo[DBGraph]).toEither match {
+      case Left(value) =>
+        logger.debug(value)
+        for {
+          statusAndGraph <- ar.status match {
+            case "Assembling" =>
+              tryConvertVersionAdapter(ar, versions).map(Application.Assembling -> _)
+            case "Failed" =>
+              tryConvertVersionAdapter(ar, versions).map(Application.Failed -> _)
+            case "Ready" =>
+              tryConvertExecutionAdapter(ar, versions, servables).map(Application.Ready -> _)
+            case _ => InvalidApplicationSchema(ar).asLeft
+          }
+        } yield Application(
+          id = ar.id,
+          name = ar.application_name,
+          signature = ModelSignature.fromAscii(ar.application_contract),
+          kafkaStreaming = ar.kafka_streams.map(p => p.parseJson.convertTo[ApplicationKafkaStream]),
+          namespace = ar.namespace,
+          status = statusAndGraph._1,
+          statusMessage = ar.status_message,
+          graph = statusAndGraph._2,
+          metadata = ar.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty)
+        ).some
+      case Right(_) =>
+        None.asRight
+    }
+
   }
 
   def default[F[_]](
@@ -119,7 +133,7 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
                 }.toMap
               }
             _ <- makeAppFromOldAdapter(appRow, versions, servables) match {
-              case Right(x) => appsRepo.update(x).void
+              case Right(x) => x.traverse(appsRepo.update).void
               case Left(IncompatibleExecutionGraphError(app)) => restoreServables(app).void
               case Left(UsingModelVersionIsMissing(app, graph)) => restoreVersions(app, graph).void
               case Left(UsingServableIsMissing(app, _)) => restoreServables(app).void
