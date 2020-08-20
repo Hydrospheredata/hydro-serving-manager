@@ -1,9 +1,14 @@
 package io.hydrosphere.serving.manager
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
+import cats.data.OptionT
+import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.implicits._
 import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.api.grpc.{GrpcServer, GrpcServingDiscovery, ManagerGrpcService}
@@ -22,11 +27,14 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
-import io.hydrosphere.serving.manager.util.UUIDGenerator
+import io.hydrosphere.serving.manager.util.{FileUtils, UUIDGenerator}
 import io.hydrosphere.serving.manager.util.random.RNG
+import org.apache.commons.io.IOUtils
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.collection.JavaConverters._
+import spray.json._
 
 
 case class App[F[_]](
@@ -39,6 +47,15 @@ case class App[F[_]](
 )
 
 object App {
+  def loadOpenApi[F[_]](implicit F: Sync[F]): F[JsValue] = {
+    OptionT(F.delay(getClass.getClassLoader.getResourceAsStream("swagger.json")).map(Option.apply))
+      .semiflatMap { stream =>
+        F.delay(IOUtils.toString(stream, StandardCharsets.UTF_8))
+          .map(_.parseJson)
+      }
+      .getOrElseF(F.raiseError(new IllegalStateException("Can't find OpenAPI spec (swagger.json) in resources")))
+  }
+
   def make[F[_] : ConcurrentEffect : ContextShift : Timer](
     config: ManagerConfiguration,
     dockerClient: DockerdClient[F],
@@ -53,6 +70,7 @@ object App {
     implicit val uuidGen = UUIDGenerator.default[F]()
     implicit val dc = dockerClient
     for {
+      openApi <- Resource.liftF(loadOpenApi[F])
       rngF <- Resource.liftF(RNG.default[F])
       cloudDriver = CloudDriver.fromConfig[F](dockerClient, config.cloudDriver, config.dockerRepository)
       hk <- Database.makeHikariDataSource[F](config.database)
@@ -100,12 +118,13 @@ object App {
       monitoringController = new MonitoringController[F](core.monitoringService, core.repos.monitoringRepository)
       depConfController = new DeploymentConfigController[F](core.deploymentConfigService)
 
-      apiClasses = modelController.getClass ::
-        appController.getClass :: hsController.getClass ::
-        servableController.getClass:: sseController.getClass ::
-        monitoringController.getClass :: externalModelController.getClass ::
-        depConfController.getClass :: Nil
-      swaggerController = new SwaggerDocController(apiClasses.toSet, "2")
+//      apiClasses = modelController.getClass ::
+//        appController.getClass :: hsController.getClass ::
+//        servableController.getClass:: sseController.getClass ::
+//        monitoringController.getClass :: externalModelController.getClass ::
+//        depConfController.getClass :: Nil
+//      swaggerController = new SwaggerDocController(apiClasses.toSet, "2")
+      swaggerController = new SwaggerDocController(openApi)
 
       http = HttpServer.akkaBased(
         config = config.application,
