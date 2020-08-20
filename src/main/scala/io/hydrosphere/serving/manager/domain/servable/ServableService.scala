@@ -90,7 +90,7 @@ object ServableService extends Logging {
         d <- Deferred[F, GenericServable]
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata, deployConfig)
         _ <- servableRepository.upsert(initServable)
-        _ <- awaitServable(initServable, deployConfig)
+        _ <- awaitServable(initServable)
           .flatMap(d.complete)
           .onError {
             case NonFatal(ex) =>
@@ -102,9 +102,9 @@ object ServableService extends Logging {
       } yield DeferredResult(initServable, d)
     }
 
-    def awaitServable(servable: GenericServable, config: Option[DeploymentConfiguration]): F[GenericServable] = {
+    def awaitServable(servable: GenericServable): F[GenericServable] = {
       for {
-        _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, config)
+        _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, servable.deploymentConfiguration)
         servableDef <- monitor.monitor(servable)
         resultServable <- servableDef.get
         _ <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))
