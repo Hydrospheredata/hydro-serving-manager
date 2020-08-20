@@ -55,6 +55,8 @@ case class ApplicationView(
 )
 
 object ApplicationView {
+  implicit val appView = jsonFormat8(ApplicationView.apply)
+
   def fromApplication(app: Application): ApplicationView = {
     val status = app.status.productPrefix
     val message = app.statusMessage
