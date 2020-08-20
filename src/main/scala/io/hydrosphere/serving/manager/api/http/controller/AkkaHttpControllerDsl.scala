@@ -115,14 +115,15 @@ trait AkkaHttpControllerDsl extends CompleteJsonProtocol with Directives with Lo
         )
       )
     case p: Throwable =>
-      logger.error(p.toString)
+      logger.error(p)
+      logger.error(p.getMessage)
       logger.error(p.getStackTrace.mkString("\n"))
       complete(
         HttpResponse(
           StatusCodes.InternalServerError,
           entity = Map(
             "error" -> "InternalException",
-            "message" -> Option(p.toString).getOrElse(s"Unknown error: $p")
+            "message" -> s"$p: ${Option(p.getMessage)}"
           ).toJson.toString()
         )
       )
