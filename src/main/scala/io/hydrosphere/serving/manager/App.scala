@@ -1,13 +1,11 @@
 package io.hydrosphere.serving.manager
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import cats.data.OptionT
-import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.effect._
 import cats.implicits._
 import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
@@ -27,14 +25,13 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
-import io.hydrosphere.serving.manager.util.{FileUtils, UUIDGenerator}
 import io.hydrosphere.serving.manager.util.random.RNG
+import io.hydrosphere.serving.manager.util.{FileUtils, UUIDGenerator}
 import org.apache.commons.io.IOUtils
+import spray.json._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.collection.JavaConverters._
-import spray.json._
 
 
 case class App[F[_]](
@@ -48,12 +45,10 @@ case class App[F[_]](
 
 object App {
   def loadOpenApi[F[_]](implicit F: Sync[F]): F[JsValue] = {
-    OptionT(F.delay(getClass.getClassLoader.getResourceAsStream("swagger.json")).map(Option.apply))
-      .semiflatMap { stream =>
-        F.delay(IOUtils.toString(stream, StandardCharsets.UTF_8))
-          .map(_.parseJson)
-      }
-      .getOrElseF(F.raiseError(new IllegalStateException("Can't find OpenAPI spec (swagger.json) in resources")))
+    FileUtils.getResourceStream[F]("swagger.json").use { stream =>
+      F.delay(IOUtils.toString(stream, StandardCharsets.UTF_8))
+        .map(_.parseJson)
+    }
   }
 
   def make[F[_] : ConcurrentEffect : ContextShift : Timer](
