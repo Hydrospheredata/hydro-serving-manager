@@ -88,7 +88,7 @@ object ServableService extends Logging {
         }
         randomSuffix <- generateUniqueSuffix(modelVersion)
         d <- Deferred[F, GenericServable]
-        initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata)
+        initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata, deployConfig)
         _ <- servableRepository.upsert(initServable)
         _ <- awaitServable(initServable, deployConfig)
           .flatMap(d.complete)
