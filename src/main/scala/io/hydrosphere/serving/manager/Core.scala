@@ -29,6 +29,7 @@ case class Repositories[F[_]](
   servableRepo: ServableRepository[F],
   buildLogRepo: BuildLogRepository[F],
   monitoringRepository: MonitoringRepository[F],
+  depConfRepository: DeploymentConfigurationRepository[F]
 )
 
 final case class Core[F[_]](
@@ -103,7 +104,7 @@ object Core {
           implicit val appService: ApplicationService[F] = ApplicationService[F]()
           implicit val modelService: ModelService[F] = ModelService[F]()
 
-          val repos = Repositories(appRepo, deploymentConfigRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo, monitoringRepo)
+          val repos = Repositories(appRepo, deploymentConfigRepo, modelRepo, modelVersionRepo, servableRepo, buildLogsRepo, monitoringRepo, deploymentConfigRepo)
           Core(
             deployer = appDeployer,
             repos = repos,
