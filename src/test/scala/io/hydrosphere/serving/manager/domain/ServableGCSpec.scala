@@ -62,7 +62,8 @@ class ServableGCSpec extends GenericUnitTest {
             modelVersionId = mv.id,
             threshold = 1,
             thresholdCmpOperator = ThresholdCmpOperator.Less,
-            servable = metricServable.some
+            servable = metricServable.some,
+            deploymentConfigName = None
           )
         )
       val metric1Cleaned = metric1.copy(config = metric1.config.copy(servable = None))
@@ -74,7 +75,8 @@ class ServableGCSpec extends GenericUnitTest {
             modelVersionId = mv.id,
             threshold = 1,
             thresholdCmpOperator = ThresholdCmpOperator.Less,
-            servable = None
+            servable = None,
+            deploymentConfigName = None
           )
         )
 
