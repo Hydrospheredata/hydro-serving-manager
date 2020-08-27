@@ -1,26 +1,34 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
 import akka.stream.scaladsl.Source
+import cats.MonadError
 import cats.effect.Async
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
+import skuber.Service.Port
 
 import scala.util.Try
 
-class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDriver[F] {
-  private def kubeSvc2Servable(svc: skuber.Service): Option[CloudInstance] = for {
-    modelVersionId <- Try(svc.metadata.labels(CloudDriver.Labels.ModelVersionId).toLong).toOption
-    serviceName <- Try(svc.metadata.labels(CloudDriver.Labels.ServiceName)).toOption
-    host <- svc.spec.map(_.clusterIP)
-    port <- svc.spec.flatMap(_.ports.find(_.name == "grpc")).map(_.port)
+class KubernetesDriver[F[_]](client: KubernetesClient[F])(implicit F: MonadError[F, Throwable]) extends CloudDriver[F] {
+  private def kubeSvc2Servable(svc: skuber.Service) = for {
+    modelVersionId <- Try(svc.metadata.labels(CloudDriver.Labels.ModelVersionId).toLong).toEither
+    serviceName <- Try(svc.metadata.labels(CloudDriver.Labels.ServiceName)).toEither
+    host <- svc.spec
+      .map(_.clusterIP)
+      .toRight(new IllegalArgumentException(s"SVC doesn't have ClusterIP: ${svc}"))
+    port <- svc.spec
+      .toList
+      .flatMap(_.ports)
+      .collectFirst{case Port("grpc", _, port, _, _) => port}
+      .toRight(new IllegalArgumentException(s"SVC doesn't expose grpc port: ${svc}"))
   } yield CloudInstance(
     modelVersionId,
     serviceName,
     CloudInstance.Status.Running(host, port)
   )
 
-  override def instances: F[List[CloudInstance]] = client.services.map(_.map(kubeSvc2Servable).collect { case Some(v) => v })
+  override def instances: F[List[CloudInstance]] = client.services.map(_.map(kubeSvc2Servable).collect { case Right(v) => v })
 
   override def instance(name: String): F[Option[CloudInstance]] = instances.map(_.find(_.name == name))
 
@@ -29,12 +37,12 @@ class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDr
     val servable = CloudInstance(modelVersionId, name, CloudInstance.Status.Starting)
     for {
       dep <- client.runDeployment(name, servable, image, config)
-      _ <- client.createHPA(name, dep.metadata.name, dep.apiVersion, dep.kind, config.flatMap(_.hpa))
+      _ <- config.flatMap(_.hpa).traverse(client.createHPA(name, dep.metadata.name, dep.apiVersion, dep.kind, _))
       service <- client.runService(name, servable)
       maybeServable = kubeSvc2Servable(service)
       newServable <- maybeServable match {
-        case Some(value) => Async[F].pure(value)
-        case None => Async[F].raiseError[CloudInstance](new RuntimeException(s"Cannot create Servable from kube Service $service"))
+        case Right(value) => F.pure(value)
+        case Left(error) => F.raiseError[CloudInstance](new RuntimeException(s"Cannot create Servable from kube Service $service Reason: $error"))
       }
     } yield newServable
   }

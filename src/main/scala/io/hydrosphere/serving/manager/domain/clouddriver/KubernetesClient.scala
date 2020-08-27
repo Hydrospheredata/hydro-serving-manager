@@ -36,7 +36,7 @@ trait KubernetesClient[F[_]] {
     targetName: String,
     targetApiVersion: String,
     targetKind: String,
-    config: Option[K8sHorizontalPodAutoscalerConfig]
+    config: K8sHorizontalPodAutoscalerConfig
   ): F[HorizontalPodAutoscaler]
 
   def runService(name: String, servable: CloudInstance): F[skuber.Service]
@@ -158,13 +158,13 @@ object KubernetesClient {
       targetName: String,
       targetApiVersion: String,
       targetKind: String,
-      config: Option[K8sHorizontalPodAutoscalerConfig]
+      config: K8sHorizontalPodAutoscalerConfig
     ): F[HorizontalPodAutoscaler] = {
       val hpaSpec = autoscaling.HorizontalPodAutoscaler.Spec(
         scaleTargetRef = CrossVersionObjectReference(name = targetName, apiVersion = targetApiVersion),
-        minReplicas = config.flatMap(_.minReplicas),
-        maxReplicas = config.map(_.maxReplicas).getOrElse(1),
-        cpuUtilization = config.flatMap(_.cpuUtilization).map(CPUTargetUtilization.apply)
+        minReplicas = config.minReplicas,
+        maxReplicas = config.maxReplicas,
+        cpuUtilization = config.cpuUtilization.map(CPUTargetUtilization.apply)
       )
 
       val hpa = autoscaling.HorizontalPodAutoscaler(
