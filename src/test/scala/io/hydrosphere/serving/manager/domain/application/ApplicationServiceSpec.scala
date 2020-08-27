@@ -5,6 +5,7 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, IO}
+import cats.syntax.applicative._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
@@ -15,6 +16,7 @@ import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringRepository
 import io.hydrosphere.serving.manager.domain.servable.Servable._
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableGC, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -80,6 +82,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
       val discoveryHub = new ApplicationEvents.Publisher[IO] {
         override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = IO.unit
       }
+      val monitoringRepo = mock[MonitoringRepository[IO]]
       val appDeployer = ApplicationDeployer.default[IO]()(
         Concurrent[IO],
         applicationRepository = appRepo,
@@ -88,7 +91,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         discoveryHub = discoveryHub,
         deploymentConfigService = null,
         monitoringService = null,
-        monitoringRepo = null
+        monitoringRepo = monitoringRepo
       )
       val graph = ExecutionGraphRequest(NonEmptyList.of(
         PipelineStageRequest(NonEmptyList.of(
@@ -138,6 +141,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val discoveryHub = new ApplicationEvents.Publisher[IO] {
           override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = IO.unit
         }
+        val monitoringRepo = mock[MonitoringRepository[IO]]
+
         val appDeployer = ApplicationDeployer.default[IO]()(
           Concurrent[IO],
           applicationRepository = appRepo,
@@ -146,7 +151,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           discoveryHub = discoveryHub,
           deploymentConfigService = null,
           monitoringService = null,
-          monitoringRepo = null
+          monitoringRepo = monitoringRepo
         )
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -196,6 +201,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val discoveryHub = new ApplicationEvents.Publisher[IO] {
           override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = IO.unit
         }
+        val monitoringRepo = mock[MonitoringRepository[IO]]
+        when(monitoringRepo.forModelVersion(1)).thenReturn(Nil.pure[IO])
         val appDeployer = ApplicationDeployer.default[IO]()(
           Concurrent[IO],
           applicationRepository = appRepo,
@@ -204,7 +211,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           discoveryHub = discoveryHub,
           deploymentConfigService = null,
           monitoringService = null,
-          monitoringRepo = null
+          monitoringRepo = monitoringRepo
         )
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -278,6 +285,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
+        val monitoringRepo = mock[MonitoringRepository[IO]]
+        when(monitoringRepo.forModelVersion(1)).thenReturn(Nil.pure[IO])
         val appDeployer = ApplicationDeployer.default[IO]()(
           Concurrent[IO],
           applicationRepository = appRepo,
@@ -286,7 +295,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           discoveryHub = discoveryHub,
           deploymentConfigService = null,
           monitoringService = null,
-          monitoringRepo = null
+          monitoringRepo = monitoringRepo
         )
         appDeployer.deploy("test", graph, List.empty).flatMap { res =>
           res.completed.get.map { finished =>
