@@ -86,7 +86,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
         versionRepository = versionRepo,
         servableService= servableService,
         discoveryHub = discoveryHub,
-        deploymentConfigService = null
+        deploymentConfigService = null,
+        monitoringService = null,
+        monitoringRepo = null
       )
       val graph = ExecutionGraphRequest(NonEmptyList.of(
         PipelineStageRequest(NonEmptyList.of(
@@ -142,7 +144,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
           versionRepository = versionRepo,
           servableService= servableService,
           discoveryHub = discoveryHub,
-          deploymentConfigService = null
+          deploymentConfigService = null,
+          monitoringService = null,
+          monitoringRepo = null
         )
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -198,7 +202,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
           versionRepository = versionRepo,
           servableService= servableService,
           discoveryHub = discoveryHub,
-          deploymentConfigService = null
+          deploymentConfigService = null,
+          monitoringService = null,
+          monitoringRepo = null
         )
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -278,7 +284,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
           versionRepository = versionRepo,
           servableService= servableService,
           discoveryHub = discoveryHub,
-          deploymentConfigService = null
+          deploymentConfigService = null,
+          monitoringService = null,
+          monitoringRepo = null
         )
         appDeployer.deploy("test", graph, List.empty).flatMap { res =>
           res.completed.get.map { finished =>
