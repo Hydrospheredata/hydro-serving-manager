@@ -28,7 +28,8 @@ class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDr
   override def run(name: String, modelVersionId: Long, image: DockerImage, config: Option[DeploymentConfiguration] = None): F[CloudInstance] = {
     val servable = CloudInstance(modelVersionId, name, CloudInstance.Status.Starting)
     for {
-      _ <- client.runDeployment(name, servable, image, config)
+      dep <- client.runDeployment(name, servable, image, config)
+      _ <- client.createHPA(name, dep.metadata.name, dep.apiVersion, dep.kind, config.flatMap(_.hpa))
       service <- client.runService(name, servable)
       maybeServable = kubeSvc2Servable(service)
       newServable <- maybeServable match {
@@ -38,7 +39,9 @@ class KubernetesDriver[F[_]: Async](client: KubernetesClient[F]) extends CloudDr
     } yield newServable
   }
 
-  override def remove(name: String): F[Unit] = client.removeService(name) *> client.removeDeployment(name)
+  override def remove(name: String): F[Unit] = {
+    client.removeService(name) *> client.removeHPA(name).attempt *> client.removeDeployment(name)
+  }
 
   override def getByVersionId(modelVersionId: Long): F[Option[CloudInstance]] = {
     instances.map(_.find(_.modelVersionId == modelVersionId))

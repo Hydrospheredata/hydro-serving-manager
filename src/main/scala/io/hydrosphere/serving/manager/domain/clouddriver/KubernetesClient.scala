@@ -6,14 +6,14 @@ import akka.stream.scaladsl.Source
 import cats.effect._
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, K8sHorizontalPodAutoscalerConfig}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import org.apache.logging.log4j.scala.Logging
 import skuber.Container.PullPolicy
 import skuber._
 import skuber.apps.v1.{Deployment, DeploymentList}
-import skuber.autoscaling.CPUTargetUtilization
+import skuber.autoscaling.{CPUTargetUtilization, HorizontalPodAutoscaler}
 import skuber.autoscaling.HorizontalPodAutoscaler.CrossVersionObjectReference
 import skuber.json.format._
 
@@ -24,12 +24,26 @@ trait KubernetesClient[F[_]] {
   def services: F[List[skuber.Service]]
   def deployments: F[List[Deployment]]
   
-  def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, config: Option[DeploymentConfiguration]): F[Deployment]
+  def runDeployment(
+    name: String,
+    servable: CloudInstance,
+    dockerImage: DockerImage,
+    config: Option[DeploymentConfiguration]
+  ): F[Deployment]
+
+  def createHPA(
+    name: String,
+    targetName: String,
+    targetApiVersion: String,
+    targetKind: String,
+    config: Option[K8sHorizontalPodAutoscalerConfig]
+  ): F[Unit]
 
   def runService(name: String, servable: CloudInstance): F[skuber.Service]
   
   def removeDeployment(name: String): F[Unit]
   def removeService(name: String): F[Unit]
+  def removeHPA(name: String): F[Unit]
   
   def getLogs(podName: String, follow: Boolean): F[Source[String, _]]
   def getPod(name: String): F[Pod]
@@ -56,7 +70,6 @@ object KubernetesClient {
     override def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, crc: Option[DeploymentConfiguration]): F[Deployment] = {
       import LabelSelector.dsl._
 
-      val hpaConf = crc.flatMap(_.hpa)
       val depConf = crc.flatMap(_.deployment)
       val podConf = crc.flatMap(_.pod)
       val containerConf = crc.flatMap(_.container)
@@ -112,24 +125,6 @@ object KubernetesClient {
         .withTemplate(podTemplate)
         .withLabelSelector(CloudDriver.Labels.ServiceName is name)
 
-      val hpaSpec = autoscaling.HorizontalPodAutoscaler.Spec(
-        scaleTargetRef = CrossVersionObjectReference(name = deployment.name),
-        minReplicas = hpaConf.flatMap(_.minReplicas),
-        maxReplicas = hpaConf.map(_.maxReplicas).getOrElse(1),
-        cpuUtilization = hpaConf.flatMap(_.cpuUtilization).map(CPUTargetUtilization.apply)
-      )
-
-      val hpa = autoscaling.HorizontalPodAutoscaler(
-        metadata = ObjectMeta(
-          name = servable.name,
-          labels = Map(
-            CloudDriver.Labels.ServiceName -> name,
-            CloudDriver.Labels.ModelVersionId -> servable.modelVersionId.toString
-          )
-        ),
-        spec = hpaSpec
-      )
-
       for {
         deployed <- deployments
         maybeExist = deployed.find(_.metadata.labels.getOrElse(CloudDriver.Labels.ServiceName, "") == name)
@@ -137,7 +132,6 @@ object KubernetesClient {
           case Some(value) => Async[F].pure(value)
           case None => AsyncUtil.futureAsync(underlying.create(deployment))
         }
-        _ <- AsyncUtil.futureAsync(underlying.create(hpa))
       } yield dpl
     }
 
@@ -157,6 +151,32 @@ object KubernetesClient {
           case None => AsyncUtil.futureAsync(underlying.create(service))
         }
       } yield svc
+    }
+
+    override def createHPA(
+      name: String,
+      targetName: String,
+      targetApiVersion: String,
+      targetKind: String,
+      config: Option[K8sHorizontalPodAutoscalerConfig]
+    ): F[Unit] = {
+      val hpaSpec = autoscaling.HorizontalPodAutoscaler.Spec(
+        scaleTargetRef = CrossVersionObjectReference(name = targetName, apiVersion = targetApiVersion),
+        minReplicas = config.flatMap(_.minReplicas),
+        maxReplicas = config.map(_.maxReplicas).getOrElse(1),
+        cpuUtilization = config.flatMap(_.cpuUtilization).map(CPUTargetUtilization.apply)
+      )
+
+      val hpa = autoscaling.HorizontalPodAutoscaler(
+        metadata = ObjectMeta(
+          name = name,
+          labels = Map(
+            CloudDriver.Labels.ServiceName -> name,
+          )
+        ),
+        spec = hpaSpec
+      )
+      AsyncUtil.futureAsync(underlying.create(hpa))
     }
 
     override def removeDeployment(name: String): F[Unit] = for {
@@ -189,6 +209,10 @@ object KubernetesClient {
           case Nil => Async[F].raiseError(new RuntimeException(s"There is no running pods for $name"))
         }
       }
+    }
+
+    override def removeHPA(name: String): F[Unit] = {
+      AsyncUtil.futureAsync(underlying.delete[HorizontalPodAutoscaler](name))
     }
   }
 
