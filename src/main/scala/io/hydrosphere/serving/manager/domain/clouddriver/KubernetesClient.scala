@@ -21,15 +21,22 @@ import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
 trait KubernetesClient[F[_]] {
-  def services: F[List[skuber.Service]]
   def deployments: F[List[Deployment]]
-  
+
   def runDeployment(
     name: String,
     servable: CloudInstance,
     dockerImage: DockerImage,
     config: Option[DeploymentConfiguration]
   ): F[Deployment]
+
+  def removeDeployment(name: String): F[Unit]
+
+  def services: F[List[skuber.Service]]
+
+  def runService(name: String, servable: CloudInstance): F[skuber.Service]
+
+  def removeService(name: String): F[Unit]
 
   def createHPA(
     name: String,
@@ -39,13 +46,12 @@ trait KubernetesClient[F[_]] {
     config: K8sHorizontalPodAutoscalerConfig
   ): F[HorizontalPodAutoscaler]
 
-  def runService(name: String, servable: CloudInstance): F[skuber.Service]
-  
-  def removeDeployment(name: String): F[Unit]
-  def removeService(name: String): F[Unit]
+  def getHPA(name: String): F[Option[HorizontalPodAutoscaler]]
+
   def removeHPA(name: String): F[Unit]
-  
+
   def getLogs(podName: String, follow: Boolean): F[Source[String, _]]
+
   def getPod(name: String): F[Pod]
 }
 
@@ -83,12 +89,12 @@ object KubernetesClient {
         .setEnvVar(DefaultConstants.ENV_APP_PORT, DefaultConstants.DEFAULT_APP_PORT.toString)
 
       val containerReqs = containerConf.flatMap(_.resources)
-      containerReqs.flatMap(_.requests).foreach{ req =>
+      containerReqs.flatMap(_.requests).foreach { req =>
         container = container.addResourceRequest("cpu", req.cpu)
         container = container.addResourceRequest("memory", req.memory)
       }
 
-      containerReqs.flatMap(_.limits).foreach{ req =>
+      containerReqs.flatMap(_.limits).foreach { req =>
         container = container.addResourceLimit("cpu", req.cpu)
         container = container.addResourceLimit("memory", req.memory)
       }
@@ -213,6 +219,10 @@ object KubernetesClient {
 
     override def removeHPA(name: String): F[Unit] = {
       AsyncUtil.futureAsync(underlying.delete[HorizontalPodAutoscaler](name))
+    }
+
+    override def getHPA(name: String): F[Option[HorizontalPodAutoscaler]] = {
+      AsyncUtil.futureAsync(underlying.get[HorizontalPodAutoscaler](name)).attempt.map(_.toOption)
     }
   }
 

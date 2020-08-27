@@ -110,7 +110,7 @@ class KubernetesDriverSpec extends GenericUnitTest {
       val client = mock[KubernetesClient[IO]]
       when(client.removeDeployment(name)).thenReturn(IO.unit)
       when(client.removeService(name)).thenReturn(IO.unit)
-      when(client.removeHPA(name)).thenReturn(IO.raiseError(new Exception("Not found")))
+      when(client.getHPA(name)).thenReturn(None.pure[IO])
 
       val driver = new KubernetesDriver[IO](client)
 
@@ -120,10 +120,20 @@ class KubernetesDriverSpec extends GenericUnitTest {
 
     it("should delete a Deployment, a Service, and a HPA") {
       val name = "asd"
-
+      val hpa = HorizontalPodAutoscaler(
+        metadata = skuber.ObjectMeta(),
+        spec = HorizontalPodAutoscaler.Spec(
+          scaleTargetRef = CrossVersionObjectReference(
+            apiVersion = "apps/v1",
+            kind = "Deployment",
+            name = name
+          )
+        )
+      )
       val client = mock[KubernetesClient[IO]]
       when(client.removeDeployment(name)).thenReturn(IO.unit)
       when(client.removeService(name)).thenReturn(IO.unit)
+      when(client.getHPA(name)).thenReturn(hpa.some.pure[IO])
       when(client.removeHPA(name)).thenReturn(IO.unit)
 
       val driver = new KubernetesDriver[IO](client)

@@ -48,7 +48,12 @@ class KubernetesDriver[F[_]](client: KubernetesClient[F])(implicit F: MonadError
   }
 
   override def remove(name: String): F[Unit] = {
-    client.removeService(name) *> client.removeHPA(name).attempt *> client.removeDeployment(name)
+    val removeHpa = client.getHPA(name)
+      .flatMap(_.traverse(_ => client.removeHPA(name)).void)
+
+    client.removeService(name) *>
+      removeHpa *>
+      client.removeDeployment(name)
   }
 
   override def getByVersionId(modelVersionId: Long): F[Option[CloudInstance]] = {
