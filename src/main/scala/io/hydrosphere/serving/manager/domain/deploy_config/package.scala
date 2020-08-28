@@ -8,16 +8,10 @@ import skuber.json.format._
 
 package object deploy_config {
   type NodeSelector = Map[String, String]
-
+  type Requirement = Map[String, String]
   type CpuDefinition = String
 
   type MemoryDefinition = String
-
-  final case class Requirement(cpu: String, memory: String)
-
-  object Requirement {
-    implicit val format: RootJsonFormat[Requirement] = jsonFormat2(Requirement.apply)
-  }
 
   final case class Requirements(limits: Option[Requirement], requests: Option[Requirement])
 

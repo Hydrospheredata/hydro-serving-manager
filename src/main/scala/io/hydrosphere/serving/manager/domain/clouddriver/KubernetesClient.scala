@@ -89,15 +89,17 @@ object KubernetesClient {
         .setEnvVar(DefaultConstants.ENV_APP_PORT, DefaultConstants.DEFAULT_APP_PORT.toString)
 
       val containerReqs = containerConf.flatMap(_.resources)
-      containerReqs.flatMap(_.requests).foreach { req =>
-        container = container.addResourceRequest("cpu", req.cpu)
-        container = container.addResourceRequest("memory", req.memory)
-      }
+      containerReqs
+        .flatMap(_.requests).getOrElse(Map.empty)
+        .foreach {
+          case (key, value) => container = container.addResourceRequest(key, value)
+        }
 
-      containerReqs.flatMap(_.limits).foreach { req =>
-        container = container.addResourceLimit("cpu", req.cpu)
-        container = container.addResourceLimit("memory", req.memory)
-      }
+      containerReqs
+        .flatMap(_.limits).getOrElse(Map.empty)
+        .foreach {
+          case (key, value) => container = container.addResourceLimit(key, value)
+        }
 
       var podSpec = Pod.Spec(
         affinity = podConf.flatMap(_.affinity),
