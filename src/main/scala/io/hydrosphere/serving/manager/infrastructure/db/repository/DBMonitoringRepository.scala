@@ -29,7 +29,8 @@ object DBMonitoringRepository {
     modelVersionId: Long,
     thresholdValue: Double,
     thresholdOp: ThresholdCmpOperator,
-    servableName: Option[String]
+    servableName: Option[String],
+    deploymentConfigName: Option[String]
   )
 
   def parseConfig(row: MetricSpecRow) = {
@@ -48,7 +49,8 @@ object DBMonitoringRepository {
       modelVersionId = spec.config.modelVersionId,
       thresholdValue = spec.config.threshold,
       thresholdOp = spec.config.thresholdCmpOperator,
-      servableName = spec.config.servable.map(_.fullName)
+      servableName = spec.config.servable.map(_.fullName),
+      deploymentConfigName = spec.config.deploymentConfigName
     )
     Try(config.toJson.compactPrint).toEither.map { json =>
       MetricSpecRow(
@@ -143,7 +145,8 @@ object DBMonitoringRepository {
           modelVersionId = parsedConfig.modelVersionId,
           threshold = parsedConfig.thresholdValue,
           thresholdCmpOperator = parsedConfig.thresholdOp,
-          servable = servable
+          servable = servable,
+          deploymentConfigName = parsedConfig.deploymentConfigName
         )
         CustomModelMetricSpec(
           name = rawSpec.name,

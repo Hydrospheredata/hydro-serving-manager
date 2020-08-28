@@ -6,14 +6,14 @@ import akka.stream.scaladsl.Source
 import cats.effect._
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
+import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, K8sHorizontalPodAutoscalerConfig}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import org.apache.logging.log4j.scala.Logging
 import skuber.Container.PullPolicy
 import skuber._
 import skuber.apps.v1.{Deployment, DeploymentList}
-import skuber.autoscaling.CPUTargetUtilization
+import skuber.autoscaling.{CPUTargetUtilization, HorizontalPodAutoscaler}
 import skuber.autoscaling.HorizontalPodAutoscaler.CrossVersionObjectReference
 import skuber.json.format._
 
@@ -21,17 +21,37 @@ import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
 trait KubernetesClient[F[_]] {
-  def services: F[List[skuber.Service]]
   def deployments: F[List[Deployment]]
-  
-  def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, config: Option[DeploymentConfiguration]): F[Deployment]
+
+  def runDeployment(
+    name: String,
+    servable: CloudInstance,
+    dockerImage: DockerImage,
+    config: Option[DeploymentConfiguration]
+  ): F[Deployment]
+
+  def removeDeployment(name: String): F[Unit]
+
+  def services: F[List[skuber.Service]]
 
   def runService(name: String, servable: CloudInstance): F[skuber.Service]
-  
-  def removeDeployment(name: String): F[Unit]
+
   def removeService(name: String): F[Unit]
-  
+
+  def createHPA(
+    name: String,
+    targetName: String,
+    targetApiVersion: String,
+    targetKind: String,
+    config: K8sHorizontalPodAutoscalerConfig
+  ): F[HorizontalPodAutoscaler]
+
+  def getHPA(name: String): F[Option[HorizontalPodAutoscaler]]
+
+  def removeHPA(name: String): F[Unit]
+
   def getLogs(podName: String, follow: Boolean): F[Source[String, _]]
+
   def getPod(name: String): F[Pod]
 }
 
@@ -56,7 +76,6 @@ object KubernetesClient {
     override def runDeployment(name: String, servable: CloudInstance, dockerImage: DockerImage, crc: Option[DeploymentConfiguration]): F[Deployment] = {
       import LabelSelector.dsl._
 
-      val hpaConf = crc.flatMap(_.hpa)
       val depConf = crc.flatMap(_.deployment)
       val podConf = crc.flatMap(_.pod)
       val containerConf = crc.flatMap(_.container)
@@ -70,12 +89,12 @@ object KubernetesClient {
         .setEnvVar(DefaultConstants.ENV_APP_PORT, DefaultConstants.DEFAULT_APP_PORT.toString)
 
       val containerReqs = containerConf.flatMap(_.resources)
-      containerReqs.flatMap(_.requests).foreach{ req =>
+      containerReqs.flatMap(_.requests).foreach { req =>
         container = container.addResourceRequest("cpu", req.cpu)
         container = container.addResourceRequest("memory", req.memory)
       }
 
-      containerReqs.flatMap(_.limits).foreach{ req =>
+      containerReqs.flatMap(_.limits).foreach { req =>
         container = container.addResourceLimit("cpu", req.cpu)
         container = container.addResourceLimit("memory", req.memory)
       }
@@ -112,24 +131,6 @@ object KubernetesClient {
         .withTemplate(podTemplate)
         .withLabelSelector(CloudDriver.Labels.ServiceName is name)
 
-      val hpaSpec = autoscaling.HorizontalPodAutoscaler.Spec(
-        scaleTargetRef = CrossVersionObjectReference(name = deployment.name),
-        minReplicas = hpaConf.flatMap(_.minReplicas),
-        maxReplicas = hpaConf.map(_.maxReplicas).getOrElse(1),
-        cpuUtilization = hpaConf.flatMap(_.cpuUtilization).map(CPUTargetUtilization.apply)
-      )
-
-      val hpa = autoscaling.HorizontalPodAutoscaler(
-        metadata = ObjectMeta(
-          name = servable.name,
-          labels = Map(
-            CloudDriver.Labels.ServiceName -> name,
-            CloudDriver.Labels.ModelVersionId -> servable.modelVersionId.toString
-          )
-        ),
-        spec = hpaSpec
-      )
-
       for {
         deployed <- deployments
         maybeExist = deployed.find(_.metadata.labels.getOrElse(CloudDriver.Labels.ServiceName, "") == name)
@@ -137,7 +138,6 @@ object KubernetesClient {
           case Some(value) => Async[F].pure(value)
           case None => AsyncUtil.futureAsync(underlying.create(deployment))
         }
-        _ <- AsyncUtil.futureAsync(underlying.create(hpa))
       } yield dpl
     }
 
@@ -157,6 +157,32 @@ object KubernetesClient {
           case None => AsyncUtil.futureAsync(underlying.create(service))
         }
       } yield svc
+    }
+
+    override def createHPA(
+      name: String,
+      targetName: String,
+      targetApiVersion: String,
+      targetKind: String,
+      config: K8sHorizontalPodAutoscalerConfig
+    ): F[HorizontalPodAutoscaler] = {
+      val hpaSpec = autoscaling.HorizontalPodAutoscaler.Spec(
+        scaleTargetRef = CrossVersionObjectReference(name = targetName, apiVersion = targetApiVersion),
+        minReplicas = config.minReplicas,
+        maxReplicas = config.maxReplicas,
+        cpuUtilization = config.cpuUtilization.map(CPUTargetUtilization.apply)
+      )
+
+      val hpa = autoscaling.HorizontalPodAutoscaler(
+        metadata = ObjectMeta(
+          name = name,
+          labels = Map(
+            CloudDriver.Labels.ServiceName -> name,
+          )
+        ),
+        spec = hpaSpec
+      )
+      AsyncUtil.futureAsync(underlying.create(hpa))
     }
 
     override def removeDeployment(name: String): F[Unit] = for {
@@ -189,6 +215,14 @@ object KubernetesClient {
           case Nil => Async[F].raiseError(new RuntimeException(s"There is no running pods for $name"))
         }
       }
+    }
+
+    override def removeHPA(name: String): F[Unit] = {
+      AsyncUtil.futureAsync(underlying.delete[HorizontalPodAutoscaler](name))
+    }
+
+    override def getHPA(name: String): F[Option[HorizontalPodAutoscaler]] = {
+      AsyncUtil.futureAsync(underlying.get[HorizontalPodAutoscaler](name)).attempt.map(_.toOption)
     }
   }
 

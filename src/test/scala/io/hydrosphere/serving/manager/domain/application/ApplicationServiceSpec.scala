@@ -5,6 +5,7 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, IO}
+import cats.syntax.applicative._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_field.ModelField
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
@@ -15,11 +16,12 @@ import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, Monitoring, MonitoringRepository, ThresholdCmpOperator}
 import io.hydrosphere.serving.manager.domain.servable.Servable._
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableGC, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.tensorflow.types.DataType
-import org.mockito.Matchers
+import org.mockito.{Matchers, Mockito}
 
 import scala.collection.mutable.ListBuffer
 
@@ -80,13 +82,16 @@ class ApplicationServiceSpec extends GenericUnitTest {
       val discoveryHub = new ApplicationEvents.Publisher[IO] {
         override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = IO.unit
       }
+      val monitoringRepo = mock[MonitoringRepository[IO]]
       val appDeployer = ApplicationDeployer.default[IO]()(
         Concurrent[IO],
         applicationRepository = appRepo,
         versionRepository = versionRepo,
         servableService= servableService,
         discoveryHub = discoveryHub,
-        deploymentConfigService = null
+        deploymentConfigService = null,
+        monitoringService = null,
+        monitoringRepo = monitoringRepo
       )
       val graph = ExecutionGraphRequest(NonEmptyList.of(
         PipelineStageRequest(NonEmptyList.of(
@@ -136,13 +141,17 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val discoveryHub = new ApplicationEvents.Publisher[IO] {
           override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = IO.unit
         }
+        val monitoringRepo = mock[MonitoringRepository[IO]]
+
         val appDeployer = ApplicationDeployer.default[IO]()(
           Concurrent[IO],
           applicationRepository = appRepo,
           versionRepository = versionRepo,
           servableService= servableService,
           discoveryHub = discoveryHub,
-          deploymentConfigService = null
+          deploymentConfigService = null,
+          monitoringService = null,
+          monitoringRepo = monitoringRepo
         )
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -192,13 +201,17 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val discoveryHub = new ApplicationEvents.Publisher[IO] {
           override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = IO.unit
         }
+        val monitoringRepo = mock[MonitoringRepository[IO]]
+        when(monitoringRepo.forModelVersion(1)).thenReturn(Nil.pure[IO])
         val appDeployer = ApplicationDeployer.default[IO]()(
           Concurrent[IO],
           applicationRepository = appRepo,
           versionRepository = versionRepo,
           servableService= servableService,
           discoveryHub = discoveryHub,
-          deploymentConfigService = null
+          deploymentConfigService = null,
+          monitoringService = null,
+          monitoringRepo = monitoringRepo
         )
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
@@ -272,16 +285,104 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
+        val monitoringRepo = mock[MonitoringRepository[IO]]
+        when(monitoringRepo.forModelVersion(1)).thenReturn(Nil.pure[IO])
         val appDeployer = ApplicationDeployer.default[IO]()(
           Concurrent[IO],
           applicationRepository = appRepo,
           versionRepository = versionRepo,
           servableService= servableService,
           discoveryHub = discoveryHub,
-          deploymentConfigService = null
+          deploymentConfigService = null,
+          monitoringService = null,
+          monitoringRepo = monitoringRepo
         )
         appDeployer.deploy("test", graph, List.empty).flatMap { res =>
           res.completed.get.map { finished =>
+            assert(finished.name === "test")
+            assert(finished.status.isInstanceOf[Application.Ready.type])
+            assert(appChanged.toList.nonEmpty)
+          }
+        }
+      }
+    }
+
+    it("should recreate missing MetricSpec Servables") {
+      ioAssert {
+        val appRepo = mock[ApplicationRepository[IO]]
+        when(appRepo.update(Matchers.any())).thenReturn(IO(1))
+        when(appRepo.get("test")).thenReturn(IO(None))
+        when(appRepo.create(Matchers.any())).thenReturn(IO(
+          Application(
+            id = 1,
+            name = "test",
+            namespace = None,
+            status = Application.Assembling,
+            signature = signature.copy(signatureName = "test"),
+            kafkaStreaming = List.empty,
+            graph = appGraph
+          )
+        ))
+        val versionRepo = mock[ModelVersionRepository[IO]]
+        when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
+        val servableService = mock[ServableService[IO]]
+        when(servableService.deploy(modelVersion, None, Map.empty)).thenReturn{
+          val s = Servable(
+            modelVersion = modelVersion,
+            nameSuffix = "test",
+            status = Servable.Serving("Ok", "host", 9090),
+            usedApps = Nil
+          )
+          DeferredResult.completed[IO, GenericServable](s)
+        }
+
+        val appChanged = ListBuffer.empty[Application]
+        val discoveryHub = new ApplicationEvents.Publisher[IO] {
+          override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = {
+            t match {
+              case DiscoveryEvent.Initial => IO.unit
+              case DiscoveryEvent.ItemUpdate(items) => IO(appChanged ++= items)
+              case DiscoveryEvent.ItemRemove(items) => IO.unit
+            }
+          }
+        }
+        val spec = CustomModelMetricSpec(
+          name = "test1",
+          modelVersionId = modelVersion.id,
+          config = CustomModelMetricSpecConfiguration(
+            modelVersionId = 2,
+            threshold = 2,
+            thresholdCmpOperator = ThresholdCmpOperator.Eq,
+            servable = None,
+            deploymentConfigName = None
+          )
+        )
+        val monitoringRepo = mock[MonitoringRepository[IO]]
+        when(monitoringRepo.forModelVersion(1)).thenReturn(List(spec).pure[IO])
+
+        val monitoringService = mock[Monitoring[IO]]
+        when(monitoringService.deployServable(spec)).thenReturn(spec.pure[IO])
+        val appDeployer = ApplicationDeployer.default[IO]()(
+          Concurrent[IO],
+          applicationRepository = appRepo,
+          versionRepository = versionRepo,
+          servableService= servableService,
+          discoveryHub = discoveryHub,
+          deploymentConfigService = null,
+          monitoringService = monitoringService,
+          monitoringRepo = monitoringRepo
+        )
+        val graph = ExecutionGraphRequest(NonEmptyList.of(
+          PipelineStageRequest(NonEmptyList.of(
+            ModelVariantRequest(
+              modelVersionId = 1,
+              weight = 100
+            )
+          ))
+        ))
+        appDeployer.deploy("test", graph, List.empty).flatMap { res =>
+          res.completed.get.map { finished =>
+            Mockito.verify(monitoringService).deployServable(spec)
             assert(finished.name === "test")
             assert(finished.status.isInstanceOf[Application.Ready.type])
             assert(appChanged.toList.nonEmpty)
