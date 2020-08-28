@@ -10,6 +10,7 @@ import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraphRequest
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationService
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -31,7 +32,9 @@ object ApplicationDeployer extends Logging {
     versionRepository: ModelVersionRepository[F],
     applicationRepository: ApplicationRepository[F],
     discoveryHub: ApplicationEvents.Publisher[F],
-    deploymentConfigService: DeploymentConfigurationService[F]
+    deploymentConfigService: DeploymentConfigurationService[F],
+    monitoringRepo: MonitoringRepository[F],
+    monitoringService: Monitoring[F]
   ): ApplicationDeployer[F] = {
     new ApplicationDeployer[F] {
       override def deploy(
@@ -141,6 +144,9 @@ object ApplicationDeployer extends Logging {
               variants <- stage.variants.traverse { i =>
                 for {
                   _ <- F.delay(logger.debug(s"Deploying ${i.modelVersion.fullName}"))
+                  mvMetrics <- monitoringRepo.forModelVersion(i.modelVersion.id)
+                  newMetricServables <- mvMetrics.filter(_.config.servable.isEmpty).traverse(monitoringService.deployServable)
+                  _ <- F.delay(logger.debug(s"Deployed MetricServables: ${newMetricServables}"))
                   result <- servableService.deploy(i.modelVersion, i.requiredDeploymentConfig, Map.empty)  // NOTE maybe infer some app-specific labels?
                   servable <- result.completed.get
                   okServable <- servable.status match {
