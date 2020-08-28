@@ -14,13 +14,13 @@ class HttpSpec extends GenericUnitTest {
     it("should return a json") {
       val container = K8sContainerConfig(
         resources = Requirements(
-          limits = Requirement(
-            cpu = "2",
-            memory = "2g"
+          limits =  Map(
+            "cpu" -> "2",
+            "memory" -> "2g"
           ).some,
-          requests = Requirement(
-            cpu = "2",
-            memory = "2g"
+          requests = Map(
+            "cpu" -> "2",
+            "memory" -> "2g"
           ).some
         ).some
       ).some
