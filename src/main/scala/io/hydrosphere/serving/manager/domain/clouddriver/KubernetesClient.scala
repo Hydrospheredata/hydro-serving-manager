@@ -169,7 +169,11 @@ object KubernetesClient {
       config: K8sHorizontalPodAutoscalerConfig
     ): F[HorizontalPodAutoscaler] = {
       val hpaSpec = autoscaling.HorizontalPodAutoscaler.Spec(
-        scaleTargetRef = CrossVersionObjectReference(name = targetName, apiVersion = targetApiVersion),
+        scaleTargetRef = CrossVersionObjectReference(
+          name = targetName,
+          apiVersion = targetApiVersion,
+          kind = targetKind
+        ),
         minReplicas = config.minReplicas,
         maxReplicas = config.maxReplicas,
         cpuUtilization = config.cpuUtilization.map(CPUTargetUtilization.apply)
