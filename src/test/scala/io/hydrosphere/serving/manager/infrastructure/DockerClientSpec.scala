@@ -28,7 +28,7 @@ class DockerClientSpec extends GenericUnitTest {
   }
 
   describe("DockerClient") {
-    it("should handle logs correctly") {
+    ignore("should handle logs correctly") {
       implicit val timer = IO.timer(ExecutionContext.global)
 
       val containerName = "keke"
