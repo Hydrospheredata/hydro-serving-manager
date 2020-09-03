@@ -76,7 +76,7 @@ class ServableSpec extends GenericUnitTest {
 
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
 
-        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
       }
       implicit val clientCtor = new PredictionClient.Factory[IO] {
         override def make(host: String, port: Int): Resource[IO, PredictionClient[IO]] = {
@@ -124,7 +124,7 @@ class ServableSpec extends GenericUnitTest {
         override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None): IO[CloudInstance] = ???
         override def remove(name: String): IO[Unit] = ???
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
       }
       val probe = ServableProbe.default[IO]()
       val result = probe.probe(servable).unsafeRunSync()
@@ -152,7 +152,7 @@ class ServableSpec extends GenericUnitTest {
         override def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[DeploymentConfiguration] = None): IO[CloudInstance] = ???
         override def remove(name: String): IO[Unit] = ???
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
       }
       val probe = ServableProbe.default[IO]()
       val result = probe.probe(servable).unsafeRunSync()
@@ -315,7 +315,7 @@ class ServableSpec extends GenericUnitTest {
         }
         override def remove(name: String): IO[Unit] = ???
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
       }
       val servableRepo = new ServableRepository[IO] {
         override def all(): IO[List[GenericServable]] = ???
@@ -380,7 +380,7 @@ class ServableSpec extends GenericUnitTest {
         }
         override def remove(name: String): IO[Unit] = ???
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
       }
       val repoState = ListBuffer.empty[GenericServable]
       val servableRepo = new ServableRepository[IO] {
@@ -480,7 +480,7 @@ class ServableSpec extends GenericUnitTest {
           IO.unit
         }
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
       }
       val repoState = ListBuffer.empty[GenericServable]
       repoState += initServable
@@ -575,7 +575,8 @@ class ServableSpec extends GenericUnitTest {
           IO.unit
         }
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+
+        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
       }
       val repoState = ListBuffer.empty[GenericServable]
       repoState += initServable
@@ -730,7 +731,8 @@ class ServableSpec extends GenericUnitTest {
         }
         override def remove(name: String): IO[Unit] = ???
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+
+        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
       }
 
       val versionRepo = new ModelVersionRepository[IO] {
@@ -796,7 +798,8 @@ class ServableSpec extends GenericUnitTest {
         }
         override def remove(name: String): IO[Unit] = ???
         override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-        override def getLogs(name: String, follow: Boolean): IO[Source[String, _]] = ???
+
+        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
       }
 
       val versionRepo = new ModelVersionRepository[IO] {

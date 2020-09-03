@@ -7,7 +7,7 @@ import java.util.Date
 
 import cats.effect.{Concurrent, IO}
 import com.spotify.docker.client.messages._
-import com.spotify.docker.client.{DockerClient, LogStream, ProgressHandler}
+import com.spotify.docker.client.{DockerClient, LogMessage, LogStream, ProgressHandler}
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
@@ -32,7 +32,7 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def runContainer(id: String): IO[Unit] = ???
           override def removeContainer(id: String, params: List[DockerClient.RemoveContainerParam]): IO[Unit] = ???
           override def listContainers(params: List[DockerClient.ListContainersParam]): IO[List[Container]] = ???
-          override def logs(id: String, follow: Boolean): IO[LogStream] = ???
+          override def logs(id: String, follow: Boolean): fs2.Stream[IO, String] = ???
           override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[DockerClient.BuildParam]): IO[String] = IO("sha:random-sha")
           override def push(image: String, progressHandler: ProgressHandler, registryAuth: RegistryAuth): IO[Unit] = IO.raiseError(new RuntimeException with NoStackTrace)
           override def inspectImage(image: String): IO[ImageInfo] = ???
@@ -153,7 +153,7 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def runContainer(id: String): IO[Unit] = ???
           override def removeContainer(id: String, params: List[DockerClient.RemoveContainerParam]): IO[Unit] = ???
           override def listContainers(params: List[DockerClient.ListContainersParam]): IO[List[Container]] = ???
-          override def logs(id: String, follow: Boolean): IO[LogStream] = ???
+          override def logs(id: String, follow: Boolean): fs2.Stream[IO, String] = ???
           override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[DockerClient.BuildParam]): IO[String] = IO("random-sha")
           override def push(image: String, progressHandler: ProgressHandler, registryAuth: RegistryAuth): IO[Unit] = IO.unit
           override def inspectImage(image: String): IO[ImageInfo] = IO(new ImageInfo {

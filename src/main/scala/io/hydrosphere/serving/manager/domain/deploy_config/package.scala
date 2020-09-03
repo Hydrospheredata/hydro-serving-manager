@@ -3,14 +3,16 @@ package io.hydrosphere.serving.manager.domain
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import io.hydrosphere.serving.manager.infrastructure.protocol.PlayJsonAdapter._
 import skuber.Pod.{Affinity, Toleration}
+import skuber.Resource.Quantity
 import spray.json.RootJsonFormat
 import skuber.json.format._
 
 package object deploy_config {
   type NodeSelector = Map[String, String]
   type Requirement = Map[String, String]
-  type CpuDefinition = String
+  type EnvironmentVariables = Map[String, String]
 
+  type CpuDefinition = String
   type MemoryDefinition = String
 
   final case class Requirements(limits: Option[Requirement], requests: Option[Requirement])
@@ -31,10 +33,11 @@ package object deploy_config {
 
   final case class K8sContainerConfig(
     resources: Option[Requirements],
+    env: Option[EnvironmentVariables]
   )
 
   object K8sContainerConfig {
-    implicit val format: RootJsonFormat[K8sContainerConfig] = jsonFormat1(K8sContainerConfig.apply)
+    implicit val format: RootJsonFormat[K8sContainerConfig] = jsonFormat2(K8sContainerConfig.apply)
   }
 
   final case class K8sPodConfig(
