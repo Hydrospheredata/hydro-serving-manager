@@ -6,15 +6,15 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
 import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.infrastructure.kubernetes.{K8SDeployments, K8SHorizontalPodAutoscalers, K8SPods, K8SServices, KubernetesClient}
-import io.hydrosphere.serving.manager.util.ReflectionUtils
+import io.hydrosphere.serving.manager.infrastructure.kubernetes._
+import io.hydrosphere.serving.manager.infrastructure.protocol.PlayJsonAdapter
 import org.mockito.{Matchers, Mockito}
-import skuber.Container.Port
-import skuber.EnvVar.StringValue
-import skuber.{Container, EnvVar, LabelSelector, LocalObjectReference, ObjectMeta, Pod, Protocol, Service}
 import skuber.apps.v1.Deployment
 import skuber.autoscaling.HorizontalPodAutoscaler
 import skuber.autoscaling.HorizontalPodAutoscaler.CrossVersionObjectReference
+import skuber.{ObjectMeta, Protocol, Service}
+import skuber.json.format._
+import spray.json._
 
 import scala.reflect.ClassTag
 
@@ -123,18 +123,8 @@ class KubernetesDriverSpec extends GenericUnitTest {
           .pure[IO]
       )
       val hpa = mock[K8SHorizontalPodAutoscalers[IO]]
-      when(hpa.create(Matchers.any())).thenReturn(
-        HorizontalPodAutoscaler(
-          metadata = skuber.ObjectMeta(),
-          spec = HorizontalPodAutoscaler.Spec(
-            scaleTargetRef = CrossVersionObjectReference(
-              apiVersion = "apps/v1",
-              kind = "Deployment",
-              name = name
-            )
-          )
-        ).pure[IO]
-      )
+      val hpa1 = KubernetesDriver.prepareHPA(name, Deployment(name), hpaConfig)
+      when(hpa.create(hpa1)).thenReturn(hpa1.pure[IO])
       val client = mockClient(deployments = deps.some, services = svc.some, hpa = hpa.some)
       val driver = new KubernetesDriver[IO](client, cdConfig, cdDrc)
 
