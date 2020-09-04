@@ -8,7 +8,7 @@ import com.spotify.docker.client.messages._
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver.DockerDriver.Internals.ContainerState
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
+import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 
@@ -48,7 +48,7 @@ class DockerDriver[F[_]](
     image: DockerImage,
     deploymentConfig: Option[DeploymentConfiguration] = None
   ): F[CloudInstance] = {
-    val container = Internals.mkContainerConfig(name, modelVersionId, image, config)
+    val container = Internals.mkContainerConfig(name, modelVersionId, image, config, deploymentConfig.flatMap(_.container))
     for {
       creation <- client.createContainer(container, None)
       _ <- client.runContainer(creation.id())
@@ -203,7 +203,8 @@ object DockerDriver {
       name: String,
       modelVersionId: Long,
       image: DockerImage,
-      dockerConf: CloudDriverConfiguration.Docker
+      dockerConf: CloudDriverConfiguration.Docker,
+      config: Option[K8sContainerConfig]
     ): ContainerConfig = {
       val hostConfig = {
         val builder = HostConfig.builder().networkMode(dockerConf.networkName)
@@ -218,7 +219,9 @@ object DockerDriver {
         CloudDriver.Labels.ServiceName -> name,
         CloudDriver.Labels.ModelVersionId -> modelVersionId.toString
       )
-      val envMap = Map(
+
+      val userEnvs = config.flatMap(_.env).getOrElse(Map.empty)
+      val envMap = userEnvs ++ Map(
         DefaultConstants.ENV_MODEL_DIR -> DefaultConstants.DEFAULT_MODEL_DIR,
         DefaultConstants.ENV_APP_PORT -> DefaultConstants.DEFAULT_APP_PORT.toString
       )

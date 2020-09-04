@@ -1,7 +1,5 @@
 package io.hydrosphere.serving.manager.infrastructure
 
-import java.nio.charset.StandardCharsets
-
 import cats.effect.IO
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.RemoveContainerParam

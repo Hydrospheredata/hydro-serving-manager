@@ -29,12 +29,12 @@ class KubernetesDriver[F[_]](
     serviceName <- Try(svc.metadata.labels(CloudDriver.Labels.ServiceName)).toEither
     host <- svc.spec
       .map(_.clusterIP)
-      .toRight(new IllegalArgumentException(s"SVC doesn't have ClusterIP: ${svc}"))
+      .toRight(new IllegalArgumentException(s"SVC doesn't have ClusterIP: $svc"))
     port <- svc.spec
       .toList
       .flatMap(_.ports)
       .collectFirst { case Port("grpc", _, port, _, _) => port }
-      .toRight(new IllegalArgumentException(s"SVC doesn't expose grpc port: ${svc}"))
+      .toRight(new IllegalArgumentException(s"SVC doesn't expose grpc port: $svc"))
   } yield CloudInstance(
     modelVersionId,
     serviceName,
