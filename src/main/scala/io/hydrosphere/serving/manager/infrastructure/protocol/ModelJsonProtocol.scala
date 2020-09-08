@@ -149,9 +149,9 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
       }
     }
   }
-  implicit val customSpecConfig = jsonFormat4(CustomModelMetricSpecConfiguration.apply)
+  implicit val customSpecConfig = jsonFormat5(CustomModelMetricSpecConfiguration.apply)
   implicit val customSpec = jsonFormat4(CustomModelMetricSpec.apply)
-  implicit val customModelConfigRow = jsonFormat4(CustomModelConfigRow.apply)
+  implicit val customModelConfigRow = jsonFormat5(CustomModelConfigRow.apply)
 }
 
 object ModelJsonProtocol extends ModelJsonProtocol

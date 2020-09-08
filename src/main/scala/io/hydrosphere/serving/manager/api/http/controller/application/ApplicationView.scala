@@ -4,8 +4,10 @@ import cats.data.NonEmptyList
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationGraphView.StageView
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationGraph, ApplicationKafkaStream}
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+import io.swagger.annotations.ApiModelProperty
 
 case class ApplicationGraphView(
   stages: NonEmptyList[StageView]
@@ -14,10 +16,11 @@ case class ApplicationGraphView(
 object ApplicationGraphView {
   case class VariantView(
     modelVersion: ModelVersion.Internal,
+    deploymentConfiguration: Option[DeploymentConfiguration],
     weight: Int
   )
   object VariantView {
-    implicit val jsformat = jsonFormat2(VariantView.apply)
+    implicit val jsformat = jsonFormat3(VariantView.apply)
   }
   case class StageView(
     modelVariants: NonEmptyList[VariantView],
@@ -32,7 +35,7 @@ object ApplicationGraphView {
   def fromGraph(graph: ApplicationGraph): ApplicationGraphView = {
     val stages = graph.stages.map{ s =>
       val variants = s.variants.map{ss =>
-        VariantView(ss.modelVersion, ss.weight)
+        VariantView(ss.modelVersion, ss.requiredDeploymentConfig, ss.weight)
       }
       StageView(variants, s.signature)
     }
@@ -52,6 +55,8 @@ case class ApplicationView(
 )
 
 object ApplicationView {
+  implicit val appView = jsonFormat8(ApplicationView.apply)
+
   def fromApplication(app: Application): ApplicationView = {
     val status = app.status.productPrefix
     val message = app.statusMessage

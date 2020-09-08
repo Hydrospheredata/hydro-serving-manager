@@ -9,7 +9,8 @@ case class CustomModelMetricSpecConfiguration(
   modelVersionId: Long,
   threshold: Double,
   thresholdCmpOperator: ThresholdCmpOperator,
-  servable: Option[GenericServable]
+  servable: Option[GenericServable],
+  deploymentConfigName: Option[String]
 )
 
 case class CustomModelMetricSpec(
