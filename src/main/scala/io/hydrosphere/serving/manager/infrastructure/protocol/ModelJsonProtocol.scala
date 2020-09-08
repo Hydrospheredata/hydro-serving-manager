@@ -11,7 +11,6 @@ import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, 
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository.CustomModelConfigRow
 import spray.json._
-import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 
 import scala.util.Try
 

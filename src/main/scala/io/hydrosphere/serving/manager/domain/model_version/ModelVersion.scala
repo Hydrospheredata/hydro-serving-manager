@@ -16,7 +16,6 @@ sealed trait ModelVersion extends Product with Serializable {
   def model: Model
   def metadata: Map[String, String]
   def fullName: String
-//  def monitoringConfiguration:
 }
 
 object ModelVersion {
