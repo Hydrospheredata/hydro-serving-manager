@@ -8,6 +8,9 @@ import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
+//import io.hydrosphere.serving.manager.infrastructure.db.repository.DBHostSelectorRepository.HostSelectorRow
+//import io.hydrosphere.serving.manager.domain.monitoring.McJsonProtocol._
+//import io.hydrosphere.serving.manager.util.SprayDoobie
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
@@ -19,7 +22,6 @@ import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurati
 import DBDeploymentConfigurationRepository._
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import spray.json._
-import io.hydrosphere.serving.manager.util.SprayDoobie._
 
 
 object DBServableRepository {
@@ -92,8 +94,8 @@ object DBServableRepository {
 
   def upsertQ(sr: ServableRow) =
     sql"""
-         |INSERT INTO hydro_serving.servable(service_name, model_version_id, status_text, host, port, status)
-         | VALUES(${sr.service_name}, ${sr.model_version_id}, ${sr.status_text}, ${sr.host}, ${sr.port}, ${sr.status})
+         |INSERT INTO hydro_serving.servable(service_name, model_version_id, status_text, host, port, status, deployment_configuration)
+         | VALUES(${sr.service_name}, ${sr.model_version_id}, ${sr.status_text}, ${sr.host}, ${sr.port}, ${sr.status}, ${sr.deployment_configuration})
          | ON CONFLICT (service_name)
          |  DO UPDATE
          |   SET service_name = ${sr.service_name},
@@ -101,7 +103,8 @@ object DBServableRepository {
          |       status_text = ${sr.status_text},
          |       host = ${sr.host},
          |       port = ${sr.port},
-         |       status = ${sr.status}
+         |       status = ${sr.status},
+         |       deployment_configuration = ${sr.deployment_configuration}
       """.stripMargin.update
 
   def deleteQ(name: String) =

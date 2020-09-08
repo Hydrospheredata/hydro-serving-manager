@@ -20,8 +20,8 @@ case class ModelVersionView(
   applications: List[String],
   image: Option[DockerImage],
   runtime: Option[DockerImage],
-  isExternal: Boolean,
-  monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration()
+  monitoringConfiguration: MonitoringConfiguration,
+  isExternal: Boolean
 )
 
 object ModelVersionView {

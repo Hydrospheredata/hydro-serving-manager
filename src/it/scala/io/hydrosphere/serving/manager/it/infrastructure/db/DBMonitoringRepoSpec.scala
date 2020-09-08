@@ -9,12 +9,11 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, ThresholdCmpOperator}
+import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, MonitoringConfiguration, ThresholdCmpOperator}
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository.MetricSpecRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
-
 
 class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
   implicit val transactor = app.transactor
@@ -53,6 +52,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
           threshold = 123,
           thresholdCmpOperator = ThresholdCmpOperator.LessEq,
           servable = None
+//          deploymentConfigName = None
         )
       )
       repo.upsert(msRow).unsafeRunSync()
@@ -66,6 +66,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
           threshold = 123,
           thresholdCmpOperator = ThresholdCmpOperator.LessEq,
           servable = Some(servable)
+//          deploymentConfigName = None
         )
       )
       repo.upsert(msRow2).unsafeRunSync()
@@ -109,7 +110,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mvOld = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, ModelVersionStatus.Released, None, Map.empty)
+      mvOld = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, ModelVersionStatus.Released, None, Map.empty, MonitoringConfiguration())
       mv <- app.core.repos.versionRepo.create(mvOld)
       mvNew = mvOld.copy(id = mv.id)
       serv = Servable(mvNew, "test-servable", Servable.Serving("ok", "here", 90), Nil, Map.empty)

@@ -12,6 +12,7 @@ import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DeferredResult
@@ -57,7 +58,9 @@ object ModelVersionBuilder {
           model = model,
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
-          metadata = metadata.metadata)
+          metadata = metadata.metadata,
+          // FIXME: Where to get MC?
+          monitoringConfiguration = MonitoringConfiguration())
         modelVersion <- modelVersionRepository.create(mv)
       } yield mv.copy(id = modelVersion.id)
     }
