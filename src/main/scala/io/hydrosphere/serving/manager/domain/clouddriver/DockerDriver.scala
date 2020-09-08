@@ -92,7 +92,7 @@ class DockerDriver[F[_]](
     (mName, mMvId).mapN { (name, mvId) =>
       c.state() match {
         case ContainerState.Running(_) =>
-          val host = Internals.extractIpAddress(c.networkSettings(), config.networkName)
+          val host = Internals.extractDNSName(c.networkSettings(), config.networkName)
           val status = CloudInstance.Status.Running(host, DefaultConstants.DEFAULT_APP_PORT)
           CloudInstance(mvId, name, status)
         case ContainerState.Created(_) =>
@@ -253,6 +253,13 @@ object DockerDriver {
     def extractIpAddress(settings: NetworkSettings, networkName: String): String = {
       val byNetworkName = Option(settings.networks().get(networkName)).map(_.ipAddress())
       byNetworkName.getOrElse(settings.ipAddress())
+    }
+
+    def extractDNSName(settings: NetworkSettings, networkName: String): String = {
+      Option(settings.networks().get(networkName))
+        .flatMap(_.aliases().asScala.headOption)
+        .map(name => s"dns:///$name")
+        .getOrElse(extractIpAddress(settings, networkName))
     }
   }
 }
