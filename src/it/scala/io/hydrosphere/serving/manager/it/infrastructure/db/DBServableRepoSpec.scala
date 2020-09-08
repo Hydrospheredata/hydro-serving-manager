@@ -75,11 +75,11 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
       mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, ModelVersionStatus.Released, None, Map.empty, MonitoringConfiguration())
       mv <- app.core.repos.versionRepo.create(mv)
-//      res <- app.core.repos.depConfRepository.create(d)
+      res <- app.core.repos.depConfRepository.create(d)
     } yield {
       println(s"Created: $mv")
       mv1 = mv.asInstanceOf[ModelVersion.Internal]
-//      depConf = res
+      depConf = res
     }
     f.unsafeRunSync()
   }
