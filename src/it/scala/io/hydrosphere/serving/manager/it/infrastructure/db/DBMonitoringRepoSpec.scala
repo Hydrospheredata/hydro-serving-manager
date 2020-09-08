@@ -51,8 +51,8 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
           modelVersionId = 1,
           threshold = 123,
           thresholdCmpOperator = ThresholdCmpOperator.LessEq,
-          servable = None
-//          deploymentConfigName = None
+          servable = None,
+          deploymentConfigName = None
         )
       )
       repo.upsert(msRow).unsafeRunSync()
@@ -65,8 +65,8 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
           modelVersionId = 1,
           threshold = 123,
           thresholdCmpOperator = ThresholdCmpOperator.LessEq,
-          servable = Some(servable)
-//          deploymentConfigName = None
+          servable = Some(servable),
+          deploymentConfigName = None
         )
       )
       repo.upsert(msRow2).unsafeRunSync()
