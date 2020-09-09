@@ -91,7 +91,6 @@ object ServableService extends Logging {
         initServable = Servable(modelVersion, randomSuffix, Servable.Starting("Initialization", None, None), Nil, metadata, deployConfig)
         _ <- servableRepository.upsert(initServable)
         _ <- awaitServable(initServable)
-          .flatTap(x => F.delay(logger.info(s"DEBUG: ${x}"))) // TODO remove
           .flatMap(d.complete)
           .onError {
             case NonFatal(ex) =>
@@ -105,12 +104,9 @@ object ServableService extends Logging {
 
     def awaitServable(servable: GenericServable): F[GenericServable] = {
       for {
-        _ <- F.delay(println(s"CloudDriver run: ${servable}"))  // TODO delete
         res <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, servable.deploymentConfiguration)
-        _ <- F.delay(println(s"CloudDriver result: ${res}"))  // TODO delete
         servableDef <- monitor.monitor(servable)
         resultServable <- servableDef.get
-        _ <- F.delay(println(s"Status monitor result ${resultServable}"))  // TODO delete
         _ <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))
         _ <- servableDH.update(resultServable)
       } yield resultServable

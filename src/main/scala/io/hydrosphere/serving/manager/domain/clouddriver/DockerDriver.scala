@@ -18,6 +18,7 @@ import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
+import scala.util.control.NoStackTrace
 
 class DockerDriver[F[_]](
   client: DockerdClient[F],
@@ -52,7 +53,7 @@ class DockerDriver[F[_]](
   ): F[CloudInstance] = {
     val container = Internals.mkContainerConfig(name, modelVersionId, image, config)
     for {
-      creation <- client.createContainer(container, None)
+      creation <- client.createContainer(container, Some(name))
       _ <- client.runContainer(creation.id())
       maybeOut <- instance(name)
       out <- maybeOut match {
@@ -88,11 +89,15 @@ class DockerDriver[F[_]](
 
     val mName = labels.get(CloudDriver.Labels.ServiceName)
     val mMvId = labels.get(CloudDriver.Labels.ModelVersionId).flatMap(i => Try(i.toLong).toOption)
-
+    val maybeName = Option(c.names())
+      .map(_.asScala)
+      .flatMap(_.headOption)
+      .map(_.tail)  // NB: name is '/container-name'. We need to remove the slash.
+      .map(n => s"dns:///$n")
     (mName, mMvId).mapN { (name, mvId) =>
       c.state() match {
         case ContainerState.Running(_) =>
-          val host = Internals.extractDNSName(c.networkSettings(), config.networkName)
+          val host = maybeName.getOrElse(Internals.extractIpAddress(c.networkSettings(), config.networkName))
           val status = CloudInstance.Status.Running(host, DefaultConstants.DEFAULT_APP_PORT)
           CloudInstance(mvId, name, status)
         case ContainerState.Created(_) =>
@@ -148,11 +153,13 @@ class DockerDriver[F[_]](
 }
 
 object DockerDriver {
-  
+
   object Internals {
 
     sealed trait ContainerState
+
     object ContainerState {
+
       final case object Created extends ContainerState {
         def unapply(arg: String): Option[Created.type] = {
           if (arg == "created") {
@@ -229,7 +236,7 @@ object DockerDriver {
         }
         withLogs.build()
       }
-  
+
       val labels = Map(
         CloudDriver.Labels.ServiceName -> name,
         CloudDriver.Labels.ModelVersionId -> modelVersionId.toString
@@ -238,9 +245,9 @@ object DockerDriver {
         DefaultConstants.ENV_MODEL_DIR -> DefaultConstants.DEFAULT_MODEL_DIR.toString,
         DefaultConstants.ENV_APP_PORT -> DefaultConstants.DEFAULT_APP_PORT.toString
       )
-  
-      val envs = envMap.map({ case (k, v) => s"$k=$v"}).toList.asJava
-  
+
+      val envs = envMap.map({ case (k, v) => s"$k=$v" }).toList.asJava
+
       ContainerConfig.builder()
         .image(image.fullName)
         .exposedPorts(DefaultConstants.DEFAULT_APP_PORT.toString)
@@ -249,17 +256,11 @@ object DockerDriver {
         .env(envs)
         .build()
     }
-  
+
     def extractIpAddress(settings: NetworkSettings, networkName: String): String = {
       val byNetworkName = Option(settings.networks().get(networkName)).map(_.ipAddress())
       byNetworkName.getOrElse(settings.ipAddress())
     }
-
-    def extractDNSName(settings: NetworkSettings, networkName: String): String = {
-      Option(settings.networks().get(networkName))
-        .flatMap(_.aliases().asScala.headOption)
-        .map(name => s"dns:///$name")
-        .getOrElse(extractIpAddress(settings, networkName))
-    }
   }
+
 }
