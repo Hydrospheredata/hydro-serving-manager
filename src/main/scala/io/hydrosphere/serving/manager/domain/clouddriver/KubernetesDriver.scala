@@ -14,7 +14,7 @@ class KubernetesDriver[F[_]](client: KubernetesClient[F])(implicit F: MonadError
   private def kubeSvc2Servable(svc: skuber.Service) = for {
     modelVersionId <- Try(svc.metadata.labels(CloudDriver.Labels.ModelVersionId).toLong).toEither
     serviceName <- Try(svc.metadata.labels(CloudDriver.Labels.ServiceName)).toEither
-    host = s"dns:///${svc.metadata.name}.${svc.metadata.namespace}"
+    host = s"dns:///${svc.metadata.name}.${svc.metadata.namespace}.svc.cluster.local"
     port <- svc.spec
       .toList
       .flatMap(_.ports)
