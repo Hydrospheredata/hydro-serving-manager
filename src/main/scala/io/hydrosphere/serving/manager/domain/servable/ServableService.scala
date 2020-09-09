@@ -94,9 +94,9 @@ object ServableService extends Logging {
           .flatMap(d.complete)
           .onError {
             case NonFatal(ex) =>
-              F.delay(logger.error(ex)) >>
               cloudDriver.remove(initServable.fullName).attempt >>
-                d.complete(initServable.copy(status = Servable.NotServing(ex.getMessage, None, None))).attempt.void
+                d.complete(initServable.copy(status = Servable.NotServing(ex.getMessage, None, None))).attempt >>
+                F.delay(logger.error(ex))
           }
           .start
       } yield DeferredResult(initServable, d)
@@ -104,7 +104,7 @@ object ServableService extends Logging {
 
     def awaitServable(servable: GenericServable): F[GenericServable] = {
       for {
-        res <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, servable.deploymentConfiguration)
+        _ <- cloudDriver.run(servable.fullName, servable.modelVersion.id, servable.modelVersion.image, servable.deploymentConfiguration)
         servableDef <- monitor.monitor(servable)
         resultServable <- servableDef.get
         _ <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))

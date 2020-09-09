@@ -18,7 +18,7 @@ import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
-import scala.util.control.NoStackTrace
+
 
 class DockerDriver[F[_]](
   client: DockerdClient[F],
