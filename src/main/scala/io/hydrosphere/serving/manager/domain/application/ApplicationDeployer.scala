@@ -11,7 +11,6 @@ import io.hydrosphere.serving.manager.domain.application.requests.ExecutionGraph
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationService
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
-import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
 import io.hydrosphere.serving.manager.util.DeferredResult
 import org.apache.logging.log4j.scala.Logging
@@ -25,6 +24,8 @@ trait ApplicationDeployer[F[_]] {
 }
 
 object ApplicationDeployer extends Logging {
+  case class IncompleteAppDeployment(app: Application, msg: String) extends Throwable
+
   def default[F[_]]()(
     implicit
     F: Concurrent[F],
@@ -48,16 +49,17 @@ object ApplicationDeployer extends Logging {
           _ <- discoveryHub.update(repoApp)
           app = composedApp.copy(id = repoApp.id)
           df <- Deferred[F, Application]
-          _ <- (for {
-            genericApp <- startServices(app)
-            _ <- F.delay(logger.debug("App services started. All ok."))
-            _ <- applicationRepository.update(genericApp)
-            _ <- discoveryHub.update(genericApp)
-            _ <- df.complete(genericApp)
-          } yield ())
-            .handleErrorWith { x =>
-              val failedApp = app.copy(status = Application.Failed, statusMessage = Option(x.getMessage))
-              F.delay(logger.error(s"Error while buidling application $failedApp", x)) >>
+          _ <- startServices(app, df)
+            .void
+            .flatTap(_ => F.delay(logger.debug("App services started. All ok.")))
+            .handleErrorWith { ex =>
+              val failedApp = ex match {
+                case IncompleteAppDeployment(incompleteApp, message) =>
+                  incompleteApp.copy(status = Application.Failed, statusMessage = Option(message))
+                case x =>
+                  app.copy(status = Application.Failed, statusMessage = Option(x.getMessage))
+              }
+              F.delay(logger.error(s"Error while buidling application $failedApp", ex)) >>
                 applicationRepository.update(failedApp) >>
                 df.complete(failedApp).attempt.void
             }
@@ -80,10 +82,10 @@ object ApplicationDeployer extends Logging {
                   version <- OptionT(versionRepository.get(m.modelVersionId))
                     .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find modelversion $m")))
                   internalVersion <- version match {
-                    case imv:  ModelVersion.Internal =>
+                    case imv: ModelVersion.Internal =>
                       imv.pure[F]
-                    case emv:  ModelVersion.External =>
-                      DomainError.invalidRequest(s"Can't deploy external ModelVersion ${emv.fullName}").raiseError[F,  ModelVersion.Internal]
+                    case emv: ModelVersion.External =>
+                      DomainError.invalidRequest(s"Can't deploy external ModelVersion ${emv.fullName}").raiseError[F, ModelVersion.Internal]
                   }
                   _ <- internalVersion.status match {
                     case ModelVersionStatus.Released => F.unit
@@ -137,7 +139,7 @@ object ApplicationDeployer extends Logging {
         } yield name
       }
 
-      private def startServices(app: Application) = {
+      private def startServices(app: Application, df: Deferred[F, Application]) = {
         for {
           deployedStages <- app.graph.stages.traverse { stage =>
             for {
@@ -147,23 +149,31 @@ object ApplicationDeployer extends Logging {
                   mvMetrics <- monitoringRepo.forModelVersion(i.modelVersion.id)
                   newMetricServables <- mvMetrics.filter(_.config.servable.isEmpty).traverse(monitoringService.deployServable)
                   _ <- F.delay(logger.debug(s"Deployed MetricServables: ${newMetricServables}"))
-                  result <- servableService.deploy(i.modelVersion, i.requiredDeploymentConfig, Map.empty)  // NOTE maybe infer some app-specific labels?
+                  result <- servableService.deploy(i.modelVersion, i.requiredDeploymentConfig, Map.empty) // NOTE maybe infer some app-specific labels?
                   servable <- result.completed.get
-                  okServable <- servable.status match {
-                    case _: Servable.Serving =>
-                      servable.asInstanceOf[OkServable].pure[F]
-                    case Servable.NotServing(msg, _, _) =>
-                      F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
-                    case Servable.NotAvailable(msg, _, _) =>
-                      F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
-                    case Servable.Starting(msg, _, _) =>
-                      F.raiseError[OkServable](DomainError.internalError(s"Servable ${servable.fullName} is in invalid state: $msg"))
-                  }
-                } yield i.copy(servable = okServable.some)
+                } yield i.copy(servable = servable.some)
               }
             } yield ApplicationStage(variants, stage.signature)
           }
           finishedApp = app.copy(status = Application.Ready, graph = ApplicationGraph(deployedStages))
+          _ <- applicationRepository.update(finishedApp)
+          _ <- finishedApp.graph.stages.toList
+            .flatMap(_.variants.toList)
+            .flatMap(_.servable)
+            .traverse { servable =>
+              servable.status match {
+                case _: Servable.Serving =>
+                  F.unit
+                case Servable.NotServing(msg, _, _) =>
+                  F.raiseError[Unit](IncompleteAppDeployment(finishedApp, s"Servable ${servable.fullName} is in invalid state: $msg"))
+                case Servable.NotAvailable(msg, _, _) =>
+                  F.raiseError[Unit](IncompleteAppDeployment(finishedApp, s"Servable ${servable.fullName} is in invalid state: $msg"))
+                case Servable.Starting(msg, _, _) =>
+                  F.raiseError[Unit](IncompleteAppDeployment(finishedApp, s"Servable ${servable.fullName} is in invalid state: $msg"))
+              }
+            }
+          _ <- df.complete(finishedApp)
+          _ <- discoveryHub.update(finishedApp)
         } yield finishedApp
       }
     }
