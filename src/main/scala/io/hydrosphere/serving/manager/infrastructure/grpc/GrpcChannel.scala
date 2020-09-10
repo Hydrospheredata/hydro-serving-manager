@@ -13,7 +13,11 @@ object GrpcChannel {
   new GrpcChannel.Factory[F] {
    def make(host: String, port: Int) = {
     val ch = F.delay {
-     val builder = ManagedChannelBuilder.forAddress(host, port)
+     val builder = if (host.startsWith("dns:")) {
+      ManagedChannelBuilder.forTarget(s"$host:$port")
+     } else {
+      ManagedChannelBuilder.forAddress(host, port)
+     }
      builder.usePlaintext()
      builder.build()
     }

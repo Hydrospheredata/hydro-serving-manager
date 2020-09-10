@@ -42,7 +42,7 @@ class KubernetesDriverSpec extends GenericUnitTest {
         image = image,
         config = config
       ).unsafeRunSync()
-      assert(result.status === CloudInstance.Status.Running("127.0.0.1", 9090))
+      assert(result.status === CloudInstance.Status.Running("dns:///asd..svc.cluster.local", 9090))
     }
 
     it("should create a Deployment, a Service, and a HPA for a Servable") {
@@ -101,7 +101,7 @@ class KubernetesDriverSpec extends GenericUnitTest {
         image = image,
         config = config
       ).unsafeRunSync()
-      assert(result.status === CloudInstance.Status.Running("127.0.0.1", 9090))
+      assert(result.status === CloudInstance.Status.Running("dns:///asd..svc.cluster.local", 9090))
     }
 
     it("should delete a Deployment and a Service") {
