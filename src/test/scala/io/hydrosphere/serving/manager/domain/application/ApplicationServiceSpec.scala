@@ -195,7 +195,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           override def findAndDeploy(name: String, version: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
           override def findAndDeploy(modelId: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
           override def deploy(modelVersion: ModelVersion.Internal, deployConfig: Option[deploy_config.DeploymentConfiguration], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] =  {
-            IO.raiseError(new RuntimeException("Test error"))
+            DeferredResult.completed[IO, GenericServable](Servable(modelVersion, "kek", Servable.NotServing("error", None, None), Nil))
           }
         }
         val discoveryHub = new ApplicationEvents.Publisher[IO] {
@@ -224,8 +224,10 @@ class ApplicationServiceSpec extends GenericUnitTest {
         appDeployer.deploy("test", graph, List.empty).flatMap { res =>
           println("Waiting for build")
           res.completed.get.map { x =>
-            val status = x.status.asInstanceOf[Application.Failed.type]
-            assert(x.statusMessage.get === "Test error")
+            assert(x.status == Application.Failed)
+            assert(x.statusMessage.get === "Servable model-1-kek is in invalid state: error")
+            println(x.graph.stages.head)
+            assert(x.graph.stages.head.variants.head.servable.isDefined)
           }
         }
       }
