@@ -14,9 +14,18 @@ import spray.json._
 
 import scala.reflect.runtime.universe.TypeTag
 
-class DBDeploymentConfigurationRepository[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]) extends DeploymentConfigurationRepository[F] {
+class DBDeploymentConfigurationRepository[F[_]](
+  eventPublisher: DeploymentConfigurationEvents.Publisher[F]
+)(
+  implicit
+  F: Bracket[F, Throwable],
+  tx: Transactor[F]
+) extends DeploymentConfigurationRepository[F] {
   override def create(entity: DeploymentConfiguration): F[DeploymentConfiguration] = {
-    insertQ(entity).run.transact(tx).as(entity)
+    insertQ(entity).run
+      .transact(tx)
+      .as(entity)
+      .flatTap(eventPublisher.update)
   }
 
   override def get(name: String): F[Option[DeploymentConfiguration]] = {
@@ -28,7 +37,9 @@ class DBDeploymentConfigurationRepository[F[_]]()(implicit F: Bracket[F, Throwab
   }
 
   override def delete(name: String): F[Int] = {
-    deleteQ(name).run.transact(tx)
+    deleteQ(name).run
+      .transact(tx)
+      .flatTap(_ => eventPublisher.remove(name))
   }
 }
 
@@ -39,6 +50,7 @@ object DBDeploymentConfigurationRepository {
     o.setValue(jsValue.compactPrint)
     o
   }
+
   implicit val jsonMeta: Meta[JsValue] = Meta.Advanced.other[PGobject]("json").timap[JsValue](
     obj => obj.getValue.parseJson)(
     json => jsonToPG(json)
@@ -53,20 +65,22 @@ object DBDeploymentConfigurationRepository {
 
   def allQ: doobie.Query0[DeploymentConfiguration] = sql"SELECT * FROM hydro_serving.deployment_configuration".query[DeploymentConfiguration]
 
-  def insertQ(entity: DeploymentConfiguration): doobie.Update0 = sql"""
-    |INSERT INTO hydro_serving.deployment_configuration (
-    | name,
-    | container,
-    | pod,
-    | deployment,
-    | hpa
-    |) VALUES (
-    | ${entity.name},
-    | ${entity.container},
-    | ${entity.pod},
-    | ${entity.deployment},
-    | ${entity.hpa}
-    |)""".stripMargin.update
+  def insertQ(entity: DeploymentConfiguration): doobie.Update0 =
+    sql"""
+         |INSERT INTO hydro_serving.deployment_configuration (
+         | name,
+         | container,
+         | pod,
+         | deployment,
+         | hpa
+         |) VALUES (
+         | ${entity.name},
+         | ${entity.container},
+         | ${entity.pod},
+         | ${entity.deployment},
+         | ${entity.hpa}
+
+         |)""".stripMargin.update
 
   def getByNameQ(name: String): doobie.Query0[DeploymentConfiguration] = sql"SELECT * FROM hydro_serving.deployment_configuration WHERE name = $name".query[DeploymentConfiguration]
 

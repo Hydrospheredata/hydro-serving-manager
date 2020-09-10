@@ -1,5 +1,6 @@
 package io.hydrosphere.serving.manager.domain
 
+import io.hydrosphere.serving.manager.discovery.DiscoveryService
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import io.hydrosphere.serving.manager.infrastructure.protocol.PlayJsonAdapter._
 import skuber.Pod.{Affinity, Toleration}
@@ -7,6 +8,8 @@ import spray.json.RootJsonFormat
 import skuber.json.format._
 
 package object deploy_config {
+  type DeploymentConfigurationName = String
+
   type NodeSelector = Map[String, String]
   type Requirement = Map[String, String]
   type CpuDefinition = String
@@ -58,7 +61,7 @@ package object deploy_config {
   }
 
   final case class DeploymentConfiguration(
-    name: String,
+    name: DeploymentConfigurationName,
     container: Option[K8sContainerConfig],
     pod: Option[K8sPodConfig],
     deployment: Option[K8sDeploymentConfig],
