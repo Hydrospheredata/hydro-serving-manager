@@ -9,7 +9,7 @@ import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionEvents, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import spray.json._
@@ -238,7 +238,7 @@ object DBModelVersionRepository {
       """.stripMargin.update
   }
 
-  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): ModelVersionRepository[F] = new ModelVersionRepository[F] {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F], modelPub: ModelVersionEvents.Publisher[F]): ModelVersionRepository[F] = new ModelVersionRepository[F] {
     override def all(): F[List[ModelVersion]] = {
       for {
         rows <- allQ.to[List].transact(tx)
@@ -246,16 +246,22 @@ object DBModelVersionRepository {
     }
 
     override def create(entity: ModelVersion): F[ModelVersion] = {
-      for {
-        id <- insertQ(fromModelVersion(entity)).withUniqueGeneratedKeys[Long]("model_version_id").transact(tx)
-      } yield entity match {
-        case imv:  ModelVersion.Internal => imv.copy(id = id)
-        case emv:  ModelVersion.External => emv.copy(id = id)
-      }
+      insertQ(fromModelVersion(entity))
+        .withUniqueGeneratedKeys[Long]("model_version_id")
+        .transact(tx)
+        .map { id =>
+          entity match {
+            case imv: ModelVersion.Internal => imv.copy(id = id)
+            case emv: ModelVersion.External => emv.copy(id = id)
+          }
+        }
+        .flatTap(modelPub.update)
     }
 
     override def update(entity: ModelVersion): F[Int] = {
-      updateQ(fromModelVersion( entity)).run.transact(tx)
+      updateQ(fromModelVersion(entity))
+        .run.transact(tx)
+        .flatTap(_ => modelPub.update(entity))
     }
 
     override def get(id: Long): F[Option[ModelVersion]] = {
@@ -272,6 +278,7 @@ object DBModelVersionRepository {
 
     override def delete(id: Long): F[Int] = {
       deleteQ(id).run.transact(tx)
+        .flatTap(_ => modelPub.remove(id))
     }
 
     override def listForModel(modelId: Long): F[List[ModelVersion]] = {
