@@ -36,7 +36,6 @@ object ApplicationService extends Logging {
     applicationRepository: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     servableService: ServableService[F],
-    discoveryHub: ApplicationEvents.Publisher[F],
     applicationDeployer: ApplicationDeployer[F],
     servableGC: ServableGC[F]
   ): ApplicationService[F] = new ApplicationService[F] {
@@ -56,7 +55,6 @@ object ApplicationService extends Logging {
     def delete(name: String): F[Application] = {
       for {
         app <- get(name)
-        _ <- discoveryHub.remove(app.name)
         _ <- applicationRepository.delete(app.id)
         _ <- app.graph.stages.traverse { stage =>
           stage.variants.traverse { variant =>

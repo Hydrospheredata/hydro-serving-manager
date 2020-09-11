@@ -29,14 +29,12 @@ object ModelVersionBuilder {
     imageRepository: ImageRepository[F],
     modelVersionService: ModelVersionService[F],
     storageOps: StorageOps[F],
-    modelDiscoveryHub: ModelVersionEvents.Publisher[F],
     buildLoggingService: BuildLoggingService[F]
   ): ModelVersionBuilder[F] = new ModelVersionBuilder[F] with Logging {
     override def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion.Internal]] = {
       for {
         init <- initialVersion(model, metadata)
         handler <- buildLoggingService.makeLogger(init)
-        _ <- modelDiscoveryHub.update(init)
         deferred <- Deferred[F, ModelVersion.Internal]
         _ <- handleBuild(init, modelFileStructure, handler).flatMap(deferred.complete).start
       } yield DeferredResult(init, deferred)
@@ -83,7 +81,6 @@ object ModelVersionBuilder {
         _ <- imageRepository.push(finishedVersion.image, handler)
         _ <- buildLoggingService.finishLogging(mv.id)
         _ <- modelVersionRepository.update(finishedVersion)
-        _ <- modelDiscoveryHub.update(finishedVersion)
       } yield finishedVersion
 
       innerCompleted.handleErrorWith { err =>
@@ -91,7 +88,6 @@ object ModelVersionBuilder {
           _ <- Concurrent[F].delay(logger.error("Model version build failed", err))
           failed = mv.copy(status = ModelVersionStatus.Failed, finished = Instant.now().some)
           _ <- buildLoggingService.finishLogging(mv.id).attempt
-          _ <- modelDiscoveryHub.update(failed).attempt
           _ <- modelVersionRepository.update(failed).attempt
         } yield failed
       }

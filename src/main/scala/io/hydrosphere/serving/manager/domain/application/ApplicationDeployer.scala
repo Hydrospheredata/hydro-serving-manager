@@ -24,6 +24,7 @@ trait ApplicationDeployer[F[_]] {
 }
 
 object ApplicationDeployer extends Logging {
+
   case class IncompleteAppDeployment(app: Application, msg: String) extends Throwable
 
   def default[F[_]]()(
@@ -32,7 +33,6 @@ object ApplicationDeployer extends Logging {
     servableService: ServableService[F],
     versionRepository: ModelVersionRepository[F],
     applicationRepository: ApplicationRepository[F],
-    discoveryHub: ApplicationEvents.Publisher[F],
     deploymentConfigService: DeploymentConfigurationService[F],
     monitoringRepo: MonitoringRepository[F],
     monitoringService: Monitoring[F]
@@ -46,7 +46,6 @@ object ApplicationDeployer extends Logging {
         for {
           composedApp <- composeApp(name, None, executionGraph, kafkaStreaming)
           repoApp <- applicationRepository.create(composedApp)
-          _ <- discoveryHub.update(repoApp)
           app = composedApp.copy(id = repoApp.id)
           df <- Deferred[F, Application]
           _ <- startServices(app, df)
@@ -173,7 +172,6 @@ object ApplicationDeployer extends Logging {
               }
             }
           _ <- df.complete(finishedApp)
-          _ <- discoveryHub.update(finishedApp)
         } yield finishedApp
       }
     }
