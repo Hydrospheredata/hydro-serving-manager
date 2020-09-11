@@ -17,9 +17,13 @@ import io.hydrosphere.serving.manager.api.http.controller.model.{ExternalModelCo
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
 import io.hydrosphere.serving.manager.api.http.controller.{DeploymentConfigController, HostSelectorController, MonitoringController, SwaggerDocController}
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
+import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
 import io.hydrosphere.serving.manager.domain.application.migrations.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
+import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
+import io.hydrosphere.serving.manager.domain.servable.ServableEvents
 import io.hydrosphere.serving.manager.infrastructure.db.Database
 import io.hydrosphere.serving.manager.infrastructure.db.repository._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
@@ -74,10 +78,19 @@ object App {
       tx <- Resource.liftF(Database.makeTransactor[F](hk, connectEc, transactEc))
       flyway <- Resource.liftF(Database.makeFlyway(tx))
       _ <- Resource.liftF(flyway.migrate())
+
+      appPubSub <- Resource.liftF(ApplicationEvents.makeTopic)
+      modelPubSub <- Resource.liftF(ModelVersionEvents.makeTopic)
+      servablePubSub <- Resource.liftF(ServableEvents.makeTopic)
+      monitoringPubSub <- Resource.liftF(MetricSpecEvents.makeTopic)
       core <- {
         implicit val rng = rngF
         implicit val cd = cloudDriver
         implicit val itx = tx
+        implicit val (appPub, appSub) = appPubSub
+        implicit val (modelPub, modelSub) = modelPubSub
+        implicit val (servablePub, servableSub) = servablePubSub
+        implicit val (metricPub, metricSub) = monitoringPubSub
         implicit val hsRepo = new DBDeploymentConfigurationRepository()
         implicit val modelRepo = DBModelRepository.make()
         implicit val modelVersionRepo = DBModelVersionRepository.make()
@@ -95,7 +108,7 @@ object App {
           .default(core.repos.appRepo, core.repos.versionRepo, cloudDriver, core.deployer, core.repos.servableRepo)
       }
       grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
-      discoveryService = new GrpcServingDiscovery[F](core.appSub, core.servableSub, core.monitoringSub , core.appService, core.servableService, core.repos.monitoringRepository)
+      discoveryService = new GrpcServingDiscovery[F](appPubSub._2, servablePubSub._2, monitoringPubSub._2 , core.appService, core.servableService, core.repos.monitoringRepository)
       grpc = GrpcServer.default(config, grpcService, discoveryService)
 
       externalModelController = new ExternalModelController[F](core.modelService)
@@ -109,7 +122,7 @@ object App {
       appController = new ApplicationController[F](core.appService)
       hsController = new HostSelectorController[F]
       servableController = new ServableController[F](core.servableService, cloudDriver)
-      sseController = new SSEController[F](core.appSub, core.modelSub, core.servableSub, core.monitoringSub)
+      sseController = new SSEController[F](appPubSub._2, modelPubSub._2, servablePubSub._2, monitoringPubSub._2)
       monitoringController = new MonitoringController[F](core.monitoringService, core.repos.monitoringRepository)
       depConfController = new DeploymentConfigController[F](core.deploymentConfigService)
 

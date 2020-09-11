@@ -206,12 +206,14 @@ object DBApplicationRepository {
       """.stripMargin.update
 
 
-  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): ApplicationRepository[F] = new ApplicationRepository[F] {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F], appPublisher: ApplicationEvents.Publisher[F]): ApplicationRepository[F] = new ApplicationRepository[F] {
     override def create(entity: Application): F[Application] = {
       val row = fromApplication(entity)
-      for {
-        id <- createQ(row).withUniqueGeneratedKeys[Long]("id").transact(tx)
-      } yield entity.copy(id = id)
+      createQ(row)
+        .withUniqueGeneratedKeys[Long]("id")
+        .transact(tx)
+        .map(id => entity.copy(id = id))
+        .flatTap(appPublisher.update)
     }
 
     override def get(id: Long): F[Option[Application]] = {
@@ -241,10 +243,17 @@ object DBApplicationRepository {
     override def update(value: Application): F[Int] = {
       val row = fromApplication(value)
       updateQ(row).run.transact(tx)
+        .flatTap(_ => appPublisher.update(value))
     }
 
     override def delete(id: Long): F[Int] = {
-      deleteQ(id).run.transact(tx)
+      get(id).flatMap {
+        case Some(app) =>
+          deleteQ(app.id).run.transact(tx)
+            .flatTap(_ => appPublisher.remove(app.name))
+        case None =>
+          F.raiseError(DomainError.notFound(s"Application with id ${id} not found"))
+      }
     }
 
     override def all(): F[List[Application]] = {

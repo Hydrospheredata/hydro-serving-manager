@@ -39,7 +39,6 @@ object Monitoring extends Logging {
     repo: MonitoringRepository[F],
     servableService: ServableService[F],
     versionRepo: ModelVersionRepository[F],
-    pub: MetricSpecEvents.Publisher[F],
     depConfService: DeploymentConfigurationService[F]
   ): Monitoring[F] = new Monitoring[F] {
     override def create(incomingMS: MetricSpecCreationRequest): F[CustomModelMetricSpec] = {
@@ -72,14 +71,12 @@ object Monitoring extends Logging {
           servableService.stop(servable.fullName)
         }
         _ = logger.debug("Send MetricSpec remove event")
-        _ <- pub.remove(specId)
       } yield spec
     }
 
     override def update(spec: CustomModelMetricSpec): F[CustomModelMetricSpec] = {
       for {
         _ <- repo.upsert(spec)
-        _ <- pub.update(spec)
       } yield spec
     }
 
@@ -112,7 +109,6 @@ object Monitoring extends Logging {
             monitorServable <- servableService.deploy(mvMonitor, depConf, servableMetadata)
             deployedSpec = spec.copy(config = spec.config.copy(servable = monitorServable.started.some))
             _ <- repo.upsert(deployedSpec)
-            _ <- pub.update(deployedSpec)
           } yield deployedSpec
       }
     }

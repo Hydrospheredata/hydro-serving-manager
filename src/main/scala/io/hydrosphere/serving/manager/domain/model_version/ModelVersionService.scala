@@ -29,7 +29,6 @@ object ModelVersionService {
     implicit F: MonadError[F, Throwable],
     modelVersionRepository: ModelVersionRepository[F],
     applicationRepo: ApplicationRepository[F],
-    modelPublisher: ModelVersionEvents.Publisher[F]
   ): ModelVersionService[F] = new ModelVersionService[F] with Logging {
 
     def list: F[List[ModelVersionView]] = {
@@ -50,7 +49,6 @@ object ModelVersionService {
       val f = for {
         version <- OptionT(modelVersionRepository.get(versionId))
         _ <- OptionT.liftF(modelVersionRepository.delete(versionId))
-        _ <- OptionT.liftF(modelPublisher.remove(versionId))
       } yield version
       f.value
     }
