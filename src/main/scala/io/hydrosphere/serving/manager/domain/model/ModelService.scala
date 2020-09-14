@@ -11,6 +11,7 @@ import io.hydrosphere.serving.manager.domain.DomainError._
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.domain.servable.ServableRepository
 import io.hydrosphere.serving.manager.domain.{Contract, DomainError}
 import io.hydrosphere.serving.manager.infrastructure.storage.ModelUnpacker
@@ -182,6 +183,7 @@ object ModelService {
           modelContract = modelReq.contract,
           model = parentModel,
           metadata = modelReq.metadata.getOrElse(Map.empty),
+          monitoringConfiguration = modelReq.monitoringConfiguration.getOrElse(MonitoringConfiguration())
         )
         ver <- modelVersionRepository.create(mv)
       } yield mv.copy(id = ver.id)

@@ -10,6 +10,7 @@ import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfigurat
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository.ServableRow
@@ -72,7 +73,7 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
     )
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, ModelVersionStatus.Released, None, Map.empty)
+      mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, ModelVersionStatus.Released, None, Map.empty, MonitoringConfiguration())
       mv <- app.core.repos.versionRepo.create(mv)
       res <- app.core.repos.depConfRepository.create(d)
     } yield {

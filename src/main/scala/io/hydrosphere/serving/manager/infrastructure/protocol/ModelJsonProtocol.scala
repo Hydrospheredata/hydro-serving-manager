@@ -21,9 +21,9 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
     implicit val running = jsonFormat2(CloudInstance.Status.Running.apply)
 
     object Keys {
-      val Running  = "running"
+      val Running = "running"
       val Starting = "starting"
-      val Stopped  = "stopped"
+      val Stopped = "stopped"
     }
 
     override def read(json: JsValue): CloudInstance.Status = {
@@ -56,8 +56,8 @@ trait ModelJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol {
 
   implicit val modelFormat         = jsonFormat2(Model)
   implicit val versionStatusFormat = enumFormat(ModelVersionStatus)
-  implicit val internalModelVersionFormat  = jsonFormat11(ModelVersion.Internal.apply)
-  implicit val externalModelVersionFormat  = jsonFormat6(ModelVersion.External.apply)
+  implicit val internalModelVersionFormat  = jsonFormat12(ModelVersion.Internal.apply)
+  implicit val externalModelVersionFormat  = jsonFormat7(ModelVersion.External.apply)
   implicit val modelVersionFormat = new RootJsonWriter[ModelVersion] {
     override def write(obj: ModelVersion): JsValue = {
       val fields = obj match {
