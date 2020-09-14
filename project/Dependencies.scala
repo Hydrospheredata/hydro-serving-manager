@@ -4,10 +4,10 @@ object Dependencies {
   val akkaVersion = "2.5.14"
   val akkaHttpVersion = "10.1.9"
   val log4j2Version = "2.8.2"
-  val postgresqlVersion = "42.1.4"
+  val postgresqlVersion = "42.2.4"
   val scalaTestVersion = "3.0.3"
   val awsSdkVersion = "1.11.312"
-  val servingGrpcScala = "2.3.1"
+  val servingGrpcScala = "2.4.0-rc2"
   val catsV = "1.2.0"
   val envoyDataPlaneApi = "v1.6.0_1"
 

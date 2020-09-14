@@ -6,6 +6,7 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 
 case class ModelVersionView(
   id: Long,
@@ -19,6 +20,7 @@ case class ModelVersionView(
   applications: List[String],
   image: Option[DockerImage],
   runtime: Option[DockerImage],
+  monitoringConfiguration: MonitoringConfiguration,
   isExternal: Boolean
 )
 
@@ -38,22 +40,24 @@ object ModelVersionView {
           status = internalMV.status.toString,
           applications = applications.map(_.name),
           metadata = internalMV.metadata,
-          isExternal = false
+          isExternal = false,
+          monitoringConfiguration = internalMV.monitoringConfiguration
         )
-      case ModelVersion.External(id, created, modelVersion, modelContract, model, metadata) =>
+      case externalMV: ModelVersion.External =>
         ModelVersionView(
-          id = id,
+          id = externalMV.id,
           image = None,
-          created = created,
-          finished = Some(created),
-          modelVersion = modelVersion,
-          modelContract = modelContract,
+          created = externalMV.created,
+          finished = Some(externalMV.created),
+          modelVersion = externalMV.modelVersion,
+          modelContract = externalMV.modelContract,
           runtime = None,
-          model = model,
+          model = externalMV.model,
           status = ModelVersionStatus.Released.toString,
           applications = Nil,
-          metadata = metadata,
-          isExternal = true
+          metadata = externalMV.metadata,
+          isExternal = true,
+          monitoringConfiguration = externalMV.monitoringConfiguration
         )
     }
   }
