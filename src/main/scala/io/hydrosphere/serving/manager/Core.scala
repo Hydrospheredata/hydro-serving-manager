@@ -2,14 +2,14 @@ package io.hydrosphere.serving.manager
 
 import cats.effect._
 import cats.implicits._
-import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationEvents, ApplicationRepository, ApplicationService, GraphComposer}
+import io.hydrosphere.serving.manager.domain.application.{ApplicationDeployer, ApplicationRepository, ApplicationService}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfigurationRepository, DeploymentConfigurationService}
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model.{ModelRepository, ModelService}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLogRepository, BuildLoggingService, ModelVersionBuilder}
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionEvents, ModelVersionRepository, ModelVersionService}
-import io.hydrosphere.serving.manager.domain.monitoring.{MetricSpecEvents, Monitoring, MonitoringRepository}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersionRepository, ModelVersionService}
+import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
@@ -39,17 +39,9 @@ final case class Core[F[_]](
   deploymentConfigService: DeploymentConfigurationService[F],
   modelService: ModelService[F],
   versionService: ModelVersionService[F],
-  modelPub: ModelVersionEvents.Publisher[F],
-  modelSub: ModelVersionEvents.Subscriber[F],
   appService: ApplicationService[F],
-  appPub: ApplicationEvents.Publisher[F],
-  appSub: ApplicationEvents.Subscriber[F],
   servableService: ServableService[F],
-  servablePub: ServableEvents.Publisher[F],
-  servableSub: ServableEvents.Subscriber[F],
   monitoringService: Monitoring[F],
-  monitoringPub: MetricSpecEvents.Publisher[F],
-  monitoringSub: MetricSpecEvents.Subscriber[F],
 )
 
 object Core {
@@ -75,18 +67,10 @@ object Core {
   ): F[Core[F]] = {
     implicit val servableProbe: ServableProbe[F] = ServableProbe.default[F]
     for {
-      appPubSub <- ApplicationEvents.makeTopic
-      modelPubSub <- ModelVersionEvents.makeTopic
-      servablePubSub <- ServableEvents.makeTopic
-      monitoringPubSub <- MetricSpecEvents.makeTopic
       buildLoggingService <- BuildLoggingService.make[F]()
       servableMonitor <- ServableMonitor.default[F](2.seconds, 1.minute)
       core <- {
         implicit val sMon = servableMonitor.mon
-        implicit val (appPub, appSub) = appPubSub
-        implicit val (modelPub, modelSub) = modelPubSub
-        implicit val (servablePub, servableSub) = servablePubSub
-        implicit val (metricPub, metricSub) = monitoringPubSub
         implicit val bl: BuildLoggingService[F] = buildLoggingService
         implicit val nameGen: NameGenerator[F] = NameGenerator.haiku[F]()
         implicit val modelUnpacker: ModelUnpacker[F] = ModelUnpacker.default[F]()
@@ -112,17 +96,9 @@ object Core {
             deploymentConfigService = deploymentConfigService,
             modelService = modelService,
             versionService = versionService,
-            modelPub = modelPub,
-            modelSub = modelSub,
             appService = appService,
-            appPub = appPub,
-            appSub = appSub,
             servableService = servableService,
-            servablePub = servablePub,
-            servableSub = servableSub,
             monitoringService = monitoringService,
-            monitoringPub = metricPub,
-            monitoringSub = metricSub
           )
         }
       }

@@ -7,7 +7,7 @@ import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableEvents, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
@@ -140,7 +140,8 @@ object DBServableRepository {
       """.stripMargin.query[JoinedServableRow]
   }
 
-  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]) = new ServableRepository[F] {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F], servablePub: ServableEvents.Publisher[F],
+  ) = new ServableRepository[F] {
     override def findForModelVersion(versionId: Long): F[List[GenericServable]] = {
       for {
         rows <- findForModelVersionQ(versionId).to[List].transact(tx)
@@ -159,11 +160,14 @@ object DBServableRepository {
 
     override def upsert(servable: GenericServable): F[GenericServable] = {
       val row = fromServable(servable)
-      upsertQ(row).run.transact(tx).as(servable)
+      upsertQ(row).run.transact(tx)
+        .as(servable)
+        .flatTap(servablePub.update)
     }
 
     override def delete(name: String): F[Int] = {
       deleteQ(name).run.transact(tx)
+        .flatTap(_ => servablePub.remove(name))
     }
 
     override def get(name: String): F[Option[GenericServable]] = {

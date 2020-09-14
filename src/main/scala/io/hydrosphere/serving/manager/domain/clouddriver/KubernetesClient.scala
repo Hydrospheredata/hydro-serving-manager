@@ -145,6 +145,7 @@ object KubernetesClient {
 
     override def runService(name: String, servable: CloudInstance): F[skuber.Service] = {
       val service = skuber.Service(metadata = ObjectMeta(name = servable.name))
+        .withClusterIP("None")  // NB: create headless k8s service for client GRPC load balancing
         .withSelector(CloudDriver.Labels.ServiceName -> name)
         .exposeOnPort(skuber.Service.Port("grpc", Protocol.TCP, DefaultConstants.DEFAULT_APP_PORT))
         .addLabels(Map(
