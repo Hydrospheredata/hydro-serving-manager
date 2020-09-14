@@ -183,8 +183,7 @@ object ModelService {
           modelContract = modelReq.contract,
           model = parentModel,
           metadata = modelReq.metadata.getOrElse(Map.empty),
-          // FIXME: Where to get MC?
-          monitoringConfiguration = MonitoringConfiguration()
+          monitoringConfiguration = modelReq.monitoringConfiguration.getOrElse(MonitoringConfiguration())
         )
         ver <- modelVersionRepository.create(mv)
       } yield mv.copy(id = ver.id)

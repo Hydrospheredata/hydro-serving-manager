@@ -59,8 +59,7 @@ object ModelVersionBuilder {
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
           metadata = metadata.metadata,
-          // FIXME: Where to get MC?
-          monitoringConfiguration = MonitoringConfiguration())
+          monitoringConfiguration = metadata.monitoringConfiguration)
         modelVersion <- modelVersionRepository.create(mv)
       } yield mv.copy(id = modelVersion.id)
     }
