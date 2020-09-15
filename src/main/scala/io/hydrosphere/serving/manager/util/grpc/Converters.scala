@@ -49,23 +49,21 @@ object Converters {
           id = imv.id,
           version = imv.modelVersion,
           status = imv.status.toString,
+          model = Some(grpc.entities.Model(imv.model.id, imv.model.name)),
+          contract = Some(imv.modelContract),
+          image = Some(grpc.entities.DockerImage(imv.image.name, imv.image.tag)),
           imageSha = imv.image.sha256.getOrElse(""),
-          model = imv.model.toGrpc.some,
-          contract = imv.modelContract.some,
-          image = grpc.entities.DockerImage(imv.image.name, imv.image.tag).some,
-          runtime = grpc.entities.DockerImage(imv.runtime.name, imv.runtime.tag).some,
-          metadata = imv.metadata,
-          monitoringConfiguration = Some(grpc.entities.MonitoringConfiguration(batchSize = imv.monitoringConfiguration.batchSize))
+          runtime = Some(grpc.entities.DockerImage(imv.runtime.name, imv.runtime.tag)),
+          metadata = imv.metadata
         )
       case emv: ModelVersion.External =>
         grpc.entities.ModelVersion(
           id = emv.id,
           version = emv.modelVersion,
           status = ModelVersionStatus.Released.toString,
-          model = emv.model.toGrpc.some,
-          contract = emv.modelContract.some,
+          model = Some(grpc.entities.Model(emv.model.id, emv.model.name)),
+          contract = Some(emv.modelContract),
           metadata = emv.metadata,
-          monitoringConfiguration = grpc.entities.MonitoringConfiguration(batchSize=emv.monitoringConfiguration.batchSize).some
         )
     }
   }

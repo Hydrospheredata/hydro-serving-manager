@@ -8,7 +8,6 @@ import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.FetcherResult
 
 case class ModelVersionMetadata(
@@ -16,8 +15,7 @@ case class ModelVersionMetadata(
   contract: ModelContract,
   runtime: DockerImage,
   installCommand: Option[String],
-  metadata: Map[String, String],
-  monitoringConfiguration: MonitoringConfiguration
+  metadata: Map[String, String]
 )
 
 object ModelVersionMetadata {
@@ -33,8 +31,7 @@ object ModelVersionMetadata {
       contract = contract,
       runtime = upload.runtime,
       installCommand = upload.installCommand,
-      metadata = metadata,
-      monitoringConfiguration = upload.monitoringConfiguration.getOrElse(MonitoringConfiguration())
+      metadata = metadata
     )
   }
 

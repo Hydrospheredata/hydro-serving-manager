@@ -34,12 +34,12 @@ trait CompleteJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol 
     override def read(json: JsValue): DomainError = throw DeserializationException("Can't deserealize DomainError")
   }
 
-  implicit val modelUpload = jsonFormat8(ModelUploadMetadata.apply)
+  implicit val modelUpload = jsonFormat7(ModelUploadMetadata.apply)
 
-  implicit val versionView = jsonFormat13(ModelVersionView.apply)
+  implicit val versionView = jsonFormat12(ModelVersionView.apply)
   implicit val deployModelFormat = jsonFormat4(DeployModelRequest.apply)
 
-  implicit val modelRegister = jsonFormat4(RegisterModelRequest.apply)
+  implicit val modelRegister = jsonFormat3(RegisterModelRequest.apply)
 }
 
 object CompleteJsonProtocol extends CompleteJsonProtocol

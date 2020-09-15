@@ -12,19 +12,18 @@ import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DeferredResult
 import org.apache.logging.log4j.scala.Logging
 
-trait ModelVersionBuilder[F[_]] {
+trait ModelVersionBuilder[F[_]]{
   def build(model: Model, metadata: ModelVersionMetadata, modelFileStructure: ModelFileStructure): F[DeferredResult[F, ModelVersion.Internal]]
 }
 
 object ModelVersionBuilder {
   def apply[F[_] : Concurrent]()(
-    implicit
+  implicit
     dockerClient: DockerdClient[F],
     modelVersionRepository: ModelVersionRepository[F],
     imageRepository: ImageRepository[F],
@@ -57,7 +56,7 @@ object ModelVersionBuilder {
           status = ModelVersionStatus.Assembling,
           installCommand = metadata.installCommand,
           metadata = metadata.metadata,
-          monitoringConfiguration = metadata.monitoringConfiguration)
+        )
         modelVersion <- modelVersionRepository.create(mv)
       } yield mv.copy(id = modelVersion.id)
     }
