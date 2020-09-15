@@ -60,7 +60,6 @@ object ServableService extends Logging {
     appRepo: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     monitor: ServableMonitor[F],
-    servableDH: ServableEvents.Publisher[F],
     monitoringRepository: MonitoringRepository[F],
     deploymentConfigService: DeploymentConfigurationService[F],
   ): ServableService[F] = new ServableService[F] {
@@ -108,7 +107,6 @@ object ServableService extends Logging {
         servableDef <- monitor.monitor(servable)
         resultServable <- servableDef.get
         _ <- F.delay(logger.debug(s"Servable init finished ${resultServable.fullName}"))
-        _ <- servableDH.update(resultServable)
       } yield resultServable
     }
 
@@ -130,7 +128,6 @@ object ServableService extends Logging {
         apps <- appRepo.findServableUsage(name)
         _ <- apps match {
           case Nil =>
-            servableDH.remove(name) >>
               cloudDriver.remove(name) >>
               servableRepository.delete(name).void
           case usedApps =>

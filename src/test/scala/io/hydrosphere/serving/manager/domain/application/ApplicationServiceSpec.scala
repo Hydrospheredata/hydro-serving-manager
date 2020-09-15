@@ -79,16 +79,12 @@ class ApplicationServiceSpec extends GenericUnitTest {
         def findAndDeploy(modelId: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
         def deploy(modelVersion: ModelVersion.Internal, deployConfig: Option[deploy_config.DeploymentConfiguration], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
       }
-      val discoveryHub = new ApplicationEvents.Publisher[IO] {
-        override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = IO.unit
-      }
       val monitoringRepo = mock[MonitoringRepository[IO]]
       val appDeployer = ApplicationDeployer.default[IO]()(
         Concurrent[IO],
         applicationRepository = appRepo,
         versionRepository = versionRepo,
         servableService= servableService,
-        discoveryHub = discoveryHub,
         deploymentConfigService = null,
         monitoringService = null,
         monitoringRepo = monitoringRepo
@@ -138,9 +134,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             }
           }
         }
-        val discoveryHub = new ApplicationEvents.Publisher[IO] {
-          override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = IO.unit
-        }
+
         val monitoringRepo = mock[MonitoringRepository[IO]]
 
         val appDeployer = ApplicationDeployer.default[IO]()(
@@ -148,7 +142,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
           applicationRepository = appRepo,
           versionRepository = versionRepo,
           servableService= servableService,
-          discoveryHub = discoveryHub,
           deploymentConfigService = null,
           monitoringService = null,
           monitoringRepo = monitoringRepo
@@ -195,11 +188,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
           override def findAndDeploy(name: String, version: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
           override def findAndDeploy(modelId: Long, deployConfigName: Option[String], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] = ???
           override def deploy(modelVersion: ModelVersion.Internal, deployConfig: Option[deploy_config.DeploymentConfiguration], metadata: Map[String, String]): IO[DeferredResult[IO, GenericServable]] =  {
-            IO.raiseError(new RuntimeException("Test error"))
+            DeferredResult.completed[IO, GenericServable](Servable(modelVersion, "kek", Servable.NotServing("error", None, None), Nil))
           }
-        }
-        val discoveryHub = new ApplicationEvents.Publisher[IO] {
-          override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = IO.unit
         }
         val monitoringRepo = mock[MonitoringRepository[IO]]
         when(monitoringRepo.forModelVersion(1)).thenReturn(Nil.pure[IO])
@@ -208,7 +198,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
           applicationRepository = appRepo,
           versionRepository = versionRepo,
           servableService= servableService,
-          discoveryHub = discoveryHub,
           deploymentConfigService = null,
           monitoringService = null,
           monitoringRepo = monitoringRepo
@@ -224,8 +213,10 @@ class ApplicationServiceSpec extends GenericUnitTest {
         appDeployer.deploy("test", graph, List.empty).flatMap { res =>
           println("Waiting for build")
           res.completed.get.map { x =>
-            val status = x.status.asInstanceOf[Application.Failed.type]
-            assert(x.statusMessage.get === "Test error")
+            assert(x.status == Application.Failed)
+            assert(x.statusMessage.get === "Servable model-1-kek is in invalid state: error")
+            println(x.graph.stages.head)
+            assert(x.graph.stages.head.variants.head.servable.isDefined)
           }
         }
       }
@@ -267,16 +258,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
           }
         }
 
-        val appChanged = ListBuffer.empty[Application]
-        val discoveryHub = new ApplicationEvents.Publisher[IO] {
-          override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = {
-            t match {
-              case DiscoveryEvent.Initial => IO.unit
-              case DiscoveryEvent.ItemUpdate(items) => IO(appChanged ++= items)
-              case DiscoveryEvent.ItemRemove(items) => IO.unit
-            }
-          }
-        }
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
             ModelVariantRequest(
@@ -292,7 +273,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
           applicationRepository = appRepo,
           versionRepository = versionRepo,
           servableService= servableService,
-          discoveryHub = discoveryHub,
           deploymentConfigService = null,
           monitoringService = null,
           monitoringRepo = monitoringRepo
@@ -301,7 +281,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
           res.completed.get.map { finished =>
             assert(finished.name === "test")
             assert(finished.status.isInstanceOf[Application.Ready.type])
-            assert(appChanged.toList.nonEmpty)
           }
         }
       }
@@ -336,16 +315,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
           DeferredResult.completed[IO, GenericServable](s)
         }
 
-        val appChanged = ListBuffer.empty[Application]
-        val discoveryHub = new ApplicationEvents.Publisher[IO] {
-          override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = {
-            t match {
-              case DiscoveryEvent.Initial => IO.unit
-              case DiscoveryEvent.ItemUpdate(items) => IO(appChanged ++= items)
-              case DiscoveryEvent.ItemRemove(items) => IO.unit
-            }
-          }
-        }
         val spec = CustomModelMetricSpec(
           name = "test1",
           modelVersionId = modelVersion.id,
@@ -367,7 +336,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
           applicationRepository = appRepo,
           versionRepository = versionRepo,
           servableService= servableService,
-          discoveryHub = discoveryHub,
           deploymentConfigService = null,
           monitoringService = monitoringService,
           monitoringRepo = monitoringRepo
@@ -385,7 +353,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
             Mockito.verify(monitoringService).deployServable(spec)
             assert(finished.name === "test")
             assert(finished.status.isInstanceOf[Application.Ready.type])
-            assert(appChanged.toList.nonEmpty)
           }
         }
       }
@@ -432,15 +399,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
         }
 
         val apps = ListBuffer.empty[Application]
-        val eventPublisher = new ApplicationEvents.Publisher[IO] {
-          override def publish(t: DiscoveryEvent[Application, String]): IO[Unit] = {
-            t match {
-              case DiscoveryEvent.Initial => IO.unit
-              case DiscoveryEvent.ItemUpdate(items) => IO(apps ++= items)
-              case DiscoveryEvent.ItemRemove(items) => IO(apps.filterNot(a => items.contains(a)))
-            }
-          }
-        }
         val graph = ExecutionGraphRequest(NonEmptyList.of(
           PipelineStageRequest(NonEmptyList.of(
             ModelVariantRequest(
@@ -460,7 +418,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
           appRepo,
           versionRepo,
           servableService,
-          eventPublisher,
           appDep,
           gc
         )

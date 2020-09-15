@@ -6,10 +6,12 @@ import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
+import io.hydrosphere.serving.manager.util.SprayDoobie._
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository, ModelVersionStatus}
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionEvents, ModelVersionRepository, ModelVersionStatus}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import spray.json._
@@ -34,7 +36,8 @@ object DBModelVersionRepository {
     profile_types: Option[String],
     install_command: Option[String],
     metadata: Option[String],
-    is_external: Boolean
+    is_external: Boolean,
+    monitoring_configuration: JsValue
   )
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow)
@@ -62,7 +65,9 @@ object DBModelVersionRepository {
         modelVersion = mvr.model_version,
         modelContract = contract,
         model = model,
-        metadata = metadata
+        metadata = metadata,
+        monitoringConfiguration = mvr.monitoring_configuration.convertTo[MonitoringConfiguration]
+
       )
     } else {
       ModelVersion.Internal(
@@ -77,6 +82,7 @@ object DBModelVersionRepository {
         status = ModelVersionStatus.withName(mvr.status),
         installCommand = mvr.install_command,
         metadata = metadata,
+        monitoringConfiguration = mvr.monitoring_configuration.convertTo[MonitoringConfiguration]
       )
     }
   }
@@ -99,17 +105,20 @@ object DBModelVersionRepository {
           status = mv.status.toString,
           profile_types = None,
           install_command = mv.installCommand,
-          metadata = if(mv.metadata.nonEmpty) {mv.metadata.toJson.compactPrint.some} else None,
-          is_external = false
+          metadata = if (mv.metadata.nonEmpty) {
+            mv.metadata.toJson.compactPrint.some
+          } else None,
+          is_external = false,
+          monitoring_configuration = mv.monitoringConfiguration.toJson
         )
-      case ModelVersion.External(id, created, modelVersion, modelContract, model, metadata) =>
+      case emv: ModelVersion.External =>
         ModelVersionRow(
-          model_version_id = id,
-          model_id = model.id,
-          created_timestamp = created,
-          finished_timestamp = Some(created),
-          model_version = modelVersion,
-          model_contract = modelContract.toJson.compactPrint,
+          model_version_id = emv.id,
+          model_id = emv.model.id,
+          created_timestamp = emv.created,
+          finished_timestamp = Some(emv.created),
+          model_version = emv.modelVersion,
+          model_contract = emv.modelContract.toJson.compactPrint,
           image_name = DockerImage.dummyImage.name,
           image_tag = DockerImage.dummyImage.tag,
           image_sha256 = None,
@@ -118,8 +127,12 @@ object DBModelVersionRepository {
           status = ModelVersionStatus.Released.toString,
           profile_types = None,
           install_command = None,
-          metadata = if(metadata.nonEmpty) {metadata.toJson.compactPrint.some} else None,
-          is_external = true
+          metadata = if (emv.metadata.nonEmpty) {
+            emv.metadata.toJson.compactPrint.some
+          } else None,
+          is_external = true,
+          monitoring_configuration = emv.monitoringConfiguration.toJson
+
         )
     }
   }
@@ -193,7 +206,8 @@ object DBModelVersionRepository {
          | status,
          | install_command,
          | metadata,
-         | is_external
+         | is_external,
+         | monitoring_configuration
          | ) VALUES (
          | ${mv.model_id},
          | ${mv.created_timestamp},
@@ -208,7 +222,8 @@ object DBModelVersionRepository {
          | ${mv.status},
          | ${mv.install_command},
          | ${mv.metadata},
-         | ${mv.is_external}
+         | ${mv.is_external},
+         | ${mv.monitoring_configuration}
          |)""".stripMargin.update
   }
 
@@ -227,7 +242,8 @@ object DBModelVersionRepository {
          | runtime_version = ${mv.runtime_version},
          | status = ${mv.status},
          | install_command = ${mv.install_command},
-         | metadata = ${mv.metadata}
+         | metadata = ${mv.metadata},
+         | monitoring_configuration = ${mv.monitoring_configuration}
          | WHERE model_version_id = ${mv.model_version_id}""".stripMargin.update
   }
 
@@ -238,7 +254,7 @@ object DBModelVersionRepository {
       """.stripMargin.update
   }
 
-  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): ModelVersionRepository[F] = new ModelVersionRepository[F] {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F], modelPub: ModelVersionEvents.Publisher[F]): ModelVersionRepository[F] = new ModelVersionRepository[F] {
     override def all(): F[List[ModelVersion]] = {
       for {
         rows <- allQ.to[List].transact(tx)
@@ -246,16 +262,22 @@ object DBModelVersionRepository {
     }
 
     override def create(entity: ModelVersion): F[ModelVersion] = {
-      for {
-        id <- insertQ(fromModelVersion(entity)).withUniqueGeneratedKeys[Long]("model_version_id").transact(tx)
-      } yield entity match {
-        case imv:  ModelVersion.Internal => imv.copy(id = id)
-        case emv:  ModelVersion.External => emv.copy(id = id)
-      }
+      insertQ(fromModelVersion(entity))
+        .withUniqueGeneratedKeys[Long]("model_version_id")
+        .transact(tx)
+        .map { id =>
+          entity match {
+            case imv: ModelVersion.Internal => imv.copy(id = id)
+            case emv: ModelVersion.External => emv.copy(id = id)
+          }
+        }
+        .flatTap(modelPub.update)
     }
 
     override def update(entity: ModelVersion): F[Int] = {
-      updateQ(fromModelVersion( entity)).run.transact(tx)
+      updateQ(fromModelVersion(entity))
+        .run.transact(tx)
+        .flatTap(_ => modelPub.update(entity))
     }
 
     override def get(id: Long): F[Option[ModelVersion]] = {
@@ -272,6 +294,7 @@ object DBModelVersionRepository {
 
     override def delete(id: Long): F[Int] = {
       deleteQ(id).run.transact(tx)
+        .flatTap(_ => modelPub.remove(id))
     }
 
     override def listForModel(modelId: Long): F[List[ModelVersion]] = {

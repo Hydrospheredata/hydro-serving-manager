@@ -84,15 +84,11 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def readBytes(path: Path): IO[Option[Array[Byte]]] = ???
           override def writeBytes(path: Path, bytes: Array[Byte]): IO[Path] = IO.pure(path)
         }
-        val mh = new ModelVersionEvents.Publisher[IO] {
-          override def publish(t: DiscoveryEvent[ModelVersion, Long]): IO[Unit] = IO.unit
-        }
         val bl = new BuildLoggingService[IO] {
           override def makeLogger(modelVersion: ModelVersion.Internal): IO[ProgressHandler] = IO(DockerProgress.makeLogger(println))
           override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
           override def getLogs(modelVersionId: Long, sinceLine: Int): IO[Option[fs2.Stream[IO, String]]] = IO(None)
         }
-
 
         val builder = ModelVersionBuilder[IO]()(
           Concurrent[IO],
@@ -100,7 +96,6 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           imageRepository = imageRepo,
           modelVersionService = versionService,
           storageOps = ops,
-          modelDiscoveryHub = mh,
           buildLoggingService = bl,
           dockerClient = dc
         )
@@ -199,9 +194,6 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def readBytes(path: Path): IO[Option[Array[Byte]]] = ???
           override def writeBytes(path: Path, bytes: Array[Byte]): IO[Path] = IO.pure(path)
         }
-        val mh = new ModelVersionEvents.Publisher[IO] {
-          override def publish(t: DiscoveryEvent[ModelVersion, Long]): IO[Unit] = IO.unit
-        }
         val bl = new BuildLoggingService[IO] {
           override def makeLogger(modelVersion: ModelVersion.Internal): IO[ProgressHandler] = IO(DockerProgress.makeLogger(println))
           override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
@@ -213,7 +205,6 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           imageRepository = imageRepo,
           modelVersionService = versionService,
           storageOps = ops,
-          modelDiscoveryHub = mh,
           buildLoggingService = bl,
           dockerClient = dc
         )
