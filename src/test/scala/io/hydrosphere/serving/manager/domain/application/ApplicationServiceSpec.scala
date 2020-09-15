@@ -97,7 +97,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           )
         ))
       ))
-      val result = appDeployer.deploy("test", graph, List.empty).attempt.unsafeRunSync()
+      val result = appDeployer.deploy("test", graph, List.empty, Map.empty).attempt.unsafeRunSync()
       result.left.value.getClass should be (classOf[DomainError.InvalidRequest])
     }
 
@@ -154,7 +154,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
-        appDeployer.deploy("test", graph, List.empty).map { res =>
+        appDeployer.deploy("test", graph, List.empty, Map.empty).map { res =>
           assert(res.started.name === "test")
           assert(res.started.status.isInstanceOf[Application.Assembling.type])
           // build will fail nonetheless
@@ -210,7 +210,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
-        appDeployer.deploy("test", graph, List.empty).flatMap { res =>
+        appDeployer.deploy("test", graph, List.empty, Map.empty).flatMap { res =>
           println("Waiting for build")
           res.completed.get.map { x =>
             assert(x.status == Application.Failed)
@@ -277,7 +277,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           monitoringService = null,
           monitoringRepo = monitoringRepo
         )
-        appDeployer.deploy("test", graph, List.empty).flatMap { res =>
+        appDeployer.deploy("test", graph, List.empty, Map.empty).flatMap { res =>
           res.completed.get.map { finished =>
             assert(finished.name === "test")
             assert(finished.status.isInstanceOf[Application.Ready.type])
@@ -348,7 +348,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           ))
         ))
-        appDeployer.deploy("test", graph, List.empty).flatMap { res =>
+        appDeployer.deploy("test", graph, List.empty, Map.empty).flatMap { res =>
           res.completed.get.map { finished =>
             Mockito.verify(monitoringService).deployServable(spec)
             assert(finished.name === "test")
@@ -408,7 +408,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           ))
         ))
         val appDep = new ApplicationDeployer[IO] {
-          override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream]): IO[DeferredResult[IO, Application]] = {
+          override def deploy(name: String, executionGraph: ExecutionGraphRequest, kafkaStreaming: List[ApplicationKafkaStream], meta: Map[String, String]): IO[DeferredResult[IO, Application]] = {
             DeferredResult.completed[IO, Application](ogApp)
           }
         }
