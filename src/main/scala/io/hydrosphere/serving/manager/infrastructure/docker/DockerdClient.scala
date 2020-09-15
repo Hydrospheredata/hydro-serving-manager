@@ -1,21 +1,21 @@
 package io.hydrosphere.serving.manager.infrastructure.docker
 
-
 import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 
 import cats.effect.Async
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.{BuildParam, ListContainersParam, RemoveContainerParam}
 import com.spotify.docker.client.messages._
-import com.spotify.docker.client.{DefaultDockerClient, DockerClient, LogStream, ProgressHandler}
+import com.spotify.docker.client.{DefaultDockerClient, DockerClient, LogMessage, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerClientConfig
 import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
 import org.apache.logging.log4j.scala.Logging
 import spray.json._
 
 import scala.collection.JavaConverters._
-import scala.util.control.NoStackTrace
+
 
 trait DockerdClient[F[_]]{
   
@@ -30,7 +30,7 @@ trait DockerdClient[F[_]]{
   def listRunningContainers: F[List[Container]] = listContainers(Nil)
   def listAllContainers: F[List[Container]] = listContainers(ListContainersParam.allContainers() :: Nil)
   
-  def logs(id: String, follow: Boolean): F[LogStream]
+  def logs(id: String, follow: Boolean): fs2.Stream[F, String]
 
   def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[BuildParam]): F[String]
 
@@ -77,12 +77,15 @@ object DockerdClient extends Logging {
         F.delay(underlying.listContainers(params: _*)).map(_.asScala.toList)
       }
 
-      override def logs(id: String, follow: Boolean): F[LogStream] = {
-        if (follow) {
+      override def logs(id: String, follow: Boolean): fs2.Stream[F, String] = {
+        val rawStream = if (follow) {
           F.delay(underlying.logs(id, DockerClient.LogsParam.stderr(), DockerClient.LogsParam.stdout(), DockerClient.LogsParam.follow()))
         } else {
           F.delay(underlying.logs(id, DockerClient.LogsParam.stderr(), DockerClient.LogsParam.stdout()))
         }
+        fs2.Stream.eval(rawStream)
+          .flatMap(x => fs2.Stream.fromIterator[F, LogMessage](x.asScala))
+          .map(logMessage => StandardCharsets.UTF_8.decode(logMessage.content()).toString)
       }
 
       override def push(image: String, progressHandler: ProgressHandler, registryAuth: RegistryAuth): F[Unit] = F.async { cb =>

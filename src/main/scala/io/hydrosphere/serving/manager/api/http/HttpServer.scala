@@ -32,7 +32,8 @@ object HttpServer extends AkkaHttpControllerDsl {
     servableRoutes: Route,
     sseRoutes: Route,
     monitoringRoutes: Route,
-    externalModelRoutes: Route
+    externalModelRoutes: Route,
+    deploymentConfRoutes: Route,
   )(implicit
     as: ActorSystem,
     am: ActorMaterializer,
@@ -47,7 +48,8 @@ object HttpServer extends AkkaHttpControllerDsl {
           hostSelectorRoutes ~
           servableRoutes ~
           sseRoutes ~
-          monitoringRoutes
+          monitoringRoutes ~
+          deploymentConfRoutes
       }
     }
 

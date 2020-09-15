@@ -1,7 +1,6 @@
 package io.hydrosphere.serving.manager.infrastructure.protocol
 
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
-import io.hydrosphere.serving.manager.api.http.controller.host_selector.CreateHostSelector
 import io.hydrosphere.serving.manager.api.http.controller.model.{ModelUploadMetadata, RegisterModelRequest}
 import io.hydrosphere.serving.manager.api.http.controller.servable.DeployModelRequest
 import io.hydrosphere.serving.manager.domain.DomainError
@@ -9,8 +8,6 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersionView
 import spray.json._
 
 trait CompleteJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol with ModelJsonProtocol {
-
-  implicit val createEnvironmentRequest = jsonFormat2(CreateHostSelector)
 
   implicit val errorFormat = new RootJsonFormat[DomainError] {
     override def write(obj: DomainError): JsValue = {
@@ -37,14 +34,12 @@ trait CompleteJsonProtocol extends CommonJsonProtocol with ContractJsonProtocol 
     override def read(json: JsValue): DomainError = throw DeserializationException("Can't deserealize DomainError")
   }
 
-  implicit val modelUpload = jsonFormat7(ModelUploadMetadata.apply)
+  implicit val modelUpload = jsonFormat8(ModelUploadMetadata.apply)
 
   implicit val versionView = jsonFormat13(ModelVersionView.apply)
-  implicit val deployModelFormat = jsonFormat3(DeployModelRequest.apply)
+  implicit val deployModelFormat = jsonFormat4(DeployModelRequest.apply)
 
-  implicit val appView = jsonFormat8(ApplicationView.apply)
-
-  implicit val modelRegister = jsonFormat3(RegisterModelRequest.apply)
+  implicit val modelRegister = jsonFormat4(RegisterModelRequest.apply)
 }
 
 object CompleteJsonProtocol extends CompleteJsonProtocol

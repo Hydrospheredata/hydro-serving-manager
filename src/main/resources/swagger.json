@@ -1,0 +1,1653 @@
+{
+  "swagger" : "2.0",
+  "info" : {
+    "description" : "",
+    "version" : "2",
+    "title" : "Hydroserving Manager service",
+    "termsOfService" : "",
+    "license" : {
+      "name" : "Apache License 2.0",
+      "url" : "https://github.com/Hydrospheredata/hydro-serving/blob/master/LICENSE"
+    }
+  },
+  "basePath" : "/api/v2",
+  "tags" : [ {
+    "name" : "DeploymentConfigurations"
+  }, {
+    "name" : "Host Selectors"
+  }, {
+    "name" : "Metric Specifications"
+  }, {
+    "name" : "Application"
+  }, {
+    "name" : "External Model registration"
+  }, {
+    "name" : "Model and Model Versions"
+  }, {
+    "name" : "Servable"
+  } ],
+  "schemes" : [ "https", "http" ],
+  "paths" : {
+    "/hostSelector" : {
+      "get" : {
+        "tags" : [ "Host Selectors" ],
+        "summary" : "listHostSelectors",
+        "description" : "listHostSelectors",
+        "operationId" : "listHostSelectors",
+        "produces" : [ "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "200" : {
+            "description" : "Serving Hosts",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/OldHostSelector"
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Host Selectors" ],
+        "summary" : "createHostSelector",
+        "description" : "createHostSelector",
+        "operationId" : "createHostSelector",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "in" : "body",
+          "name" : "body",
+          "description" : "Host Object",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/definitions/CreateHostSelector"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Host",
+            "schema" : {
+              "$ref" : "#/definitions/OldHostSelector"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/hostSelector/{envName}" : {
+      "get" : {
+        "tags" : [ "Host Selectors" ],
+        "summary" : "getHostSelector",
+        "description" : "getHostSelector",
+        "operationId" : "getHostSelector",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "envName",
+          "in" : "path",
+          "description" : "envName",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "HostSelector",
+            "schema" : {
+              "$ref" : "#/definitions/OldHostSelector"
+            }
+          },
+          "404" : {
+            "description" : "Not Found"
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Host Selectors" ],
+        "summary" : "deleteHostSelector",
+        "description" : "deleteHostSelector",
+        "operationId" : "deleteHostSelector",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "envName",
+          "in" : "path",
+          "description" : "envName",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Environment Deleted"
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/monitoring/metricspec" : {
+      "get" : {
+        "tags" : [ "Metric Specifications" ],
+        "summary" : "listSpecs",
+        "description" : "listSpecs",
+        "operationId" : "listSpecs",
+        "produces" : [ "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "200" : {
+            "description" : "MetricSpec",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/MetricSpecView"
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Metric Specifications" ],
+        "summary" : "createMetricSpec",
+        "description" : "createMetricSpec",
+        "operationId" : "createMetricSpec",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "in" : "body",
+          "name" : "body",
+          "description" : "MetricSpecCreationRequest",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/definitions/MetricSpecCreationRequest"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "MetricSpec",
+            "schema" : {
+              "$ref" : "#/definitions/MetricSpecView"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/monitoring/metricspec/{specId}" : {
+      "get" : {
+        "tags" : [ "Metric Specifications" ],
+        "summary" : "getSpec",
+        "description" : "getSpec",
+        "operationId" : "getSpec",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "specId",
+          "in" : "path",
+          "description" : "specId",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "MetricSpec",
+            "schema" : {
+              "$ref" : "#/definitions/MetricSpecView"
+            }
+          },
+          "404" : {
+            "description" : "Not found"
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Metric Specifications" ],
+        "summary" : "deleteMetricSpec",
+        "description" : "deleteMetricSpec",
+        "operationId" : "deleteMetricSpec",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "specId",
+          "in" : "path",
+          "description" : "specId",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "MetricSpec",
+            "schema" : {
+              "$ref" : "#/definitions/MetricSpecView"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/monitoring/metricspec/modelversion/{versionId}" : {
+      "get" : {
+        "tags" : [ "Metric Specifications" ],
+        "summary" : "getSpecForModelVersion",
+        "description" : "getSpecForModelVersion",
+        "operationId" : "getSpecForModelVersion",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "versionId",
+          "in" : "path",
+          "description" : "versionId",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "MetricSpec",
+            "schema" : {
+              "$ref" : "#/definitions/MetricSpecView"
+            }
+          },
+          "404" : {
+            "description" : "Not found"
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/application/{applicationName}" : {
+      "delete" : {
+        "tags" : [ "Application" ],
+        "summary" : "deleteApplication",
+        "description" : "deleteApplication",
+        "operationId" : "deleteApplication",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "applicationName",
+          "in" : "path",
+          "description" : "name",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Application Deleted"
+          }
+        }
+      }
+    },
+    "/application/generateInputs/{applicationName}" : {
+      "get" : {
+        "tags" : [ "Application" ],
+        "summary" : "Generate payload for application",
+        "description" : "Generate payload for application",
+        "operationId" : "Generate payload for application",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "applicationName",
+          "in" : "path",
+          "description" : "name",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Any"
+          }
+        }
+      }
+    },
+    "/application" : {
+      "get" : {
+        "tags" : [ "Application" ],
+        "summary" : "applications",
+        "description" : "applications",
+        "operationId" : "applications",
+        "produces" : [ "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "200" : {
+            "description" : "Application",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/ApplicationView"
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Application" ],
+        "summary" : "Add Application",
+        "description" : "Add Application",
+        "operationId" : "addApplication",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "in" : "body",
+          "name" : "body",
+          "description" : "Application",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/definitions/CreateApplicationRequest"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Application",
+            "schema" : {
+              "$ref" : "#/definitions/ApplicationView"
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "Application" ],
+        "summary" : "Update Application",
+        "description" : "Update Application",
+        "operationId" : "updateApplication",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "in" : "body",
+          "name" : "body",
+          "description" : "ApplicationCreateOrUpdateRequest",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/definitions/UpdateApplicationRequest"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Application",
+            "schema" : {
+              "$ref" : "#/definitions/ApplicationView"
+            }
+          }
+        }
+      }
+    },
+    "/application/{appName}" : {
+      "get" : {
+        "tags" : [ "Application" ],
+        "summary" : "getApp",
+        "description" : "getApp",
+        "operationId" : "getApp",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "appName",
+          "in" : "path",
+          "description" : "name",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Application",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/ApplicationView"
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found"
+          }
+        }
+      }
+    },
+    "/externalmodel" : {
+      "post" : {
+        "tags" : [ "External Model registration" ],
+        "summary" : "Register an external model",
+        "description" : "Register an external model",
+        "operationId" : "registerModel",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "in" : "body",
+          "name" : "body",
+          "description" : "RegisterModelRequest",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/definitions/RegisterModelRequest"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "ModelVersion",
+            "schema" : {
+              "$ref" : "#/definitions/External"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/model/upload" : {
+      "post" : {
+        "tags" : [ "Model and Model Versions" ],
+        "summary" : "Upload and release a model",
+        "description" : "Send POST multipart with 'payload'-tar.gz and 'metadata'-json parts",
+        "operationId" : "uploadModel",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "in" : "body",
+          "name" : "body",
+          "description" : "ModelUploadMetadata",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/definitions/ModelUploadMetadata"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : " ModelVersion",
+            "schema" : {
+              "$ref" : "#/definitions/Internal"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/model/{modelId}" : {
+      "get" : {
+        "tags" : [ "Model and Model Versions" ],
+        "summary" : "getModel",
+        "description" : "getModel",
+        "operationId" : "getModel",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "modelId",
+          "in" : "path",
+          "description" : "modelId",
+          "required" : true,
+          "type" : "integer",
+          "format" : "int64"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Model",
+            "schema" : {
+              "$ref" : "#/definitions/Model"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Model and Model Versions" ],
+        "summary" : "Delete model if not in app",
+        "description" : "Fails if any version of the model is deployed",
+        "operationId" : "deleteModel",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "modelId",
+          "in" : "path",
+          "description" : "modelId",
+          "required" : true,
+          "type" : "integer",
+          "format" : "int64"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Model",
+            "schema" : {
+              "$ref" : "#/definitions/Model"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/model" : {
+      "get" : {
+        "tags" : [ "Model and Model Versions" ],
+        "summary" : "listModels",
+        "description" : "listModels",
+        "operationId" : "listModels",
+        "produces" : [ "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "200" : {
+            "description" : "Model",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Model"
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/model/version" : {
+      "get" : {
+        "tags" : [ "Model and Model Versions" ],
+        "summary" : "All ModelVersion",
+        "description" : "All ModelVersion",
+        "operationId" : "allModelVersions",
+        "produces" : [ "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "200" : {
+            "description" : "ModelVersion",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/ModelVersionView"
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/model/version/{versionName}/{version}" : {
+      "get" : {
+        "tags" : [ "Model and Model Versions" ],
+        "summary" : "Get ModelVersion",
+        "description" : "Get ModelVersion",
+        "operationId" : "getModelVersion",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "versionName",
+          "in" : "path",
+          "description" : "modelId",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "version",
+          "in" : "path",
+          "description" : "modelId",
+          "required" : true,
+          "type" : "integer",
+          "format" : "int64"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "ModelVersion",
+            "schema" : {
+              "$ref" : "#/definitions/ModelVersionView"
+            }
+          },
+          "404" : {
+            "description" : "Not found"
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/servable" : {
+      "get" : {
+        "tags" : [ "Servable" ],
+        "summary" : "servables",
+        "description" : "servables",
+        "operationId" : "servables",
+        "produces" : [ "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "200" : {
+            "description" : "Servable",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/ServableView"
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Servable" ],
+        "summary" : "deploy servable",
+        "description" : "deploy servable",
+        "operationId" : "deploy-servable",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "in" : "body",
+          "name" : "DeployModelRequest",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/definitions/DeployModelRequest"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Servable",
+            "schema" : {
+              "$ref" : "#/definitions/ServableView"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/servable/{name}" : {
+      "get" : {
+        "tags" : [ "Servable" ],
+        "summary" : "get servable",
+        "description" : "get servable",
+        "operationId" : "get-servable",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "name",
+          "in" : "path",
+          "description" : "name",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Servable",
+            "schema" : {
+              "$ref" : "#/definitions/ServableView"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Servable" ],
+        "summary" : "stop servable",
+        "description" : "stop servable",
+        "operationId" : "stop-servable",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "name",
+          "in" : "path",
+          "description" : "name",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Servable",
+            "schema" : {
+              "$ref" : "#/definitions/ServableView"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    },
+    "/servable/{name}/logs" : {
+      "get" : {
+        "tags" : [ "Servable" ],
+        "summary" : "get servable logs",
+        "description" : "get servable logs",
+        "operationId" : "get-servable-logs",
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "name",
+          "in" : "path",
+          "description" : "name",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Logs",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          "500" : {
+            "description" : "Internal server error"
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions" : { },
+  "definitions" : {
+    "Function1" : {
+      "type" : "object"
+    },
+    "Function1RequestContextFutureRouteResult" : {
+      "type" : "object"
+    },
+    "OldHostSelector" : {
+      "type" : "object",
+      "required" : [ "id", "name", "nodeSelector" ],
+      "properties" : {
+        "id" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "name" : {
+          "type" : "string"
+        },
+        "nodeSelector" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "CreateHostSelector" : {
+      "type" : "object",
+      "required" : [ "name", "nodeSelector" ],
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "nodeSelector" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "DataProfileType" : {
+      "type" : "object",
+      "required" : [ "audio", "categorical", "continuous", "image", "interval", "nominal", "none", "numerical", "ordinal", "ratio", "text", "unrecognized", "video" ],
+      "properties" : {
+        "text" : {
+          "type" : "boolean"
+        },
+        "none" : {
+          "type" : "boolean"
+        },
+        "audio" : {
+          "type" : "boolean"
+        },
+        "image" : {
+          "type" : "boolean"
+        },
+        "video" : {
+          "type" : "boolean"
+        },
+        "categorical" : {
+          "type" : "boolean"
+        },
+        "nominal" : {
+          "type" : "boolean"
+        },
+        "ordinal" : {
+          "type" : "boolean"
+        },
+        "numerical" : {
+          "type" : "boolean"
+        },
+        "continuous" : {
+          "type" : "boolean"
+        },
+        "interval" : {
+          "type" : "boolean"
+        },
+        "ratio" : {
+          "type" : "boolean"
+        },
+        "unrecognized" : {
+          "type" : "boolean"
+        }
+      }
+    },
+    "DataType" : {
+      "type" : "object",
+      "required" : [ "dtBfloat16", "dtBool", "dtComplex128", "dtComplex64", "dtDouble", "dtFloat", "dtHalf", "dtInt16", "dtInt32", "dtInt64", "dtInt8", "dtInvalid", "dtMap", "dtQint16", "dtQint32", "dtQint8", "dtQuint16", "dtQuint8", "dtResource", "dtString", "dtUint16", "dtUint32", "dtUint64", "dtUint8", "dtVariant", "unrecognized" ],
+      "properties" : {
+        "dtInvalid" : {
+          "type" : "boolean"
+        },
+        "dtFloat" : {
+          "type" : "boolean"
+        },
+        "dtDouble" : {
+          "type" : "boolean"
+        },
+        "dtInt32" : {
+          "type" : "boolean"
+        },
+        "dtUint8" : {
+          "type" : "boolean"
+        },
+        "dtInt16" : {
+          "type" : "boolean"
+        },
+        "dtString" : {
+          "type" : "boolean"
+        },
+        "dtBool" : {
+          "type" : "boolean"
+        },
+        "dtComplex64" : {
+          "type" : "boolean"
+        },
+        "dtInt64" : {
+          "type" : "boolean"
+        },
+        "dtQint8" : {
+          "type" : "boolean"
+        },
+        "dtQuint8" : {
+          "type" : "boolean"
+        },
+        "dtQint32" : {
+          "type" : "boolean"
+        },
+        "dtBfloat16" : {
+          "type" : "boolean"
+        },
+        "dtQint16" : {
+          "type" : "boolean"
+        },
+        "dtQuint16" : {
+          "type" : "boolean"
+        },
+        "dtUint16" : {
+          "type" : "boolean"
+        },
+        "dtComplex128" : {
+          "type" : "boolean"
+        },
+        "dtHalf" : {
+          "type" : "boolean"
+        },
+        "dtResource" : {
+          "type" : "boolean"
+        },
+        "dtVariant" : {
+          "type" : "boolean"
+        },
+        "dtUint32" : {
+          "type" : "boolean"
+        },
+        "dtUint64" : {
+          "type" : "boolean"
+        },
+        "dtMap" : {
+          "type" : "boolean"
+        },
+        "dtInt8" : {
+          "type" : "boolean"
+        },
+        "unrecognized" : {
+          "type" : "boolean"
+        }
+      }
+    },
+    "Dim" : {
+      "type" : "object",
+      "required" : [ "allFields", "name", "size" ],
+      "properties" : {
+        "size" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "name" : {
+          "type" : "string"
+        },
+        "allFields" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object"
+          }
+        }
+      }
+    },
+    "DockerImage" : {
+      "type" : "object",
+      "required" : [ "name", "tag" ],
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "tag" : {
+          "type" : "string"
+        },
+        "sha256" : {
+          "type" : "string"
+        }
+      }
+    },
+    "Internal" : {
+      "type" : "object",
+      "required" : [ "created", "id", "image", "metadata", "model", "modelContract", "modelVersion", "runtime", "status" ],
+      "properties" : {
+        "id" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "image" : {
+          "$ref" : "#/definitions/DockerImage"
+        },
+        "created" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "finished" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "modelVersion" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "modelContract" : {
+          "$ref" : "#/definitions/ModelContract"
+        },
+        "runtime" : {
+          "$ref" : "#/definitions/DockerImage"
+        },
+        "model" : {
+          "$ref" : "#/definitions/Model"
+        },
+        "status" : {
+          "$ref" : "#/definitions/Value"
+        },
+        "installCommand" : {
+          "type" : "string"
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "MetricSpecConfigView" : {
+      "type" : "object",
+      "required" : [ "modelVersionId", "threshold", "thresholdCmpOperator" ],
+      "properties" : {
+        "modelVersionId" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "threshold" : {
+          "type" : "number",
+          "format" : "double"
+        },
+        "thresholdCmpOperator" : {
+          "$ref" : "#/definitions/ThresholdCmpOperator"
+        },
+        "servable" : {
+          "$ref" : "#/definitions/ServableView"
+        }
+      }
+    },
+    "MetricSpecView" : {
+      "type" : "object",
+      "required" : [ "config", "id", "modelVersionId", "name" ],
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "modelVersionId" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "config" : {
+          "$ref" : "#/definitions/MetricSpecConfigView"
+        },
+        "id" : {
+          "type" : "string"
+        }
+      }
+    },
+    "Model" : {
+      "type" : "object",
+      "required" : [ "id", "name" ],
+      "properties" : {
+        "id" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "name" : {
+          "type" : "string"
+        }
+      }
+    },
+    "ModelContract" : {
+      "type" : "object",
+      "required" : [ "allFields", "modelName", "predict" ],
+      "properties" : {
+        "modelName" : {
+          "type" : "string"
+        },
+        "predict" : {
+          "$ref" : "#/definitions/ModelSignature"
+        },
+        "allFields" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object"
+          }
+        }
+      }
+    },
+    "ModelField" : {
+      "type" : "object",
+      "required" : [ "allFields", "dtype", "name", "profile", "shape", "subfields", "typeOrSubfields" ],
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "shape" : {
+          "$ref" : "#/definitions/TensorShapeProto"
+        },
+        "profile" : {
+          "$ref" : "#/definitions/DataProfileType"
+        },
+        "typeOrSubfields" : {
+          "$ref" : "#/definitions/TypeOrSubfields"
+        },
+        "allFields" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object"
+          }
+        },
+        "subfields" : {
+          "$ref" : "#/definitions/Subfield"
+        },
+        "dtype" : {
+          "$ref" : "#/definitions/DataType"
+        }
+      }
+    },
+    "ModelSignature" : {
+      "type" : "object",
+      "required" : [ "allFields", "inputs", "outputs", "signatureName" ],
+      "properties" : {
+        "signatureName" : {
+          "type" : "string"
+        },
+        "inputs" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/ModelField"
+          }
+        },
+        "outputs" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/ModelField"
+          }
+        },
+        "allFields" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object"
+          }
+        }
+      }
+    },
+    "ServableView" : {
+      "type" : "object",
+      "required" : [ "fullName", "metadata", "modelVersion", "status" ],
+      "properties" : {
+        "modelVersion" : {
+          "$ref" : "#/definitions/Internal"
+        },
+        "status" : {
+          "$ref" : "#/definitions/Status"
+        },
+        "fullName" : {
+          "type" : "string"
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "Status" : {
+      "type" : "object"
+    },
+    "Subfield" : {
+      "type" : "object",
+      "required" : [ "allFields", "data" ],
+      "properties" : {
+        "data" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/ModelField"
+          }
+        },
+        "allFields" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object"
+          }
+        }
+      }
+    },
+    "TensorShapeProto" : {
+      "type" : "object",
+      "required" : [ "allFields", "dim", "unknownRank" ],
+      "properties" : {
+        "dim" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/Dim"
+          }
+        },
+        "unknownRank" : {
+          "type" : "boolean"
+        },
+        "allFields" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object"
+          }
+        }
+      }
+    },
+    "ThresholdCmpOperator" : {
+      "type" : "object"
+    },
+    "TypeOrSubfields" : {
+      "type" : "object",
+      "required" : [ "defined", "dtype", "empty", "subfields" ],
+      "properties" : {
+        "subfields" : {
+          "type" : "boolean"
+        },
+        "dtype" : {
+          "type" : "boolean"
+        },
+        "empty" : {
+          "type" : "boolean"
+        },
+        "defined" : {
+          "type" : "boolean"
+        }
+      }
+    },
+    "Value" : {
+      "type" : "object"
+    },
+    "MetricSpecConfigCreationRequest" : {
+      "type" : "object",
+      "required" : [ "modelVersionId", "threshold", "thresholdCmpOperator" ],
+      "properties" : {
+        "modelVersionId" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "threshold" : {
+          "type" : "number",
+          "format" : "double"
+        },
+        "thresholdCmpOperator" : {
+          "$ref" : "#/definitions/ThresholdCmpOperator"
+        }
+      }
+    },
+    "MetricSpecCreationRequest" : {
+      "type" : "object",
+      "required" : [ "config", "modelVersionId", "name" ],
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "modelVersionId" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "config" : {
+          "$ref" : "#/definitions/MetricSpecConfigCreationRequest"
+        }
+      }
+    },
+    "ApplicationGraphView" : {
+      "type" : "object",
+      "required" : [ "stages" ],
+      "properties" : {
+        "stages" : {
+          "$ref" : "#/definitions/NonEmptyListStageView"
+        }
+      }
+    },
+    "ApplicationKafkaStream" : {
+      "type" : "object",
+      "required" : [ "destinationTopic", "sourceTopic" ],
+      "properties" : {
+        "sourceTopic" : {
+          "type" : "string"
+        },
+        "destinationTopic" : {
+          "type" : "string"
+        },
+        "consumerId" : {
+          "type" : "string"
+        },
+        "errorTopic" : {
+          "type" : "string"
+        }
+      }
+    },
+    "ApplicationView" : {
+      "type" : "object",
+      "required" : [ "executionGraph", "id", "kafkaStreaming", "metadata", "name", "signature", "status" ],
+      "properties" : {
+        "id" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "name" : {
+          "type" : "string"
+        },
+        "status" : {
+          "type" : "string"
+        },
+        "signature" : {
+          "$ref" : "#/definitions/ModelSignature"
+        },
+        "executionGraph" : {
+          "$ref" : "#/definitions/ApplicationGraphView"
+        },
+        "kafkaStreaming" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/ApplicationKafkaStream"
+          }
+        },
+        "message" : {
+          "type" : "string"
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "NonEmptyList" : {
+      "type" : "object",
+      "required" : [ "head", "tail" ],
+      "properties" : {
+        "head" : {
+          "type" : "object"
+        },
+        "tail" : {
+          "type" : "array",
+          "items" : {
+            "type" : "object"
+          }
+        }
+      }
+    },
+    "NonEmptyListStageView" : {
+      "type" : "object",
+      "required" : [ "head", "tail" ],
+      "properties" : {
+        "head" : {
+          "$ref" : "#/definitions/StageView"
+        },
+        "tail" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/StageView"
+          }
+        }
+      }
+    },
+    "NonEmptyListVariantView" : {
+      "type" : "object",
+      "required" : [ "head", "tail" ],
+      "properties" : {
+        "head" : {
+          "$ref" : "#/definitions/VariantView"
+        },
+        "tail" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/VariantView"
+          }
+        }
+      }
+    },
+    "StageView" : {
+      "type" : "object",
+      "required" : [ "modelVariants", "signature" ],
+      "properties" : {
+        "modelVariants" : {
+          "$ref" : "#/definitions/NonEmptyListVariantView"
+        },
+        "signature" : {
+          "$ref" : "#/definitions/ModelSignature"
+        }
+      }
+    },
+    "VariantView" : {
+      "type" : "object",
+      "required" : [ "modelVersion", "weight" ],
+      "properties" : {
+        "modelVersion" : {
+          "$ref" : "#/definitions/Internal"
+        },
+        "weight" : {
+          "type" : "integer",
+          "format" : "int32"
+        }
+      }
+    },
+    "ExecutionGraphRequest" : {
+      "type" : "object",
+      "required" : [ "stages" ],
+      "properties" : {
+        "stages" : {
+          "$ref" : "#/definitions/NonEmptyListPipelineStageRequest"
+        }
+      }
+    },
+    "ModelVariantRequest" : {
+      "type" : "object",
+      "required" : [ "modelVersionId", "weight" ],
+      "properties" : {
+        "modelVersionId" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "weight" : {
+          "type" : "integer",
+          "format" : "int32"
+        },
+        "deploymentConfigName" : {
+          "type" : "string"
+        }
+      }
+    },
+    "NonEmptyListModelVariantRequest" : {
+      "type" : "object",
+      "required" : [ "head", "tail" ],
+      "properties" : {
+        "head" : {
+          "$ref" : "#/definitions/ModelVariantRequest"
+        },
+        "tail" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/ModelVariantRequest"
+          }
+        }
+      }
+    },
+    "NonEmptyListPipelineStageRequest" : {
+      "type" : "object",
+      "required" : [ "head", "tail" ],
+      "properties" : {
+        "head" : {
+          "$ref" : "#/definitions/PipelineStageRequest"
+        },
+        "tail" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/PipelineStageRequest"
+          }
+        }
+      }
+    },
+    "PipelineStageRequest" : {
+      "type" : "object",
+      "required" : [ "modelVariants" ],
+      "properties" : {
+        "modelVariants" : {
+          "$ref" : "#/definitions/NonEmptyListModelVariantRequest"
+        }
+      }
+    },
+    "UpdateApplicationRequest" : {
+      "type" : "object",
+      "required" : [ "executionGraph", "id", "name" ],
+      "properties" : {
+        "id" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "name" : {
+          "type" : "string"
+        },
+        "namespace" : {
+          "type" : "string"
+        },
+        "executionGraph" : {
+          "$ref" : "#/definitions/ExecutionGraphRequest"
+        },
+        "kafkaStreaming" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/ApplicationKafkaStream"
+          }
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "CreateApplicationRequest" : {
+      "type" : "object",
+      "required" : [ "executionGraph", "name" ],
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "namespace" : {
+          "type" : "string"
+        },
+        "executionGraph" : {
+          "$ref" : "#/definitions/ExecutionGraphRequest"
+        },
+        "kafkaStreaming" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/ApplicationKafkaStream"
+          }
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "External" : {
+      "type" : "object",
+      "required" : [ "created", "id", "metadata", "model", "modelContract", "modelVersion" ],
+      "properties" : {
+        "id" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "created" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "modelVersion" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "modelContract" : {
+          "$ref" : "#/definitions/ModelContract"
+        },
+        "model" : {
+          "$ref" : "#/definitions/Model"
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "RegisterModelRequest" : {
+      "type" : "object",
+      "required" : [ "contract", "name" ],
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "contract" : {
+          "$ref" : "#/definitions/ModelContract"
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "ModelUploadMetadata" : {
+      "type" : "object",
+      "required" : [ "name", "runtime" ],
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "runtime" : {
+          "$ref" : "#/definitions/DockerImage"
+        },
+        "hostSelectorName" : {
+          "type" : "string"
+        },
+        "contract" : {
+          "$ref" : "#/definitions/ModelContract"
+        },
+        "profileTypes" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "$ref" : "#/definitions/DataProfileType"
+          }
+        },
+        "installCommand" : {
+          "type" : "string"
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "ModelVersionView" : {
+      "type" : "object",
+      "required" : [ "applications", "created", "id", "isExternal", "metadata", "model", "modelContract", "modelVersion", "status" ],
+      "properties" : {
+        "id" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "created" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "finished" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "modelVersion" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "modelContract" : {
+          "$ref" : "#/definitions/ModelContract"
+        },
+        "model" : {
+          "$ref" : "#/definitions/Model"
+        },
+        "status" : {
+          "type" : "string"
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        },
+        "applications" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "image" : {
+          "$ref" : "#/definitions/DockerImage"
+        },
+        "runtime" : {
+          "$ref" : "#/definitions/DockerImage"
+        },
+        "isExternal" : {
+          "type" : "boolean"
+        }
+      }
+    },
+    "DeployModelRequest" : {
+      "type" : "object",
+      "required" : [ "modelName", "version" ],
+      "properties" : {
+        "modelName" : {
+          "type" : "string"
+        },
+        "version" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "metadata" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        },
+        "deploymentConfigName" : {
+          "type" : "string"
+        }
+      }
+    }
+  },
+  "externalDocs" : {
+    "description" : "Find out more about Hydroserving",
+    "url" : "https://hydrosphere.io/serving-docs"
+  }
+}

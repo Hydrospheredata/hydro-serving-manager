@@ -1,5 +1,6 @@
 package io.hydrosphere.serving.manager.domain.servable
 
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 
 
@@ -8,7 +9,8 @@ case class Servable[+T <: Servable.Status](
   nameSuffix: String,
   status: T,
   usedApps: List[String],
-  metadata: Map[String, String] = Map.empty
+  metadata: Map[String, String] = Map.empty,
+  deploymentConfiguration: Option[DeploymentConfiguration] = None
 ) {
   def fullName: String = Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, nameSuffix)
 }

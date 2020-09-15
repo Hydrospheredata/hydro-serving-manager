@@ -27,7 +27,7 @@ class ECSImageRepository[F[_]: Sync](
       res <- dockerClient.push(
         dockerImage.fullName,
         progressHandler,
-        auth.inderlying
+        auth.underlying
       )
     } yield res
   }

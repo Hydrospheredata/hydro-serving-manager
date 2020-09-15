@@ -29,7 +29,8 @@ object DBMonitoringRepository {
     modelVersionId: Long,
     thresholdValue: Double,
     thresholdOp: ThresholdCmpOperator,
-    servableName: Option[String]
+    servableName: Option[String],
+    deploymentConfigName: Option[String]
   )
 
   def parseConfig(row: MetricSpecRow) = {
@@ -48,7 +49,8 @@ object DBMonitoringRepository {
       modelVersionId = spec.config.modelVersionId,
       thresholdValue = spec.config.threshold,
       thresholdOp = spec.config.thresholdCmpOperator,
-      servableName = spec.config.servable.map(_.fullName)
+      servableName = spec.config.servable.map(_.fullName),
+      deploymentConfigName = spec.config.deploymentConfigName
     )
     Try(config.toJson.compactPrint).toEither.map { json =>
       MetricSpecRow(
@@ -97,7 +99,7 @@ object DBMonitoringRepository {
            DELETE FROM hydro_serving.metric_specs WHERE id = $specId
          """.update
 
-  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F]): MonitoringRepository[F] = new MonitoringRepository[F]() {
+  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F], pub: MetricSpecEvents.Publisher[F]): MonitoringRepository[F] = new MonitoringRepository[F]() {
     override def all(): F[List[CustomModelMetricSpec]] = {
       for {
         rawSpecs <- allQ.to[List].transact(tx)
@@ -114,14 +116,16 @@ object DBMonitoringRepository {
     }
 
     override def upsert(spec: CustomModelMetricSpec): F[Unit] = {
-      for {
+      val flow = for {
         row <- F.fromEither(toRowConfig(spec))
         _ <- upsertQ(row).run.transact(tx)
       } yield ()
+      flow.flatTap(_ => pub.update(spec))
     }
 
     override def delete(id: String): F[Unit] = {
       deleteQ(id).run.transact(tx).void
+        .flatTap(_ => pub.remove(id))
     }
 
     override def forModelVersion(id: Long): F[List[CustomModelMetricSpec]] = {
@@ -143,7 +147,8 @@ object DBMonitoringRepository {
           modelVersionId = parsedConfig.modelVersionId,
           threshold = parsedConfig.thresholdValue,
           thresholdCmpOperator = parsedConfig.thresholdOp,
-          servable = servable
+          servable = servable,
+          deploymentConfigName = parsedConfig.deploymentConfigName
         )
         CustomModelMetricSpec(
           name = rawSpec.name,

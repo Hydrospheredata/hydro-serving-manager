@@ -4,6 +4,9 @@ import java.io._
 import java.nio.file.{FileVisitResult, FileVisitor, Files, Path}
 import java.nio.file.attribute.BasicFileAttributes
 
+import cats.data.OptionT
+import cats.effect.{Resource, Sync}
+import cats.implicits._
 import org.apache.logging.log4j.scala.Logging
 
 
@@ -60,5 +63,11 @@ object FileUtils {
     Option(getClass.getClassLoader.getResource(resPath))
       .map(_.getPath)
       .getOrElse(throw new FileNotFoundException(s"$resPath not found in resources"))
+  }
+
+  def getResourceStream[F[_]](resourcePath: String)(implicit F: Sync[F]): Resource[F, InputStream] = {
+    val acquire = OptionT(F.delay(getClass.getClassLoader.getResourceAsStream(resourcePath)).map(Option.apply))
+      .getOrElseF(F.raiseError(new IOException(s"Can't find ${resourcePath} in resources")))
+    Resource.make(acquire)(x => F.delay(x.close()))
   }
 }

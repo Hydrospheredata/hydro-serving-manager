@@ -5,7 +5,6 @@ import cats.effect.Concurrent
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.NotFound
-import io.hydrosphere.serving.manager.domain.application.Application._
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.{ServableGC, ServableService}
@@ -16,17 +15,17 @@ import org.apache.logging.log4j.scala.Logging
 import spray.json.JsObject
 
 trait ApplicationService[F[_]] {
-  def all(): F[List[GenericApplication]]
+  def all(): F[List[Application]]
 
   def generateInputs(name: String): F[JsObject]
 
-  def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]]
+  def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, Application]]
 
-  def delete(name: String): F[GenericApplication]
+  def delete(name: String): F[Application]
 
-  def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, GenericApplication]]
+  def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, Application]]
 
-  def get(name: String): F[GenericApplication]
+  def get(name: String): F[Application]
 }
 
 object ApplicationService extends Logging {
@@ -37,7 +36,6 @@ object ApplicationService extends Logging {
     applicationRepository: ApplicationRepository[F],
     versionRepository: ModelVersionRepository[F],
     servableService: ServableService[F],
-    discoveryHub: ApplicationEvents.Publisher[F],
     applicationDeployer: ApplicationDeployer[F],
     servableGC: ServableGC[F]
   ): ApplicationService[F] = new ApplicationService[F] {
@@ -50,34 +48,24 @@ object ApplicationService extends Logging {
       } yield jsonData
     }
 
-    def create(req: CreateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
+    def create(req: CreateApplicationRequest): F[DeferredResult[F, Application]] = {
       applicationDeployer.deploy(req.name, req.executionGraph, req.kafkaStreaming.getOrElse(List.empty), req.metadata.getOrElse(Map.empty))
     }
 
-    def delete(name: String): F[GenericApplication] = {
+    def delete(name: String): F[Application] = {
       for {
         app <- get(name)
-        _ <- discoveryHub.remove(app.name)
         _ <- applicationRepository.delete(app.id)
-        _ <- app.status match {
-          case Application.Ready(graph) =>
-            graph.traverse { s =>
-              s.variants.traverse { ss =>
-                servableService.stop(ss.item.fullName)
-              }.void
-            }.void
-          case _ =>
-            F.unit // TODO do we need to delete servables that don't run?
-        }
-        _ <- app.versionGraph.traverse { s =>
-          s.modelVariants.traverse { mv =>
-            servableGC.mark(mv.item)
-          }.void
+        _ <- app.graph.stages.traverse { stage =>
+          stage.variants.traverse { variant =>
+            servableGC.mark(variant.modelVersion).void >>
+              variant.servable.fold(F.unit)(s => servableService.stop(s.fullName).void)
+          }
         }
       } yield app
     }
 
-    def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, GenericApplication]] = {
+    def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, Application]] = {
       for {
         oldApplication <- OptionT(applicationRepository.get(appRequest.id))
           .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find application id ${appRequest.id}")))
@@ -96,11 +84,11 @@ object ApplicationService extends Logging {
       } yield newApplication
     }
 
-    override def get(name: String): F[GenericApplication] = {
+    override def get(name: String): F[Application] = {
       OptionT(applicationRepository.get(name))
         .getOrElseF(F.raiseError(NotFound(s"Application with name $name is not found")))
     }
 
-    override def all(): F[List[GenericApplication]] = applicationRepository.all()
+    override def all(): F[List[Application]] = applicationRepository.all()
   }
 }

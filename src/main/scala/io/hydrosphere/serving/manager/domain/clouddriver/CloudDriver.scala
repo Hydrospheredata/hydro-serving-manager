@@ -2,12 +2,12 @@ package io.hydrosphere.serving.manager.domain.clouddriver
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import cats.effect._
 import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
-import io.hydrosphere.serving.manager.domain.host_selector.HostSelector
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
+import io.hydrosphere.serving.manager.infrastructure.kubernetes.KubernetesClient
 
 import scala.concurrent.ExecutionContext
 
@@ -39,13 +39,13 @@ trait CloudDriver[F[_]] {
 
   def instance(name: String): F[Option[CloudInstance]]
 
-  def run(name: String, modelVersionId: Long, image: DockerImage, hostSelector: Option[HostSelector] = None): F[CloudInstance]
+  def run(name: String, modelVersionId: Long, image: DockerImage, config: Option[DeploymentConfiguration]): F[CloudInstance]
 
   def remove(name: String): F[Unit]
 
   def getByVersionId(modelVersionId: Long): F[Option[CloudInstance]]
-  
-  def getLogs(name: String, follow: Boolean): F[Source[String, _]]
+
+  def getLogs(name: String, follow: Boolean): fs2.Stream[F, String]
 }
 
 object CloudDriver {
@@ -56,11 +56,13 @@ object CloudDriver {
     val ServiceId = "HS_INSTANCE_ID"
   }
 
-  def fromConfig[F[_] : Async](
+  def fromConfig[F[_]](
     dockerdClient: DockerdClient[F],
     config: CloudDriverConfiguration,
     dockerRepoConf: DockerRepositoryConfiguration
   )(implicit
+    F: Async[F],
+    cs: ContextShift[F],
     ex: ExecutionContext,
     actorSystem: ActorSystem,
     materializer: Materializer)
@@ -71,8 +73,8 @@ object CloudDriver {
       case kubeConf: CloudDriverConfiguration.Kubernetes =>
         dockerRepoConf match {
           case drc: DockerRepositoryConfiguration.Remote =>
-            val client = KubernetesClient[F](kubeConf, drc)
-            new KubernetesDriver[F](client)
+            val client = KubernetesClient.make[F](kubeConf)
+            new KubernetesDriver[F](client, kubeConf, drc)
           case _ => throw new Exception(s"Docker Repository must be remote for using kubernetes cloud driver")
         }
       case x =>

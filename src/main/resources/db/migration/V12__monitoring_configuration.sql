@@ -1,0 +1,1 @@
+ALTER TABLE hydro_serving.model_version ADD COLUMN monitoring_configuration JSON NOT NULL DEFAULT '{"batch_size": 10}'::json;

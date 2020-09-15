@@ -3,12 +3,10 @@ package io.hydrosphere.serving.manager.util.grpc
 import cats.data.NonEmptyList
 import cats.implicits._
 import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain.application.Application.ReadyApp
-import io.hydrosphere.serving.manager.domain.application.graph.Variant
+import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationGraph, ApplicationServable}
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, ThresholdCmpOperator}
 import io.hydrosphere.serving.manager.domain.servable.Servable
-import io.hydrosphere.serving.manager.domain.servable.Servable.OkServable
 import io.hydrosphere.serving.manager.grpc.entities.Servable.ServableStatus
 import io.hydrosphere.serving.manager.grpc.entities.{CustomModelMetric, ServingApp, ThresholdConfig, Servable => GServable, Stage => GStage}
 import io.hydrosphere.serving.manager.{domain, grpc}
@@ -51,22 +49,23 @@ object Converters {
           id = imv.id,
           version = imv.modelVersion,
           status = imv.status.toString,
-          selector = imv.hostSelector.map(s => grpc.entities.HostSelector(s.id, s.name)),
-          model = Some(grpc.entities.Model(imv.model.id, imv.model.name)),
-          contract = Some(imv.modelContract),
-          image = Some(grpc.entities.DockerImage(imv.image.name, imv.image.tag)),
           imageSha = imv.image.sha256.getOrElse(""),
-          runtime = Some(grpc.entities.DockerImage(imv.runtime.name, imv.runtime.tag)),
-          metadata = imv.metadata
+          model = imv.model.toGrpc.some,
+          contract = imv.modelContract.some,
+          image = grpc.entities.DockerImage(imv.image.name, imv.image.tag).some,
+          runtime = grpc.entities.DockerImage(imv.runtime.name, imv.runtime.tag).some,
+          metadata = imv.metadata,
+          monitoringConfiguration = Some(grpc.entities.MonitoringConfiguration(batchSize = imv.monitoringConfiguration.batchSize))
         )
       case emv: ModelVersion.External =>
         grpc.entities.ModelVersion(
           id = emv.id,
           version = emv.modelVersion,
           status = ModelVersionStatus.Released.toString,
-          model = Some(grpc.entities.Model(emv.model.id, emv.model.name)),
-          contract = Some(emv.modelContract),
+          model = emv.model.toGrpc.some,
+          contract = emv.modelContract.some,
           metadata = emv.metadata,
+          monitoringConfiguration = grpc.entities.MonitoringConfiguration(batchSize=emv.monitoringConfiguration.batchSize).some
         )
     }
   }
@@ -88,8 +87,8 @@ object Converters {
     )
   }
 
-  def fromApp(app: ReadyApp): ServingApp = {
-    val stages = toGStages(app)
+  def fromApp(app: Application): ServingApp = {
+    val stages = toGStages(app.graph)
     val contract = ModelContract(modelName = app.name, predict = app.signature.some)
     ServingApp(
       id = app.id.toString,
@@ -100,22 +99,28 @@ object Converters {
     )
   }
 
-  def toGServable(mv: Variant[OkServable]): GServable = {
-    GServable(
-      host = mv.item.status.host,
-      port = mv.item.status.port,
-      weight = mv.weight,
-      modelVersion = fromModelVersion(mv.item.modelVersion).some,
-      name = mv.item.fullName,
-      metadata = mv.item.metadata
-    )
+  def toGServable(mv: ApplicationServable): Option[GServable] = {
+    mv.servable.flatMap { s =>
+      s.status match {
+        case status: Servable.Serving =>
+          GServable(
+            host = status.host,
+            port = status.port,
+            weight = mv.weight,
+            modelVersion = fromModelVersion(mv.modelVersion).some,
+            name = s.fullName,
+            metadata = s.metadata
+          ).some
+        case _ => None
+      }
+    }
   }
 
-  def toGStages(app: ReadyApp): NonEmptyList[GStage] = {
-    app.status.stages.zipWithIndex.map {
+  def toGStages(graph: ApplicationGraph): NonEmptyList[GStage] = {
+    graph.stages.zipWithIndex.map {
       case (st, i) =>
-        val mapped = st.variants.map(toGServable)
-        GStage(i.toString, st.signature.some, mapped.toList)
+        val mapped = st.variants.toList.flatMap(toGServable)
+        GStage(i.toString, st.signature.some, mapped)
     }
   }
 }

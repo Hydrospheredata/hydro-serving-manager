@@ -19,8 +19,8 @@ import org.apache.logging.log4j.scala.Logging
 class MonitoringController[F[_]](
   monitoringService: Monitoring[F],
   monRepo: MonitoringRepository[F]
-)(implicit F: Effect[F], uuid: UUIDGenerator[F]) extends AkkaHttpControllerDsl with Logging {
-  implicit val configReq = jsonFormat3(MetricSpecConfigCreationRequest)
+)(implicit F: Effect[F]) extends AkkaHttpControllerDsl with Logging {
+  implicit val configReq = jsonFormat4(MetricSpecConfigCreationRequest)
   implicit val specReq = jsonFormat3(MetricSpecCreationRequest)
   implicit val configView = jsonFormat4(MetricSpecConfigView)
   implicit val specView = jsonFormat4(MetricSpecView)
@@ -38,24 +38,9 @@ class MonitoringController[F[_]](
   def createSpec: Route = path("metricspec") {
     post {
       entity(as[MetricSpecCreationRequest]) { incomingMS =>
-        logger.info(s"Got MetricSpec create request: $incomingMS")
-        val flow = for {
-          id <- uuid.generate()
-          config = CustomModelMetricSpecConfiguration(
-            incomingMS.config.modelVersionId,
-            incomingMS.config.threshold,
-            incomingMS.config.thresholdCmpOperator,
-            None
-          )
-          ms = CustomModelMetricSpec(
-            incomingMS.name,
-            incomingMS.modelVersionId,
-            config,
-            id = id.toString
-          )
-          res <- monitoringService.create(ms)
-        } yield fromMetricSpec(res)
-        completeF(flow)
+        completeF {
+          monitoringService.create(incomingMS).map(fromMetricSpec)
+        }
       }
     }
   }
@@ -128,7 +113,12 @@ class MonitoringController[F[_]](
 }
 
 object MonitoringRequests {
-  final case class MetricSpecConfigCreationRequest(modelVersionId: Long, threshold: Double, thresholdCmpOperator: ThresholdCmpOperator)
+  final case class MetricSpecConfigCreationRequest(
+    modelVersionId: Long,
+    threshold: Double,
+    thresholdCmpOperator: ThresholdCmpOperator,
+    deploymentConfigName: Option[String]
+  )
   final case class MetricSpecCreationRequest(name: String, modelVersionId: Long, config: MetricSpecConfigCreationRequest)
 
   final case class MetricSpecConfigView(
