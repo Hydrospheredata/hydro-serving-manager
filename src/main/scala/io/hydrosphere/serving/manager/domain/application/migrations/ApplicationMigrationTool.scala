@@ -200,7 +200,8 @@ object ApplicationMigrationTool extends Logging with CompleteJsonProtocol {
         )
         streaming = rawApp.kafka_streams.map(p => p.parseJson.convertTo[ApplicationKafkaStream])
         _ = logger.debug(s"Restoring ${rawApp.application_name}")
-        newApp <- appDeployer.deploy(rawApp.application_name, graph, streaming)
+        metadata = rawApp.metadata.flatMap(x => Try(x.parseJson.convertTo[Map[String,String]]).toOption).getOrElse(Map.empty)
+        newApp <- appDeployer.deploy(rawApp.application_name, graph, streaming, metadata)
       } yield rawApp
     }
   }

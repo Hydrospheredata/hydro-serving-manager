@@ -19,7 +19,8 @@ trait ApplicationDeployer[F[_]] {
   def deploy(
     name: String,
     executionGraph: ExecutionGraphRequest,
-    kafkaStreaming: List[ApplicationKafkaStream]
+    kafkaStreaming: List[ApplicationKafkaStream],
+    metadata: Map[String, String]
   ): F[DeferredResult[F, Application]]
 }
 
@@ -41,10 +42,11 @@ object ApplicationDeployer extends Logging {
       override def deploy(
         name: String,
         executionGraph: ExecutionGraphRequest,
-        kafkaStreaming: List[ApplicationKafkaStream]
+        kafkaStreaming: List[ApplicationKafkaStream],
+        metadata: Map[String, String]
       ): F[DeferredResult[F, Application]] = {
         for {
-          composedApp <- composeApp(name, None, executionGraph, kafkaStreaming)
+          composedApp <- composeApp(name, None, executionGraph, kafkaStreaming, metadata)
           repoApp <- applicationRepository.create(composedApp)
           app = composedApp.copy(id = repoApp.id)
           df <- Deferred[F, Application]
@@ -70,7 +72,8 @@ object ApplicationDeployer extends Logging {
         name: String,
         namespace: Option[String],
         executionGraph: ExecutionGraphRequest,
-        kafkaStreaming: List[ApplicationKafkaStream]
+        kafkaStreaming: List[ApplicationKafkaStream],
+        metadata: Map[String, String]
       ): F[Application] = {
         for {
           _ <- checkApplicationName(name)
@@ -114,7 +117,8 @@ object ApplicationDeployer extends Logging {
             kafkaStreaming = kafkaStreaming,
             status = Application.Assembling,
             statusMessage = None,
-            graph = graph
+            graph = graph,
+            metadata = metadata
           )
       }
 
