@@ -26,7 +26,7 @@ class RemoteImageRepository[F[_]: Sync](
             serverAddress = Some(conf.host),
             None,
             None
-          ).inderlying
+          ).underlying
         )
       }
       res <- dockerClient.push(dockerImage.fullName, progressHandler, auth)

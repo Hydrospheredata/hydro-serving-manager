@@ -22,6 +22,9 @@ class HttpSpec extends GenericUnitTest {
             "cpu" -> "2",
             "memory" -> "2g"
           ).some
+        ).some,
+        env = Map(
+          "SUPER_SECRET_ENV" -> "asdasdasd"
         ).some
       ).some
 

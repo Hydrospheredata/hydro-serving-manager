@@ -10,7 +10,7 @@ case class DockerRegistryAuth(
   identityToken: Option[String],
   auth: Option[String]
 ) {
-  def inderlying: RegistryAuth = {
+  def underlying: RegistryAuth = {
     RegistryAuth.create(
       username.orNull,
       password.orNull,

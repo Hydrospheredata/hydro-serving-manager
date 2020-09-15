@@ -1,22 +1,31 @@
 package io.hydrosphere.serving.manager.api.http.controller.servable
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
-import cats.effect.Effect
+import akka.stream.scaladsl.Source
+import cats.effect.{ConcurrentEffect, ContextShift, Effect}
 import cats.implicits._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.servable.ServableService
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import streamz.converter._
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 @Path("/servable")
 @Api(produces = "application/json", tags = Array("Servable"))
-class ServableController[F[_]: Effect](
+class ServableController[F[_]](
   servableService: ServableService[F],
   cloudDriver: CloudDriver[F]
+)(
+  implicit F: ConcurrentEffect[F],
+  cs: ContextShift[F],
+  ec: ExecutionContext,
+  actorSystem: ActorSystem,
 ) extends AkkaHttpControllerDsl {
 
   @Path("/")
@@ -65,13 +74,10 @@ class ServableController[F[_]: Effect](
   def sseServableLogs = path("servable" / Segment / "logs") { name =>
     get {
       parameter('follow.as[Boolean].?) { follow: Option[Boolean] =>
-        completeF {
-          cloudDriver.getLogs(name, follow.getOrElse(false))
-            .map(source => {
-              source
-                .map(ServerSentEvent(_))
-                .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
-            })
+        complete {
+          val stream = cloudDriver.getLogs(name, follow.getOrElse(false)).map(ServerSentEvent(_))
+          Source.fromGraph(stream.toSource)
+            .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
         }
       }
     }
