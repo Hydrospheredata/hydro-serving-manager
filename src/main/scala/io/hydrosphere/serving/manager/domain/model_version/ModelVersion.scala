@@ -32,7 +32,7 @@ object ModelVersion {
     status: ModelVersionStatus,
     installCommand: Option[String],
     metadata: Map[String, String],
-    monitoringConfiguration: MonitoringConfiguration,
+    monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration(),
   ) extends ModelVersion {
     def fullName: String = s"${model.name}:$modelVersion"
   }
@@ -44,7 +44,7 @@ object ModelVersion {
     modelContract: ModelContract,
     model: Model,
     metadata: Map[String, String],
-    monitoringConfiguration: MonitoringConfiguration,
+    monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration(),
   ) extends ModelVersion {
     def fullName: String = s"${model.name}:$modelVersion"
   }
