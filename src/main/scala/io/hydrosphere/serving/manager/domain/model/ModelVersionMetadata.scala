@@ -17,7 +17,7 @@ case class ModelVersionMetadata(
   runtime: DockerImage,
   installCommand: Option[String],
   metadata: Map[String, String],
-  monitoringConfiguration: MonitoringConfiguration
+  monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration()
 )
 
 object ModelVersionMetadata {
