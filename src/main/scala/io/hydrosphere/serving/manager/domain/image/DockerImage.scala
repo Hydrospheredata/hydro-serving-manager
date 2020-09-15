@@ -14,7 +14,7 @@ case class DockerImage(
   
   def replaceUser(user: String): Either[Throwable, DockerImage] = name match {
     case DockerImage.NamePattern(_, imageName) => DockerImage(s"$user/$imageName", tag, sha256).asRight
-    case x => new Exception(s"Can't parse image name $x").asLeft
+    case x => new Exception(s"Can't parse image name '$x'").asLeft
   }
 }
 

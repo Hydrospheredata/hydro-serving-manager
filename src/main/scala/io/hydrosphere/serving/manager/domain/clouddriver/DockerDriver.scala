@@ -1,29 +1,27 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
-import java.io.{PipedInputStream, PipedOutputStream}
-import java.util.concurrent.Executors
-
-import akka.stream.scaladsl.{Source, StreamConverters}
-import cats._
+import cats.MonadError
 import cats.data.OptionT
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContainerParam}
 import com.spotify.docker.client.messages._
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
+import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.clouddriver.DockerDriver.Internals.ContainerState
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
+import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 
 class DockerDriver[F[_]](
   client: DockerdClient[F],
-  config: CloudDriverConfiguration.Docker)(
-  implicit F: MonadError[F, Throwable]
+  config: CloudDriverConfiguration.Docker
+)(
+  implicit
+  F: MonadError[F, Throwable],
 ) extends CloudDriver[F] {
 
   import DockerDriver._
@@ -51,7 +49,7 @@ class DockerDriver[F[_]](
     image: DockerImage,
     deploymentConfig: Option[DeploymentConfiguration] = None
   ): F[CloudInstance] = {
-    val container = Internals.mkContainerConfig(name, modelVersionId, image, config)
+    val container = Internals.mkContainerConfig(name, modelVersionId, image, config, deploymentConfig.flatMap(_.container))
     for {
       creation <- client.createContainer(container, Some(name))
       _ <- client.runContainer(creation.id())
@@ -122,33 +120,19 @@ class DockerDriver[F[_]](
     r.value
   }
 
-  override def getLogs(name: String, follow: Boolean): F[Source[String, _]] = {
+  override def getLogs(name: String, follow: Boolean): fs2.Stream[F, String] = {
     val query = List(
       ListContainersParam.withLabel(CloudDriver.Labels.ServiceName, name)
     )
-    
+
     for {
-      list <- client.listContainers(query)
+      list <- fs2.Stream.eval(client.listContainers(query))
       container <- list match {
-        case head :: _ => F.pure(head)
-        case Nil => F.raiseError[Container](new RuntimeException(s"There is no running containers for $name"))
+        case head :: _ => fs2.Stream[F, Container](head)
+        case Nil => fs2.Stream.raiseError[F](DomainError.notFound(s"There is no running containers for $name"))
       }
-      logStream <- client.logs(container.id(), follow)
-    } yield {
-      val stderr = new PipedInputStream()
-      val stdout = new PipedInputStream()
-      val stderrPipe = new PipedOutputStream(stderr)
-      val stdoutPipe = new PipedOutputStream(stdout)
-      Future {
-        logStream.attach(stdoutPipe, stderrPipe)
-      }(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(50)))
-      
-      StreamConverters.fromInputStream(() => stdout).merge(StreamConverters.fromInputStream(() => stderr)).map(_.utf8String)
-        .watchTermination() { (_, b) => b.foreach { _ =>
-          stdoutPipe.close()
-          stderrPipe.close()
-        }(ExecutionContext.Implicits.global)}
-    }
+      logMessage <- client.logs(container.id(), follow)
+    } yield logMessage
   }
 }
 
@@ -226,7 +210,8 @@ object DockerDriver {
       name: String,
       modelVersionId: Long,
       image: DockerImage,
-      dockerConf: CloudDriverConfiguration.Docker
+      dockerConf: CloudDriverConfiguration.Docker,
+      config: Option[K8sContainerConfig]
     ): ContainerConfig = {
       val hostConfig = {
         val builder = HostConfig.builder().networkMode(dockerConf.networkName)
@@ -241,8 +226,10 @@ object DockerDriver {
         CloudDriver.Labels.ServiceName -> name,
         CloudDriver.Labels.ModelVersionId -> modelVersionId.toString
       )
-      val envMap = Map(
-        DefaultConstants.ENV_MODEL_DIR -> DefaultConstants.DEFAULT_MODEL_DIR.toString,
+
+      val userEnvs = config.flatMap(_.env).getOrElse(Map.empty)
+      val envMap = userEnvs ++ Map(
+        DefaultConstants.ENV_MODEL_DIR -> DefaultConstants.DEFAULT_MODEL_DIR,
         DefaultConstants.ENV_APP_PORT -> DefaultConstants.DEFAULT_APP_PORT.toString
       )
 

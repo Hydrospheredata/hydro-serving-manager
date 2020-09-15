@@ -5,9 +5,10 @@ import java.lang
 import java.nio.file.{Path, Paths}
 import java.util.Date
 
+import cats.implicits._
 import cats.effect.{Concurrent, IO}
 import com.spotify.docker.client.messages._
-import com.spotify.docker.client.{DockerClient, LogStream, ProgressHandler}
+import com.spotify.docker.client.{DockerClient, LogMessage, LogStream, ProgressHandler}
 import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
@@ -18,6 +19,7 @@ import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DockerProgress
 import org.mockito.Matchers
+import org.mockito.invocation.InvocationOnMock
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Promise}
@@ -27,30 +29,15 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
   describe("ModelVersionBuilder") {
     it("should handle push error") {
       ioAssert {
-        val dc = new DockerdClient[IO] {
-          override def createContainer(container: ContainerConfig, name: Option[String]): IO[ContainerCreation] = ???
-          override def runContainer(id: String): IO[Unit] = ???
-          override def removeContainer(id: String, params: List[DockerClient.RemoveContainerParam]): IO[Unit] = ???
-          override def listContainers(params: List[DockerClient.ListContainersParam]): IO[List[Container]] = ???
-          override def logs(id: String, follow: Boolean): IO[LogStream] = ???
-          override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[DockerClient.BuildParam]): IO[String] = IO("sha:random-sha")
-          override def push(image: String, progressHandler: ProgressHandler, registryAuth: RegistryAuth): IO[Unit] = IO.raiseError(new RuntimeException with NoStackTrace)
-          override def inspectImage(image: String): IO[ImageInfo] = ???
-          override def getHost: IO[String] = ???
-        }
+        val dc = mock[DockerdClient[IO]]
+        when(dc.build(Matchers.any(), Matchers.any(), Matchers.any(), Matchers.any(), Matchers.any())).thenReturn("sha:random-sha".pure[IO])
+        when(dc.push(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(IO.raiseError(new RuntimeException with NoStackTrace))
 
         val model = Model(1, "push-me")
 
-        val versionRepo = new ModelVersionRepository[IO] {
-          override def create(entity: ModelVersion): IO[ModelVersion] = IO.pure(entity)
-          override def get(id: Long): IO[Option[ModelVersion]] = ???
-          override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
-          override def delete(id: Long): IO[Int] = ???
-          override def update(entity: ModelVersion): IO[Int] = IO(1)
-          override def all(): IO[List[ModelVersion]] = ???
-          override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
-          override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]] = ???
-        }
+        val versionRepo = mock[ModelVersionRepository[IO]]
+        when(versionRepo.create(Matchers.any())).thenAnswer((invocation: InvocationOnMock) => invocation.getArgumentAt[ModelVersion](0, classOf[ModelVersion]).pure[IO])
+        when(versionRepo.update(Matchers.any())).thenReturn(1.pure[IO])
 
         val modelVersionMetadata = ModelVersionMetadata(
           modelName = model.name,
@@ -148,7 +135,7 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def runContainer(id: String): IO[Unit] = ???
           override def removeContainer(id: String, params: List[DockerClient.RemoveContainerParam]): IO[Unit] = ???
           override def listContainers(params: List[DockerClient.ListContainersParam]): IO[List[Container]] = ???
-          override def logs(id: String, follow: Boolean): IO[LogStream] = ???
+          override def logs(id: String, follow: Boolean): fs2.Stream[IO, String] = ???
           override def build(directory: Path, name: String, dockerfile: String, handler: ProgressHandler, params: List[DockerClient.BuildParam]): IO[String] = IO("random-sha")
           override def push(image: String, progressHandler: ProgressHandler, registryAuth: RegistryAuth): IO[Unit] = IO.unit
           override def inspectImage(image: String): IO[ImageInfo] = IO(new ImageInfo {
@@ -226,13 +213,13 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           startedBuild = stateful.started
           completedBuild <- stateful.completed.get
         } yield {
-          assert(startedBuild.model.name === "push-me")
-          assert(startedBuild.modelVersion === 1)
-          assert(startedBuild.image === DockerImage("push-me", "1"))
+          assert(startedBuild.model.name == "push-me")
+          assert(startedBuild.modelVersion == 1)
+          assert(startedBuild.image == DockerImage("push-me", "1"))
           val pushedImage = Await.result(p.future, 20.seconds)
-          assert(pushedImage.fullName === completedBuild.image.fullName)
-          assert(startedBuild.model.name === completedBuild.model.name)
-          assert(startedBuild.modelVersion === completedBuild.modelVersion)
+          assert(pushedImage.fullName == completedBuild.image.fullName)
+          assert(startedBuild.model.name == completedBuild.model.name)
+          assert(startedBuild.modelVersion == completedBuild.modelVersion)
           assert(DockerImage("push-me", "1", Some("random-sha")) === completedBuild.image)
         }
       }
