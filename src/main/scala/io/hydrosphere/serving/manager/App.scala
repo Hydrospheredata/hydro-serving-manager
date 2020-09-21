@@ -20,6 +20,7 @@ import io.hydrosphere.serving.manager.config.ManagerConfiguration
 import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
 import io.hydrosphere.serving.manager.domain.application.migrations.ApplicationMigrationTool
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationEvents
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
@@ -83,6 +84,7 @@ object App {
       modelPubSub <- Resource.liftF(ModelVersionEvents.makeTopic)
       servablePubSub <- Resource.liftF(ServableEvents.makeTopic)
       monitoringPubSub <- Resource.liftF(MetricSpecEvents.makeTopic)
+      depPubSub <- Resource.liftF(DeploymentConfigurationEvents.makeTopic)
       core <- {
         implicit val rng = rngF
         implicit val cd = cloudDriver
@@ -91,6 +93,7 @@ object App {
         implicit val (modelPub, modelSub) = modelPubSub
         implicit val (servablePub, servableSub) = servablePubSub
         implicit val (metricPub, metricSub) = monitoringPubSub
+        implicit val (depPub, depSUb) = depPubSub
         implicit val hsRepo = new DBDeploymentConfigurationRepository()
         implicit val modelRepo = DBModelRepository.make()
         implicit val modelVersionRepo = DBModelVersionRepository.make()
@@ -122,7 +125,7 @@ object App {
       appController = new ApplicationController[F](core.appService)
       hsController = new HostSelectorController[F]
       servableController = new ServableController[F](core.servableService, cloudDriver)
-      sseController = new SSEController[F](appPubSub._2, modelPubSub._2, servablePubSub._2, monitoringPubSub._2)
+      sseController = new SSEController[F](appPubSub._2, modelPubSub._2, servablePubSub._2, monitoringPubSub._2, depPubSub._2)
       monitoringController = new MonitoringController[F](core.monitoringService, core.repos.monitoringRepository)
       depConfController = new DeploymentConfigController[F](core.deploymentConfigService)
 

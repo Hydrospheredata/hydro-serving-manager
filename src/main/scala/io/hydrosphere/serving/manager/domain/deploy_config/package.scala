@@ -1,5 +1,6 @@
 package io.hydrosphere.serving.manager.domain
 
+import io.hydrosphere.serving.manager.discovery.DiscoveryService
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import io.hydrosphere.serving.manager.infrastructure.protocol.PlayJsonAdapter._
 import skuber.Pod.{Affinity, Toleration}
@@ -68,4 +69,5 @@ package object deploy_config {
     implicit val format: RootJsonFormat[DeploymentConfiguration] = jsonFormat5(DeploymentConfiguration.apply)
   }
 
+  object DeploymentConfigurationEvents extends DiscoveryService[DeploymentConfiguration, String]
 }
