@@ -101,10 +101,10 @@ object ONNXFetcher {
 
   def valueInfoToField(x: ValueInfoProto): ModelField = {
     ModelField(
-      x.name,
-      convertShape(x.getType.getTensorType.shape),
-      DataProfileType.NONE,
-      convertType(x.getType.getTensorType.elemType)
+      name = x.name,
+      shape = convertShape(x.getType.getTensorType.shape),
+      profile = DataProfileType.NONE,
+      typeOrSubfields = convertType(x.getType.getTensorType.elemType)
     )
   }
 

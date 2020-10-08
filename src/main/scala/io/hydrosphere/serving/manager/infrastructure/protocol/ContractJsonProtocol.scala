@@ -15,8 +15,8 @@ trait ContractJsonProtocol extends CommonJsonProtocol {
 
   implicit val dataTypeFormat = protoEnumFormat(DataType)
 
-  implicit val tensorShapeDimFormat = jsonFormat2(TensorShapeProto.Dim.apply)
-  implicit val tensorShapeFormat = jsonFormat2(TensorShapeProto.apply)
+  implicit val tensorShapeDimFormat = jsonFormat2(TensorShapeProto.Dim.of)
+  implicit val tensorShapeFormat = jsonFormat2(TensorShapeProto.of)
 
   implicit val modelFieldFormat = new RootJsonFormat[ModelField] {
 
@@ -57,18 +57,23 @@ trait ContractJsonProtocol extends CommonJsonProtocol {
 
     override def read(json: JsValue): ModelField = json match {
       case DtypeJson(name, shape, profileType, dtype) =>
-        ModelField(
-          name.value,
-          shape.map(_.convertTo[TensorShapeProto]),
-          profileType.flatMap(x => DataProfileType.fromName(x.value.toUpperCase)).getOrElse(DataProfileType.NONE),
-          ModelField.TypeOrSubfields.Dtype(DataType.fromName(dtype.value).get)
+        ModelField.of(
+          name = name.value,
+          shape = shape.map(_.convertTo[TensorShapeProto]),
+          typeOrSubfields = ModelField.TypeOrSubfields.Dtype(DataType.fromName(dtype.value).get),
+          profile = profileType.flatMap(x => DataProfileType.fromName(x.value.toUpperCase)).getOrElse(DataProfileType.NONE)
         )
 
       case SubfieldsJson(name, shape, subs) =>
         val subfields = ModelField.TypeOrSubfields.Subfields(
           ModelField.Subfield(subs.elements.map(read))
         )
-        ModelField(name.value, shape.map(_.convertTo[TensorShapeProto]), DataProfileType.NONE, subfields)
+        ModelField(
+          name = name.value,
+          shape = shape.map(_.convertTo[TensorShapeProto]),
+          profile = DataProfileType.NONE,
+          typeOrSubfields = subfields
+        )
 
       case x => throw DeserializationException(s"Invalid ModelField: $x")
     }
@@ -91,8 +96,8 @@ trait ContractJsonProtocol extends CommonJsonProtocol {
     }
   }
 
-  implicit val modelSignatureFormat = jsonFormat3(ModelSignature.apply)
-  implicit val modelContractFormat = jsonFormat2(ModelContract.apply)
+  implicit val modelSignatureFormat = jsonFormat3(ModelSignature.of)
+  implicit val modelContractFormat = jsonFormat2(ModelContract.of)
 }
 
 object ContractJsonProtocol extends ContractJsonProtocol

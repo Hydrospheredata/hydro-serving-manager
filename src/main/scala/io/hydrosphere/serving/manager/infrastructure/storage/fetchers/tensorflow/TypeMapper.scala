@@ -3,7 +3,7 @@ package io.hydrosphere.serving.manager.infrastructure.storage.fetchers.tensorflo
 import io.hydrosphere.serving.tensorflow.types.DataType
 
 object TypeMapper {
-  val nameToDtypes = Map(
+  val nameToDtypes: Map[String, DataType] = Map(
     "invalid" -> DataType.DT_INVALID,
     "variant" -> DataType.DT_VARIANT,
     "bool" -> DataType.DT_BOOL,
