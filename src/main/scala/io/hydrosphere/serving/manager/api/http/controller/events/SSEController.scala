@@ -13,6 +13,8 @@ import io.hydrosphere.serving.manager.api.http.controller.application.Applicatio
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
 import io.hydrosphere.serving.manager.discovery._
 import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
+import io.hydrosphere.serving.manager.domain.deploy_config
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationEvents
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.ServableEvents
@@ -27,7 +29,8 @@ class SSEController[F[_]](
   applicationSubscriber: ApplicationEvents.Subscriber[F],
   modelSubscriber: ModelVersionEvents.Subscriber[F],
   servableSubscriber: ServableEvents.Subscriber[F],
-  metricSpecSubscriber: MetricSpecEvents.Subscriber[F]
+  metricSpecSubscriber: MetricSpecEvents.Subscriber[F],
+  depSubscriber: DeploymentConfigurationEvents.Subscriber[F]
 )(
   implicit F: ConcurrentEffect[F],
   cs: ContextShift[F],
@@ -53,7 +56,10 @@ class SSEController[F[_]](
         val msSSE = metricSpecSubscriber.subscribe
           .flatMap(x => fs2.Stream.emits(SSEController.fromMetricSpecDiscovery(x)))
 
-        val joined = appsSSE merge modelSSE merge servableSSE merge msSSE
+        val depSSE = depSubscriber.subscribe
+          .flatMap(x => fs2.Stream.emits(SSEController.fromDepConfDiscovery(x)))
+
+        val joined = appsSSE merge modelSSE merge servableSSE merge msSSE merge depSSE
 
         Source.fromGraph(joined.toSource)
           .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
@@ -71,6 +77,26 @@ class SSEController[F[_]](
 }
 
 object SSEController extends CompleteJsonProtocol {
+  def fromDepConfDiscovery(x: DeploymentConfigurationEvents.Event): List[ServerSentEvent] = {
+    x match {
+      case DiscoveryEvent.Initial => Nil
+      case DiscoveryEvent.ItemUpdate(items) =>
+        items.map { s =>
+          ServerSentEvent(
+            data = s.toJson.compactPrint,
+            `type` = "DeploymentConfigurationUpdate"
+          )
+        }
+      case DiscoveryEvent.ItemRemove(items) =>
+        items.map { s =>
+          ServerSentEvent(
+            data = s,
+            `type` = "DeploymentConfigurationRemove"
+          )
+        }
+    }
+  }
+
   def fromServableDiscovery(x: ServableEvents.Event): List[ServerSentEvent] = {
     x match {
       case DiscoveryEvent.Initial => Nil
