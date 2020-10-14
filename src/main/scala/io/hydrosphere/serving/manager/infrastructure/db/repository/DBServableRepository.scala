@@ -101,7 +101,7 @@ object DBServableRepository {
          |       host = ${sr.host},
          |       port = ${sr.port},
          |       status = ${sr.status},
-         |       deployment_configuration = ${sr.deployment_configuration}
+         |       deployment_configuration = ${sr.deployment_configuration},
          |       metadata = ${sr.metadata}
       """.stripMargin.update
 
