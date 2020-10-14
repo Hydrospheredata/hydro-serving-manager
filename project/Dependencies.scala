@@ -1,15 +1,16 @@
 import sbt._
 
 object Dependencies {
-  val akkaVersion = "2.5.14"
-  val akkaHttpVersion = "10.1.9"
-  val log4j2Version = "2.8.2"
+  val akkaVersion = "2.6.4"
+  val akkaHttpVersion = "10.1.12"
+  val log4j2Version = "2.13.3"
   val postgresqlVersion = "42.2.4"
-  val scalaTestVersion = "3.0.3"
+  val scalaTestVersion = "3.1.2"
   val awsSdkVersion = "1.11.312"
-  val servingGrpcScala = "2.4.0"
-  val catsV = "1.2.0"
+  val servingGrpcScala = "3.0.0-dev1"
+  val catsV = "2.2.0"
   val envoyDataPlaneApi = "v1.6.0_1"
+  val fs2 = "2.4.4"
 
   lazy val awsDependencies = Seq(
     "com.amazonaws" % "aws-java-sdk-ecs" % awsSdkVersion,
@@ -33,8 +34,8 @@ object Dependencies {
     "com.typesafe.akka" %% "akka-http-core" % akkaHttpVersion,
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
-    "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.0.0" exclude ("javax.ws.rs", "jsr311-api"),
-    "ch.megard" %% "akka-http-cors" % "0.2.1"
+    "com.github.swagger-akka-http" %% "swagger-akka-http" % "2.2.0" exclude ("javax.ws.rs", "jsr311-api"),
+    "ch.megard" %% "akka-http-cors" % "1.0.0"
   )
 
   lazy val grpcDependencies = Seq(
@@ -46,19 +47,19 @@ object Dependencies {
   lazy val testDependencies = Seq(
     "org.mockito" % "mockito-all" % "1.10.19" % "test,it",
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test,it",
-    "com.dimafeng" %% "testcontainers-scala" % "0.7.0" % "test,it",
+    "com.dimafeng" %% "testcontainers-scala" % "0.38.4" % "test,it",
     "org.scalactic" %% "scalactic" % scalaTestVersion % "test,it",
     "org.scalatest" %% "scalatest" % scalaTestVersion % "test,it",
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test,it",
     "com.amazonaws" % "aws-java-sdk-test-utils" % "1.11.174" % "test,it",
-    "io.findify" %% "s3mock" % "0.2.3" % "test,it"
+    "io.findify" %% "s3mock" % "0.2.6" % "test,it"
   )
 
   lazy val logDependencies = Seq(
     "org.apache.logging.log4j" % "log4j-api" % log4j2Version,
     "org.apache.logging.log4j" % "log4j-core" % log4j2Version,
     "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4j2Version,
-    "org.apache.logging.log4j" %% "log4j-api-scala" % "11.0"
+    "org.apache.logging.log4j" %% "log4j-api-scala" % "12.0"
   )
 
   lazy val mlDependencies = Seq(
@@ -76,19 +77,18 @@ object Dependencies {
     mlDependencies ++
     Seq(
       "org.typelevel" %% "cats-effect" % catsV,
-      "org.tpolecat" %% "doobie-core" % "0.7.0",
-      "org.tpolecat" %% "doobie-postgres" % "0.7.0",
+      "org.tpolecat" %% "doobie-core" % "0.9.0",
+      "org.tpolecat" %% "doobie-postgres" % "0.9.0",
+      "org.tpolecat" %% "doobie-scalatest" % "0.9.0" % "test, it",
       "com.zaxxer" % "HikariCP" % "2.6.3", // doobie-hikari depends on hikari 3.3.1 which has weird pool retries.
-      "org.tpolecat" %% "doobie-scalatest" % "0.7.0" % "test, it",
-      "io.hydrosphere" %% "typed-sql" % "0.1.0",
       "org.postgresql" % "postgresql" % postgresqlVersion,
       "org.flywaydb" % "flyway-core" % "4.2.0",
       "com.spotify" % "docker-client" % "8.16.0" exclude ("ch.qos.logback", "logback-classic"),
       "com.google.guava" % "guava" % "22.0",
-      "com.github.pureconfig" %% "pureconfig" % "0.9.1",
-      "co.fs2" %% "fs2-core" % "1.0.5",
-      "co.fs2" %% "fs2-io" % "1.0.5",
-      "com.github.krasserm" %% "streamz-converter" % "0.10-M2", // uses FS2 1.0.0,
+      "com.github.pureconfig" %% "pureconfig" % "0.14.0",
+      "co.fs2" %% "fs2-core" % fs2,
+      "co.fs2" %% "fs2-io" % fs2,
+      "com.github.krasserm" %% "streamz-converter" % "0.13-RC4", // uses FS2 2.x.x,
       "com.github.mpilquist" %% "simulacrum" % "0.19.0"
     )
 }

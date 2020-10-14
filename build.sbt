@@ -3,7 +3,7 @@ version := sys.props.getOrElse("appVersion", IO.read(file("version")).trim)
 organization := "io.hydrosphere.serving"
 homepage := Some(url("https://hydrosphere.io/serving-docs"))
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.13.3"
 scalacOptions ++= Seq(
   "-unchecked",
   "-deprecation",
@@ -59,6 +59,7 @@ dockerfile in docker := {
     cmd("/hydro-serving/app/start.sh")
   }
 }
-resolvers += "krasserm at bintray" at "https://dl.bintray.com/krasserm/maven"
+
+resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven/"
   
 libraryDependencies ++= Dependencies.all
