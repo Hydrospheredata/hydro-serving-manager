@@ -143,6 +143,10 @@ object ApplicationDeployer extends Logging {
       }
 
       private def startServices(app: Application, df: Deferred[F, Application]) = {
+        val servableMetadata = Map(
+          "applicationName" -> app.name,
+          "applicationId" -> app.id.toString,
+        )
         for {
           deployedStages <- app.graph.stages.traverse { stage =>
             for {
@@ -152,7 +156,7 @@ object ApplicationDeployer extends Logging {
                   mvMetrics <- monitoringRepo.forModelVersion(i.modelVersion.id)
                   newMetricServables <- mvMetrics.filter(_.config.servable.isEmpty).traverse(monitoringService.deployServable)
                   _ <- F.delay(logger.debug(s"Deployed MetricServables: ${newMetricServables}"))
-                  result <- servableService.deploy(i.modelVersion, i.requiredDeploymentConfig, Map.empty) // NOTE maybe infer some app-specific labels?
+                  result <- servableService.deploy(i.modelVersion, i.requiredDeploymentConfig, servableMetadata) // NOTE maybe infer some app-specific labels?
                   servable <- result.completed.get
                 } yield i.copy(servable = servable.some)
               }
