@@ -305,7 +305,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         val servableService = mock[ServableService[IO]]
-        when(servableService.deploy(modelVersion, None, Map.empty)).thenReturn{
+        when(servableService.deploy(Matchers.eq(modelVersion), Matchers.eq(None), Matchers.any())).thenReturn{
           val s = Servable(
             modelVersion = modelVersion,
             nameSuffix = "test",
@@ -352,7 +352,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           res.completed.get.map { finished =>
             Mockito.verify(monitoringService).deployServable(spec)
             assert(finished.name === "test")
-            assert(finished.status.isInstanceOf[Application.Ready.type])
+            assert(finished.status.isInstanceOf[Application.Ready.type], finished.status)
           }
         }
       }
