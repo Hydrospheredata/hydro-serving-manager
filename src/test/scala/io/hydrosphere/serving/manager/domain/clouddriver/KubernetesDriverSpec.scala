@@ -61,6 +61,7 @@ class KubernetesDriverSpec extends GenericUnitTest {
 
       val services = mock[K8SServices[IO]]
       val service1 = skuber.Service(metadata = ObjectMeta(name = "asd"))
+        .withClusterIP("None")
         .withSelector(CloudDriver.Labels.ServiceName -> "asd")
         .exposeOnPort(skuber.Service.Port("grpc", Protocol.TCP, DefaultConstants.DEFAULT_APP_PORT))
         .addLabels(Map(
