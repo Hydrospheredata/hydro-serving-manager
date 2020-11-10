@@ -74,9 +74,9 @@ object App {
       rngF <- Resource.liftF(RNG.default[F])
       cloudDriver = CloudDriver.fromConfig[F](dockerClient, config.cloudDriver, config.dockerRepository)
       hk <- Database.makeHikariDataSource[F](config.database)
-      connectEc <- ExecutionContexts.fixedThreadPool[F](32)
+      blocker <- Blocker[F]
       transactEc <- ExecutionContexts.cachedThreadPool[F]
-      tx <- Resource.liftF(Database.makeTransactor[F](hk, connectEc, transactEc))
+      tx <- Resource.liftF(Database.makeTransactor[F](hk, transactEc, blocker))
       flyway <- Resource.liftF(Database.makeFlyway(tx))
       _ <- Resource.liftF(flyway.migrate())
 

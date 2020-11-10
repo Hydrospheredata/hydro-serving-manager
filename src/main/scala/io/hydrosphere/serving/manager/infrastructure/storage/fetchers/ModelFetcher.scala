@@ -24,8 +24,7 @@ trait ModelFetcher[F[_]] {
 }
 
 object ModelFetcher extends Logging {
-  def default[F[_] : Sync: StorageOps]() = {
-    val storageOps = StorageOps[F]
+  def default[F[_] : Sync](implicit storageOps: StorageOps[F]) = {
     combine(Seq(
       new SparkModelFetcher[F](storageOps),
       new TensorflowModelFetcher[F](storageOps),

@@ -73,8 +73,8 @@ object Core {
         implicit val sMon = servableMonitor.mon
         implicit val bl: BuildLoggingService[F] = buildLoggingService
         implicit val nameGen: NameGenerator[F] = NameGenerator.haiku[F]()
-        implicit val modelUnpacker: ModelUnpacker[F] = ModelUnpacker.default[F]()
-        implicit val modelFetcher: ModelFetcher[F] = ModelFetcher.default[F]()
+        implicit val modelUnpacker: ModelUnpacker[F] = ModelUnpacker.default[F]
+        implicit val modelFetcher: ModelFetcher[F] = ModelFetcher.default[F]
         implicit val deploymentConfigService: DeploymentConfigurationService[F] = DeploymentConfigurationService[F](deploymentConfigRepo)
         implicit val versionService: ModelVersionService[F] = ModelVersionService[F]()
         implicit val servableService: ServableService[F] = ServableService[F]()

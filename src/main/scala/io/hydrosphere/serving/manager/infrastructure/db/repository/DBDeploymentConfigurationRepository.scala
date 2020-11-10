@@ -5,7 +5,7 @@ import cats.effect.Bracket
 import cats.implicits._
 import doobie.Fragments
 import doobie.implicits._
-import doobie.util.Meta
+import doobie.util.meta.Meta
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBDeploymentConfigurationRepository._
@@ -39,7 +39,7 @@ object DBDeploymentConfigurationRepository {
     o.setValue(jsValue.compactPrint)
     o
   }
-  implicit val jsonMeta: Meta[JsValue] = Meta.Advanced.other[PGobject]("json").timap[JsValue](
+   val jsonMeta: Meta[JsValue] = Meta.Advanced.other[PGobject]("json").timap[JsValue](
     obj => obj.getValue.parseJson)(
     json => jsonToPG(json)
   )

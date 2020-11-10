@@ -12,7 +12,6 @@ scalacOptions ++= Seq(
   "-language:higherKinds",
   "-language:implicitConversions",
   "-language:postfixOps",
-  "-Ypartial-unification"
 )
 
 publishArtifact := false
@@ -25,7 +24,7 @@ fork in(IntegrationTest, test) := true
 fork in(IntegrationTest, testOnly) := true
 
 enablePlugins(BuildInfoPlugin, sbtdocker.DockerPlugin)
-addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
+//addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
 configs(IntegrationTest)
 ManagerDev.settings

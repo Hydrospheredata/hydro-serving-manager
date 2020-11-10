@@ -49,10 +49,10 @@ class TensorflowModelFetcher[F[_]: Monad](storageOps: StorageOps[F]) extends Mod
     val savedModelData = Map("tensorflow.metaGraphsCount" -> mgCount).collect({ case (k, Some(v)) => k -> v.toString })
 
     val all = (metagraphdata ++ savedModelData)
-      .mapValues(_.trim)
+      .view.mapValues(_.trim)
       .filter { // filter proto default strings
         case (_, s) => s.nonEmpty
-      }
+      }.toMap
     all
   }
 
@@ -99,7 +99,7 @@ object TensorflowModelFetcher {
   def convertTensor(tensorInfo: TensorInfo): FieldInfo = {
     val shape = if (tensorInfo.hasTensorShape) {
       val tShape = tensorInfo.getTensorShape
-      Some(TensorShapeProto(tShape.getDimList.asScala.map(x => TensorShapeProto.Dim(x.getSize, x.getName)), tShape.getUnknownRank))
+      Some(TensorShapeProto(tShape.getDimList.asScala.map(x => TensorShapeProto.Dim(x.getSize, x.getName)).toSeq, tShape.getUnknownRank))
     } else None
     val convertedDtype = DataType.fromValue(tensorInfo.getDtypeValue)
     FieldInfo(convertedDtype, TensorShape(shape))

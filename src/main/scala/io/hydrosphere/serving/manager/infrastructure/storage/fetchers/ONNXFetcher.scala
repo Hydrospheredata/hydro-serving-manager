@@ -34,7 +34,7 @@ class ONNXFetcher[F[_]: Monad](
       "onnx.irVersion" -> model.irVersion.toString,
       "onnx.modelVersion" -> model.modelVersion.toString,
       "onnx.docString" -> model.docString,
-    ).mapValues(_.trim)
+    ).view.mapValues(_.trim)
       .filter { // filter proto default strings
         case (_, s) => s.nonEmpty
       }
@@ -44,7 +44,7 @@ class ONNXFetcher[F[_]: Monad](
     }.toMap
 
     basic ++ props
-  }
+  }.toMap
 
   override def fetch(directory: Path): F[Option[FetcherResult]] = {
     val f = for {
@@ -103,8 +103,8 @@ object ONNXFetcher {
     ModelField(
       x.name,
       convertShape(x.getType.getTensorType.shape),
-      DataProfileType.NONE,
-      convertType(x.getType.getTensorType.elemType)
+      convertType(x.getType.getTensorType.elemType),
+      DataProfileType.NONE
     )
   }
 

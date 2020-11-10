@@ -24,9 +24,10 @@ trait CommonJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol with 
       case n: BigDecimal => JsNumber(n)
       case s: String => JsString(s)
       case b: Boolean => JsBoolean(b)
-      case list: List[_] => seqFormat[Any].write(list)
-      case array: Array[_] => seqFormat[Any].write(array.toList)
-      case map: Map[String, _]@unchecked => mapFormat[String, Any] write map
+      case list: List[_] => listFormat[Any].write(list)
+      case seq: Seq[_] => seqFormat[Any].write(seq)
+      case array: Array[Any] => arrayFormat[Any].write(array)
+      case map: Map[String, _]@unchecked => mapFormat[String, Any].write(map)
       case e => throw DeserializationException(e.toString)
     }
 

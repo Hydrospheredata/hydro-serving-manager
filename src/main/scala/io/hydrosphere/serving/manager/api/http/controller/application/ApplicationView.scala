@@ -7,7 +7,6 @@ import io.hydrosphere.serving.manager.domain.application.{Application, Applicati
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
-import io.swagger.annotations.ApiModelProperty
 
 case class ApplicationGraphView(
   stages: NonEmptyList[StageView]

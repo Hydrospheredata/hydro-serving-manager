@@ -12,13 +12,12 @@ import scala.collection.mutable
 
 trait ContractJsonProtocol extends CommonJsonProtocol {
   implicit val dataProfileTypeFormat = protoEnumFormat(DataProfileType)
-
   implicit val dataTypeFormat = protoEnumFormat(DataType)
 
-  implicit val tensorShapeDimFormat = jsonFormat2(TensorShapeProto.Dim.apply)
-  implicit val tensorShapeFormat = jsonFormat2(TensorShapeProto.apply)
+  implicit val tensorShapeDimFormat = jsonFormat2(TensorShapeProto.Dim.of)
+  implicit val tensorShapeFormat = jsonFormat2(TensorShapeProto.of)
 
-  implicit val modelFieldFormat = new RootJsonFormat[ModelField] {
+  implicit val modelFieldFormat: RootJsonFormat[ModelField] = new RootJsonFormat[ModelField] {
 
     object DtypeJson {
       def unapply(arg: JsValue): Option[(JsString, Option[JsObject], Option[JsString], JsString)] = {
@@ -60,15 +59,19 @@ trait ContractJsonProtocol extends CommonJsonProtocol {
         ModelField(
           name.value,
           shape.map(_.convertTo[TensorShapeProto]),
-          profileType.flatMap(x => DataProfileType.fromName(x.value.toUpperCase)).getOrElse(DataProfileType.NONE),
-          ModelField.TypeOrSubfields.Dtype(DataType.fromName(dtype.value).get)
+          ModelField.TypeOrSubfields.Dtype(DataType.fromName(dtype.value).get),
+          profileType.flatMap(x => DataProfileType.fromName(x.value.toUpperCase)).getOrElse(DataProfileType.NONE)
         )
 
       case SubfieldsJson(name, shape, subs) =>
         val subfields = ModelField.TypeOrSubfields.Subfields(
           ModelField.Subfield(subs.elements.map(read))
         )
-        ModelField(name.value, shape.map(_.convertTo[TensorShapeProto]), DataProfileType.NONE, subfields)
+        ModelField(
+          name.value,
+          shape.map(_.convertTo[TensorShapeProto]),
+          subfields,
+          DataProfileType.NONE)
 
       case x => throw DeserializationException(s"Invalid ModelField: $x")
     }
@@ -91,8 +94,8 @@ trait ContractJsonProtocol extends CommonJsonProtocol {
     }
   }
 
-  implicit val modelSignatureFormat = jsonFormat3(ModelSignature.apply)
-  implicit val modelContractFormat = jsonFormat2(ModelContract.apply)
+  implicit val modelSignatureFormat: RootJsonFormat[ModelSignature] = jsonFormat3(ModelSignature.of)
+  implicit val modelContractFormat: RootJsonFormat[ModelContract] = jsonFormat2(ModelContract.of)
 }
 
 object ContractJsonProtocol extends ContractJsonProtocol

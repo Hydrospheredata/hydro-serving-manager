@@ -4,10 +4,12 @@ import cats.data.OptionT
 import cats.implicits._
 import cats.effect.Bracket
 import doobie.implicits._
+import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import spray.json._
 import io.hydrosphere.serving.manager.domain.monitoring._
+import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository.JoinedServableRow
 
 import scala.util.Try
 
@@ -138,7 +140,7 @@ object DBMonitoringRepository {
     def getFullMetricSpec(rawSpec: MetricSpecRow): F[CustomModelMetricSpec] = {
       for {
         parsedConfig <- F.fromEither(parseConfig(rawSpec))
-        servableRow <- parsedConfig.servableName.flatTraverse { servableName =>
+        servableRow <- parsedConfig.servableName.flatTraverse[F, JoinedServableRow] { servableName =>
           DBServableRepository.getQ(servableName).option.transact(tx)
         }
         servable <- servableRow.traverse(x => F.fromEither(DBServableRepository.toServableT(x)))

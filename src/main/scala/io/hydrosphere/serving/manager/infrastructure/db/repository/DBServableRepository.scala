@@ -4,7 +4,9 @@ import cats.effect.Bracket
 import cats.implicits._
 import doobie._
 import doobie.implicits._
+import doobie.implicits.javatime._
 import doobie.postgres.implicits._
+import io.hydrosphere.serving.manager.util.SprayDoobie._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableEvents, ServableRepository}

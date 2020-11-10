@@ -70,7 +70,7 @@ object HttpServer extends AkkaHttpControllerDsl {
       ))
     }
 
-    val routes: Route = CorsDirectives.cors(CorsSettings.defaultSettings.copy(allowedMethods = Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))) {
+    val routes: Route = CorsDirectives.cors(CorsSettings.defaultSettings.withAllowedMethods(Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))) {
       pathPrefix("health") {
         complete("OK")
       } ~

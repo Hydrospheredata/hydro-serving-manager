@@ -36,13 +36,13 @@ object TypeMapper {
     "complex128" -> DataType.DT_COMPLEX128,
   )
 
-  val dtypesToNames = nameToDtypes.filterKeys(_ != "half").map(_.swap)
+  val dtypesToNames = nameToDtypes.view.filterKeys(_ != "half").map(_.swap).toMap
 
   def toType(dtype: String): DataType = {
     nameToDtypes.getOrElse(dtype, DataType.DT_INVALID)
   }
 
-  def toName(dtype: DataType): String = {
+  def toName(dtype: DataType.Recognized): String = {
     dtypesToNames.getOrElse(dtype, "invalid")
   }
 
@@ -50,7 +50,7 @@ object TypeMapper {
     nameToDtypes.contains(name)
   }
 
-  def isSupportedType(dataType: DataType): Boolean = {
+  def isSupportedType(dataType: DataType.Recognized): Boolean = {
     dtypesToNames.contains(dataType)
   }
 }
