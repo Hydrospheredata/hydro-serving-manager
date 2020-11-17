@@ -1,7 +1,7 @@
 package io.hydrosphere.serving.manager.domain
 
 import io.hydrosphere.serving.manager.discovery.DiscoveryService
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
 import io.hydrosphere.serving.manager.infrastructure.protocol.PlayJsonAdapter._
 import skuber.Pod.{Affinity, Toleration}
 import spray.json.RootJsonFormat

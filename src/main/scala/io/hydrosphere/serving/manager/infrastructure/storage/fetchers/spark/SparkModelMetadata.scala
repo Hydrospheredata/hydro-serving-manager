@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark
 
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
+import io.hydrosphere.serving.manager.infrastructure.protocol.{CommonJsonProtocol}
 
 case class SparkModelMetadata(
   `class`: String,
@@ -33,7 +33,7 @@ case class SparkModelMetadata(
   }
 }
 
-object SparkModelMetadata extends CompleteJsonProtocol {
+object SparkModelMetadata extends CommonJsonProtocol {
   import spray.json._
   implicit val sparkMetadataFormat: RootJsonFormat[SparkModelMetadata] = jsonFormat8(SparkModelMetadata.apply)
 

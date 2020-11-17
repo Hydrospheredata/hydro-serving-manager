@@ -1,7 +1,7 @@
 import sbt._
 
 object Dependencies {
-  val akkaVersion = "2.6.4"
+  val akkaVersion = "2.6.9"
   val akkaHttpVersion = "10.1.12"
   val log4j2Version = "2.13.3"
   val postgresqlVersion = "42.2.4"
@@ -52,7 +52,8 @@ object Dependencies {
     "org.scalatest" %% "scalatest" % scalaTestVersion % "test,it",
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test,it",
     "com.amazonaws" % "aws-java-sdk-test-utils" % "1.11.174" % "test,it",
-    "io.findify" %% "s3mock" % "0.2.6" % "test,it"
+    "io.findify" %% "s3mock" % "0.2.6" % "test,it",
+    "org.scalatestplus" %% "mockito-3-4" % "3.2.2.0" % "test"
   )
 
   lazy val logDependencies = Seq(

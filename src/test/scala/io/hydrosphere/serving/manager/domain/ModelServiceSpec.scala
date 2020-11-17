@@ -47,11 +47,11 @@ class ModelServiceSpec extends GenericUnitTest {
       }
       it("should fail if input contains invalid dtype") {
         val inputs = Seq(
-          ModelField("name1", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)),
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING)),
+          ModelField("name1", None, ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID), DataProfileType.NONE),
+          ModelField("name2", None, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING), DataProfileType.NONE),
         )
         val outputs = Seq(
-          ModelField("name3", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField("name3", None, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING), DataProfileType.NONE)
         )
         val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
         val res = Contract.validateContract(contract)
@@ -59,11 +59,11 @@ class ModelServiceSpec extends GenericUnitTest {
       }
       it("should fail if output contains invalid dtype") {
         val inputs = Seq(
-          ModelField("name1", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField("name1", None, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING), DataProfileType.NONE)
         )
         val outputs = Seq(
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID)),
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField("name2", None, ModelField.TypeOrSubfields.Dtype(DataType.DT_INVALID), DataProfileType.NONE),
+          ModelField("name2", None, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING), DataProfileType.NONE)
         )
         val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
         val res = Contract.validateContract(contract)
@@ -71,11 +71,11 @@ class ModelServiceSpec extends GenericUnitTest {
       }
       it("should pass if ok") {
         val inputs = Seq(
-          ModelField("name1", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField("name1", None, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING), DataProfileType.NONE)
         )
         val outputs = Seq(
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_BOOL)),
-          ModelField("name2", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING))
+          ModelField("name2", None, ModelField.TypeOrSubfields.Dtype(DataType.DT_BOOL), DataProfileType.NONE),
+          ModelField("name2", None, ModelField.TypeOrSubfields.Dtype(DataType.DT_STRING), DataProfileType.NONE)
         )
         val contract = ModelContract(predict = Some(ModelSignature("sig", inputs, outputs)))
         val res = Contract.validateContract(contract)
@@ -96,8 +96,8 @@ class ModelServiceSpec extends GenericUnitTest {
         val contract = ModelContract("",
           Some(ModelSignature(
             "testSig",
-            Seq(ModelField("in", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE))),
-            Seq(ModelField("out", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)))
+            Seq(ModelField("in", TensorShape.scalar.toProto,ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE), DataProfileType.NONE)),
+            Seq(ModelField("out", TensorShape.scalar.toProto,ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE), DataProfileType.NONE))
           ))
         )
         val modelVersion = ModelVersion.Internal(
@@ -186,8 +186,8 @@ class ModelServiceSpec extends GenericUnitTest {
         val contract = ModelContract("",
           Some(ModelSignature(
             "testSig",
-            Seq(ModelField("in", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE))),
-            Seq(ModelField("out", TensorShape.scalar.toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE)))
+            Seq(ModelField("in", TensorShape.scalar.toProto, ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE), DataProfileType.NONE)),
+            Seq(ModelField("out", TensorShape.scalar.toProto,ModelField.TypeOrSubfields.Dtype(DataType.DT_DOUBLE), DataProfileType.NONE))
           ))
         )
         val modelVersion = ModelVersion.Internal(

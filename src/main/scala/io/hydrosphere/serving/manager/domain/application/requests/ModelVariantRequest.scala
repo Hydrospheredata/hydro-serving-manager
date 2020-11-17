@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager.domain.application.requests
-
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
 
 case class ModelVariantRequest(
   modelVersionId: Long,

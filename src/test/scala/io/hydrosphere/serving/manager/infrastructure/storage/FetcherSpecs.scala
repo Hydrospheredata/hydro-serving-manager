@@ -14,6 +14,7 @@ import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.Spar
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.tensorflow.TensorflowModelFetcher
 import io.hydrosphere.serving.tensorflow.TensorShape
 import io.hydrosphere.serving.tensorflow.types.DataType
+import org.scalatest.enablers.Definition.definitionOfOption
 
 class FetcherSpecs extends GenericUnitTest {
   implicit val ops = StorageOps.default[IO]
@@ -58,11 +59,11 @@ class FetcherSpecs extends GenericUnitTest {
         val expectedSigs = Some(
           ModelSignature(
             "serving_default",
-            Seq(ModelField("images", TensorShape.mat(-1, 784).toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_FLOAT))),
+            Seq(ModelField("images", TensorShape.mat(-1, 784).toProto, ModelField.TypeOrSubfields.Dtype(DataType.DT_FLOAT), DataProfileType.NONE)),
             Seq(
-              ModelField("labels", TensorShape.vector(-1).toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INT64)),
-              ModelField("labels2", TensorShape.vector(-1).toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INT64)),
-              ModelField("random", TensorShape.mat(2, 3).toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_FLOAT))
+              ModelField("labels", TensorShape.vector(-1).toProto, ModelField.TypeOrSubfields.Dtype(DataType.DT_INT64), DataProfileType.NONE),
+              ModelField("labels2", TensorShape.vector(-1).toProto,ModelField.TypeOrSubfields.Dtype(DataType.DT_INT64), DataProfileType.NONE ),
+              ModelField("random", TensorShape.mat(2, 3).toProto,ModelField.TypeOrSubfields.Dtype(DataType.DT_FLOAT), DataProfileType.NONE)
             )
           )
         )
@@ -178,7 +179,7 @@ class FetcherSpecs extends GenericUnitTest {
   describe("Default fetcher") {
     it("should parse tensorflow model") {
       ioAssert {
-        val defaultFetcher = ModelFetcher.default[IO]()
+        val defaultFetcher = ModelFetcher.default[IO]
         defaultFetcher.fetch(getModel("tensorflow_model")).map { model =>
           assert(model.isDefined, model)
         }

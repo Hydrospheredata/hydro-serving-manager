@@ -9,7 +9,7 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.mappers.SparkMlTypeMapper
-import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{FetcherResult, ModelFetcher}
+import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{ FetcherResult, ModelFetcher }
 import org.apache.logging.log4j.scala.Logging
 
 import scala.util.Try

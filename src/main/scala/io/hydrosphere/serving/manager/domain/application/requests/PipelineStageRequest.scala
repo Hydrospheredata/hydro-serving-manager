@@ -7,6 +7,6 @@ case class PipelineStageRequest(
 )
 
 object PipelineStageRequest {
-  import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
+  import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
   implicit val format = jsonFormat1(PipelineStageRequest.apply)
 }
