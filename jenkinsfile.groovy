@@ -20,8 +20,13 @@ def checkoutRepo(String repo){
 
 def getVersion(){
     try{
+      if (params.release == 'global'){
         //remove only quotes
+        version = sh(script: "cat \"version\" | sed 's/\\\"/\\\\\"/g'", returnStdout: true ,label: "get version").trim()
+      } else {
+        //Set version as commit SHA
         version = sh(script: "git rev-parse HEAD", returnStdout: true ,label: "get version").trim()
+      }
         return version
     }catch(err){
         return "$err" 
@@ -176,6 +181,21 @@ def updateHelmChart(String newVersion){
   }
 }
 
+//Create github release
+def releaseService(String xVersion, String yVersion){
+  withCredentials([usernamePassword(credentialsId: 'HydroRobot_AccessToken', passwordVariable: 'password', usernameVariable: 'username')]) {
+      //Set global git
+      sh script: "git diff", label: "show diff"
+      sh script: "git commit -a -m 'Bump to $yVersion'", label: "commit to git"
+      sh script: "git push --set-upstream origin master", label: "push all file to git"
+      sh script: "git tag -a $yVersion -m 'Bump $xVersion to $yVersion version'",label: "set git tag"
+      sh script: "git push --set-upstream origin master --tags",label: "push tag and create release"
+      //Create release from tag
+      sh script: "curl -X POST -H \"Accept: application/vnd.github.v3+json\" -H \"Authorization: token ${password}\" https://api.github.com/repos/Hydrospheredata/${SERVICENAME}/releases -d '{\"tag_name\":\"${yVersion}\",\"name\": \"${yVersion}\",\"body\": \"Bump to ${yVersion}\",\"draft\": false,\"prerelease\": false}'"
+  }
+}
+
+
 node('hydrocentral') {
     try {
         stage('SCM'){
@@ -199,31 +219,43 @@ node('hydrocentral') {
 
         stage('Release'){
             if (BRANCH_NAME == 'master' || BRANCH_NAME == 'main'){
-                newVersion = getVersion()
+                if (params.release == 'global'){
+                    oldVersion = getVersion()
+                    bumpVersion(getVersion(),params.newVersion,params.patchVersion,'version')
+                    newVersion = getVersion()
+                } else {
+                    newVersion = getVersion()
+                }
                 bumpGrpc(grpcVersion, SEARCHGRPC, params.patchVersion, SEARCHPATH) 
                 buildDocker()
                 pushDocker(REGISTRYURL, SERVICEIMAGENAME+":$newVersion")
                 //Update helm and docker-compose if release 
-                if (params.release == 'local'){
-                dir('release'){
-                    //bump only image tag
-                    withCredentials([usernamePassword(credentialsId: 'HydroRobot_AccessToken', passwordVariable: 'Githubpassword', usernameVariable: 'Githubusername')]) {
-                    git changelog: false, credentialsId: 'HydroRobot_AccessToken', url: "https://$Githubusername:$Githubpassword@github.com/Hydrospheredata/hydro-serving.git"      
-                    updateHelmChart("$newVersion")
-                    updateDockerCompose("$newVersion")
-                    sh script: "git commit --allow-empty -a -m 'Releasing $SERVICENAME:$newVersion'",label: "commit to git chart repo"
-                    sh script: "git push https://$Githubusername:$Githubpassword@github.com/Hydrospheredata/hydro-serving.git --set-upstream master",label: "push to git"
+                if (params.release == 'global'){
+                    releaseService(oldVersion, newVersion)
+                } else {
+                    dir('release'){
+                        //bump only image tag
+                        withCredentials([usernamePassword(credentialsId: 'HydroRobot_AccessToken', passwordVariable: 'Githubpassword', usernameVariable: 'Githubusername')]) {
+                        git changelog: false, credentialsId: 'HydroRobot_AccessToken', url: "https://$Githubusername:$Githubpassword@github.com/Hydrospheredata/hydro-serving.git"      
+                        updateHelmChart("$newVersion")
+                        updateDockerCompose("$newVersion")
+                        sh script: "git commit --allow-empty -a -m 'Releasing $SERVICENAME:$newVersion'",label: "commit to git chart repo"
+                        sh script: "git push https://$Githubusername:$Githubpassword@github.com/Hydrospheredata/hydro-serving.git --set-upstream master",label: "push to git"
+                        }
                     }
-                }
                 }
             }
         }
-        //post if success
-            slackMessage()
+    //post if success
+    if (params.release == 'local'){
+        slackMessage()
+    }
     } catch (e) {
-        //post if failure
-            currentBuild.result = 'FAILURE'
-            slackMessage()
+    //post if failure
+        currentBuild.result = 'FAILURE'
+    if (params.release == 'local'){
+        slackMessage()
+    }
         throw e
     }
 }
