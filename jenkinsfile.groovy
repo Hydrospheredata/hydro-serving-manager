@@ -50,7 +50,7 @@ def slackMessage(){
 			"block_id": "section567",
 			"text": {
 				"type": "mrkdwn",
-				"text": "Build info:\n    Project: $JOB_NAME\n    Author: ${env.CHANGE_AUTHOR_DISPLAY_NAME}\n    SHA: $newVersion"
+				"text": "Build info:\n    Project: $JOB_NAME\n    Author: $AUTHOR\n    SHA: $newVersion"
 			},
 			"accessory": {
 				"type": "image",
@@ -126,7 +126,7 @@ def buildDocker(){
 def pushDocker(String registryUrl, String dockerImage){
     //push docker image to registryUrl
     withCredentials([usernamePassword(credentialsId: 'hydrorobot_docker_creds', passwordVariable: 'password', usernameVariable: 'username')]) {
-      sh script: "docker login --username $username --password $password $registryUrl"
+      sh script: "docker login --username ${username} --password ${password}"
       //sh script: "docker tag hydrosphere/$dockerImage $registryUrl/$dockerImage",label: "set tag to docker image"
       sh script: "docker push $registryUrl/$dockerImage",label: "push docker image to registry"
     }
@@ -187,6 +187,7 @@ node('hydrocentral') {
             sh script: "git config --global user.email \"robot@hydrosphere.io\"", label: "Set user email"
             // git changelog: false, credentialsId: 'HydroRobot_AccessToken', poll: false, url: 'https://github.com/Hydrospheredata/hydro-serving-manager.git' 
             checkoutRepo("https://github.com/Hydrospheredata/$SERVICENAME" + '.git')
+            AUTHOR = sh(script:"git log -1 --pretty=format:'%an'", returnStdout: true, label: "get last commit author").trim()
             if (params.grpcVersion == ''){
                 //Set grpcVersion
                 grpcVersion = sh(script: "curl -Ls https://pypi.org/pypi/hydro-serving-grpc/json | jq -r .info.version", returnStdout: true, label: "get grpc version").trim()
@@ -224,6 +225,7 @@ node('hydrocentral') {
             slackMessage()
     } catch (e) {
         //post if failure
+            currentBuild.result = 'FAILURE'
             slackMessage()
         throw e
     }
