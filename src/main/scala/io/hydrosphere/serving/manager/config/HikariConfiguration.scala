@@ -9,7 +9,7 @@ case class HikariConfiguration(
   driverClassname: String = "org.postgresql.Driver",
   maximumPoolSize: Int,
   initializationFailTimeout: Long = 20000L,
-  leakDetectionThreshold: Long = 5000L
+  leakDetectionThreshold: Long = 15000L
 )
 
 object HikariConfiguration {
