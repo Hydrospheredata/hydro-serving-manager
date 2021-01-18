@@ -3,7 +3,6 @@ properties([
     choice(choices: ['patch','minor','major'], name: 'patchVersion', description: 'What needs to be bump?'),
     string(defaultValue:'', description: 'Force set newVersion or leave empty', name: 'newVersion', trim: false),
     string(defaultValue:'', description: 'Set grpcVersion or leave empty', name: 'grpcVersion', trim: false),
-    choice(choices: ['false', 'true'], name: 'release', description: 'Release python package?'),
     choice(choices: ['local', 'global'], name: 'releaseType', description: 'It\'s local release or global?'),
    ])
 ])
@@ -219,7 +218,7 @@ node('hydrocentral') {
         }
 
         stage('Release'){
-            if (BRANCH_NAME == 'master' && params.release == 'true' || BRANCH_NAME == 'main' && params.release == 'true' ){ //Run only manual from master{
+            if (BRANCH_NAME == 'master' || BRANCH_NAME == 'main'){ //Run only manual from master{
                 if (params.release == 'global'){
                     oldVersion = getVersion()
                     bumpVersion(getVersion(),params.newVersion,params.patchVersion,'version')
@@ -248,13 +247,13 @@ node('hydrocentral') {
             }
         }
     //post if success
-    if (params.releaseType == 'local' && params.release == 'true'){
+    if (params.releaseType == 'local' && BRANCH_NAME == 'master'){
         slackMessage()
     }
   } catch (e) {
   //post if failure
     currentBuild.result = 'FAILURE'
-    if (params.releaseType == 'local' && params.release == 'true'){
+    if (params.releaseType == 'local' && BRANCH_NAME == 'master'){
         slackMessage()
     }
       throw e
