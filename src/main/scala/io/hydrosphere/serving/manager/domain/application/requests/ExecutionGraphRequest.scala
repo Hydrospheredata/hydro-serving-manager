@@ -1,14 +1,9 @@
 package io.hydrosphere.serving.manager.domain.application.requests
 
 import cats.data.NonEmptyList
+import io.circe.generic.JsonCodec
 
+@JsonCodec
 case class ExecutionGraphRequest(
   stages: NonEmptyList[PipelineStageRequest]
 )
-
-object ExecutionGraphRequest {
-
-  import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
-
-  implicit val format = jsonFormat1(ExecutionGraphRequest.apply)
-}

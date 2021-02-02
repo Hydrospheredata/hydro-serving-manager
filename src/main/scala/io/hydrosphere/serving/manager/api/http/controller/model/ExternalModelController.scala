@@ -5,8 +5,8 @@ import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import cats.effect.{ConcurrentEffect, ContextShift}
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
-import io.hydrosphere.serving.manager.domain.model.{ModelService}
-import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion }
+import io.hydrosphere.serving.manager.domain.model.ModelService
+
 import javax.ws.rs.Path
 
 @Path("/externalmodel")

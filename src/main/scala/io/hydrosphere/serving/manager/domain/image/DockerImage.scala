@@ -1,9 +1,11 @@
 package io.hydrosphere.serving.manager.domain.image
 
 import cats.syntax.either._
+import io.circe.generic.JsonCodec
 
 import scala.util.matching.Regex
 
+@JsonCodec
 case class DockerImage(
   name: String,
   tag: String,

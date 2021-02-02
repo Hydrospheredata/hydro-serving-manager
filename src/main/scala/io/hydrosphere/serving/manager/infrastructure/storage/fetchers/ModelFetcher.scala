@@ -1,12 +1,11 @@
 package io.hydrosphere.serving.manager.infrastructure.storage.fetchers
 
 import java.nio.file.Path
-
 import cats.effect.Sync
 import cats.instances.list._
 import cats.syntax.functor._
 import cats.{Monad, Traverse}
-import io.hydrosphere.serving.contract.model_contract.ModelContract
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.keras.KerasFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.SparkModelFetcher
@@ -14,9 +13,9 @@ import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.tensorflow
 import org.apache.logging.log4j.scala.Logging
 
 case class FetcherResult(
-  modelName: String,
-  modelContract: ModelContract,
-  metadata: Map[String, String]
+    modelName: String,
+    modelSignature: Signature,
+    metadata: Map[String, String]
 )
 
 trait ModelFetcher[F[_]] {
@@ -24,15 +23,15 @@ trait ModelFetcher[F[_]] {
 }
 
 object ModelFetcher extends Logging {
-  def default[F[_] : Sync](implicit storageOps: StorageOps[F]) = {
-    combine(Seq(
-      new SparkModelFetcher[F](storageOps),
-      new TensorflowModelFetcher[F](storageOps),
-      new ONNXFetcher[F](storageOps),
-      new KerasFetcher[F](storageOps),
-      new FallbackContractFetcher[F](storageOps)
-    ))
-  }
+  def default[F[_]: Sync](implicit storageOps: StorageOps[F]) =
+    combine(
+      Seq(
+        new SparkModelFetcher[F](storageOps),
+        new TensorflowModelFetcher[F](storageOps),
+        new KerasFetcher[F](storageOps),
+        new FallbackContractFetcher[F](storageOps)
+      )
+    )
 
   /**
     * Sequentially applies fetchers and returns the first successful result
@@ -41,17 +40,13 @@ object ModelFetcher extends Logging {
     * @tparam F
     * @return
     */
-  def combine[F[_] : Monad](fetchers: Seq[ModelFetcher[F]]) =
+  def combine[F[_]: Monad](fetchers: Seq[ModelFetcher[F]]) =
     new ModelFetcher[F] {
       override def fetch(path: Path): F[Option[FetcherResult]] = {
-        val res = Traverse[List].traverse(fetchers.toList) { fetcher =>
-          fetcher.fetch(path)
-        }
+        val res = Traverse[List].traverse(fetchers.toList)(fetcher => fetcher.fetch(path))
         for {
           fetchResults <- res
-        } yield {
-          fetchResults.flatten.headOption
-        }
+        } yield fetchResults.flatten.headOption
       }
     }
 }

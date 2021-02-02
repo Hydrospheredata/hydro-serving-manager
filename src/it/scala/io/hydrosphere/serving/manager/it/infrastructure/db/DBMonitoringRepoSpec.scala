@@ -9,7 +9,12 @@ import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, MonitoringConfiguration, ThresholdCmpOperator}
+import io.hydrosphere.serving.manager.domain.monitoring.{
+  CustomModelMetricSpec,
+  CustomModelMetricSpecConfiguration,
+  MonitoringConfiguration,
+  ThresholdCmpOperator
+}
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository.MetricSpecRow
@@ -19,7 +24,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
   implicit val transactor = app.transactor
 
   var version: ModelVersion.Internal = _
-  var servable: Servable.GenericServable = _
+  var servable: Servable.Servable    = _
 
   describe("Queries") {
     val id = UUID.randomUUID().toString
@@ -110,10 +115,23 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
 
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mvOld = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, ModelVersionStatus.Released, None, Map.empty, MonitoringConfiguration())
+      mvOld = ModelVersion.Internal(
+        1,
+        DockerImage("qwe", "asdasd"),
+        Instant.now(),
+        Some(Instant.now()),
+        1,
+        ModelContract.defaultInstance,
+        dummyImage,
+        m,
+        ModelVersionStatus.Released,
+        None,
+        Map.empty,
+        MonitoringConfiguration()
+      )
       mv <- app.core.repos.versionRepo.create(mvOld)
       mvNew = mvOld.copy(id = mv.id)
-      serv = Servable(mvNew, "test-servable", Servable.Serving("ok", "here", 90), Nil, Map.empty)
+      serv  = Servable(mvNew, "test-servable", Servable.Serving("ok", "here", 90), Nil, Map.empty)
       res <- app.core.repos.servableRepo.upsert(serv)
     } yield {
       println(s"Created: $mv")

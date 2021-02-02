@@ -6,19 +6,23 @@ import cats.effect.Bracket
 import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
+import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import spray.json._
 import io.hydrosphere.serving.manager.domain.monitoring._
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository.JoinedServableRow
 
 import scala.util.Try
+import io.circe.parser._
+import io.circe.syntax._
 
 object DBMonitoringRepository {
+
 
   case class InvalidMetricSpecConfig(row: MetricSpecRow)
     extends RuntimeException(s"Invalid config for MetricSpec id=${row.id} name=${row.name} kind=${row.kind} config=${row.config}")
 
-
+  @JsonCodec
   case class MetricSpecRow(
     kind: String,
     name: String,
@@ -27,6 +31,7 @@ object DBMonitoringRepository {
     id: String
   )
 
+  @JsonCodec
   case class CustomModelConfigRow(
     modelVersionId: Long,
     thresholdValue: Double,
@@ -40,7 +45,7 @@ object DBMonitoringRepository {
       case "CustomModelMetricSpec" =>
         for {
           config <- row.config.toRight(InvalidMetricSpecConfig(row))
-          parsedConfig <- Try(config.parseJson.convertTo[CustomModelConfigRow]).toEither
+          parsedConfig <- decode[CustomModelConfigRow](config)
         } yield parsedConfig
       case _ => Left(InvalidMetricSpecConfig(row))
     }
@@ -54,7 +59,7 @@ object DBMonitoringRepository {
       servableName = spec.config.servable.map(_.fullName),
       deploymentConfigName = spec.config.deploymentConfigName
     )
-    Try(config.toJson.compactPrint).toEither.map { json =>
+    Try(config.asJson.noSpaces).toEither.map { json =>
       MetricSpecRow(
         id = spec.id,
         kind = spec.productPrefix,

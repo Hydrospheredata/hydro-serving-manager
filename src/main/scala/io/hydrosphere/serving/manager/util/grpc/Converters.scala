@@ -2,84 +2,113 @@ package io.hydrosphere.serving.manager.util.grpc
 
 import cats.data.NonEmptyList
 import cats.implicits._
-import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationGraph, ApplicationServable}
+import io.hydrosphere.serving.manager.domain.application.{
+  Application,
+  ApplicationGraph,
+  ApplicationServable
+}
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, ThresholdCmpOperator}
+import io.hydrosphere.serving.manager.domain.monitoring.{
+  CustomModelMetricSpec,
+  CustomModelMetricSpecConfiguration,
+  ThresholdCmpOperator
+}
 import io.hydrosphere.serving.manager.domain.servable.Servable
-import io.hydrosphere.serving.manager.grpc.entities.Servable.ServableStatus
-import io.hydrosphere.serving.manager.grpc.entities.{CustomModelMetric, ServingApp, ThresholdConfig, Servable => GServable, Stage => GStage}
-import io.hydrosphere.serving.manager.{domain, grpc}
+import io.hydrosphere.serving.manager.util.BiMap
+import io.hydrosphere.serving.proto.manager.{entities => grpcEntity}
 
 object Converters {
-  def mapThresholdOperator(thresholdCmpOperator: ThresholdCmpOperator): ThresholdConfig.CmpOp = {
+  final val servableStatusMap
+      : BiMap[Servable.Status, grpcEntity.Servable.ServableStatus.Recognized] =
+    BiMap(
+      Servable.Status.Serving      -> grpcEntity.Servable.ServableStatus.SERVING,
+      Servable.Status.NotServing   -> grpcEntity.Servable.ServableStatus.NOT_SERVING,
+      Servable.Status.NotAvailable -> grpcEntity.Servable.ServableStatus.NOT_AVAILABlE,
+      Servable.Status.Starting     -> grpcEntity.Servable.ServableStatus.STARTING
+    )
+
+  final val modelVersionStatusMap
+      : BiMap[ModelVersionStatus, grpcEntity.ModelVersionStatus.Recognized] =
+    BiMap(
+      ModelVersionStatus.Assembling -> grpcEntity.ModelVersionStatus.Building,
+      ModelVersionStatus.Released   -> grpcEntity.ModelVersionStatus.Success,
+      ModelVersionStatus.Failed     -> grpcEntity.ModelVersionStatus.Failed
+    )
+
+  def mapThresholdOperator(
+      thresholdCmpOperator: ThresholdCmpOperator
+  ): grpcEntity.ThresholdConfig.CmpOp =
     thresholdCmpOperator match {
-      case ThresholdCmpOperator.Eq => ThresholdConfig.CmpOp.EQ
-      case ThresholdCmpOperator.NotEq => ThresholdConfig.CmpOp.NOT_EQ
-      case ThresholdCmpOperator.Greater => ThresholdConfig.CmpOp.GREATER
-      case ThresholdCmpOperator.Less =>ThresholdConfig.CmpOp.LESS
-      case ThresholdCmpOperator.GreaterEq =>ThresholdConfig.CmpOp.GREATER_EQ
-      case ThresholdCmpOperator.LessEq =>ThresholdConfig.CmpOp.LESS_EQ
+      case ThresholdCmpOperator.Eq        => grpcEntity.ThresholdConfig.CmpOp.EQ
+      case ThresholdCmpOperator.NotEq     => grpcEntity.ThresholdConfig.CmpOp.NOT_EQ
+      case ThresholdCmpOperator.Greater   => grpcEntity.ThresholdConfig.CmpOp.GREATER
+      case ThresholdCmpOperator.Less      => grpcEntity.ThresholdConfig.CmpOp.LESS
+      case ThresholdCmpOperator.GreaterEq => grpcEntity.ThresholdConfig.CmpOp.GREATER_EQ
+      case ThresholdCmpOperator.LessEq    => grpcEntity.ThresholdConfig.CmpOp.LESS_EQ
     }
-  }
 
-  def fromMetricSpecConfig(specConfig: CustomModelMetricSpecConfiguration): CustomModelMetric = {
-    val threshold = ThresholdConfig(specConfig.threshold, mapThresholdOperator(specConfig.thresholdCmpOperator))
+  def fromMetricSpecConfig(
+      specConfig: CustomModelMetricSpecConfiguration
+  ): grpcEntity.CustomModelMetric = {
+    val threshold =
+      grpcEntity.ThresholdConfig(
+        specConfig.threshold,
+        mapThresholdOperator(specConfig.thresholdCmpOperator)
+      )
 
-    CustomModelMetric(
+    grpcEntity.CustomModelMetric(
       monitorModelId = specConfig.modelVersionId,
       threshold = Some(threshold),
       servable = specConfig.servable.map(fromServable)
     )
   }
 
-  def fromMetricSpec(metricSpec: CustomModelMetricSpec): grpc.entities.MetricSpec = {
-    grpc.entities.MetricSpec(
+  def fromMetricSpec(metricSpec: CustomModelMetricSpec): grpcEntity.MetricSpec =
+    grpcEntity.MetricSpec(
       id = metricSpec.id,
       name = metricSpec.name,
       modelVersionId = metricSpec.modelVersionId,
-      customModelConfig = fromMetricSpecConfig(metricSpec.config).some,
+      customModelConfig = fromMetricSpecConfig(metricSpec.config).some
     )
-  }
 
-  def fromModelVersion(mv: domain.model_version.ModelVersion): grpc.entities.ModelVersion = {
+  def fromModelVersion(mv: ModelVersion): grpcEntity.ModelVersion =
     mv match {
       case imv: ModelVersion.Internal =>
-        grpc.entities.ModelVersion(
+        grpcEntity.ModelVersion(
           id = imv.id,
           version = imv.modelVersion,
-          status = imv.status.toString,
+          status = modelVersionStatusMap.forward(imv.status),
           imageSha = imv.image.sha256.getOrElse(""),
-          model = imv.model.toGrpc.some,
-          contract = imv.modelContract.some,
-          image = grpc.entities.DockerImage(imv.image.name, imv.image.tag).some,
-          runtime = grpc.entities.DockerImage(imv.runtime.name, imv.runtime.tag).some,
+          signature = Signature.toProto(imv.modelSignature).some,
+          image = grpcEntity.DockerImage(imv.image.name, imv.image.tag).some,
+          runtime = grpcEntity.DockerImage(imv.runtime.name, imv.runtime.tag).some,
           metadata = imv.metadata,
-          monitoringConfiguration = Some(grpc.entities.MonitoringConfiguration(batchSize = imv.monitoringConfiguration.batchSize))
+          monitoringConfiguration = Some(
+            grpcEntity.MonitoringConfiguration(batchSize = imv.monitoringConfiguration.batchSize)
+          )
         )
       case emv: ModelVersion.External =>
-        grpc.entities.ModelVersion(
+        grpcEntity.ModelVersion(
           id = emv.id,
           version = emv.modelVersion,
-          status = ModelVersionStatus.Released.toString,
-          model = emv.model.toGrpc.some,
-          contract = emv.modelContract.some,
+          status = grpcEntity.ModelVersionStatus.Success,
+          signature = Signature.toProto(emv.modelSignature).some,
           metadata = emv.metadata,
-          monitoringConfiguration = grpc.entities.MonitoringConfiguration(batchSize=emv.monitoringConfiguration.batchSize).some
+          monitoringConfiguration = grpcEntity
+            .MonitoringConfiguration(batchSize = emv.monitoringConfiguration.batchSize)
+            .some
         )
     }
-  }
 
-  def fromServable(s: domain.servable.Servable.GenericServable): grpc.entities.Servable = {
-    val (status, host, port) = s.status match {
-      case Servable.Serving(_, h, p) => (ServableStatus.SERVING, h, p)
-      case Servable.NotServing(_, h, p) => (ServableStatus.NOT_SERVING, h.getOrElse(""), p.getOrElse(0))
-      case Servable.NotAvailable(_, h, p) => (ServableStatus.NOT_AVAILABlE, h.getOrElse(""), p.getOrElse(0))
-      case Servable.Starting(_, h, p) => (ServableStatus.STARTING, h.getOrElse(""), p.getOrElse(0))
-    }
-    grpc.entities.Servable(
-      host = host,
-      port = port,
+  def fromServable(s: Servable): grpcEntity.Servable = {
+    val status =
+      servableStatusMap.forward
+        .getOrElse(s.status, grpcEntity.Servable.ServableStatus.NOT_AVAILABlE)
+
+    grpcEntity.Servable(
+      host = s.host.getOrElse(""),
+      port = s.port.getOrElse(0),
       modelVersion = fromModelVersion(s.modelVersion).some,
       name = s.fullName,
       status = status,
@@ -87,40 +116,35 @@ object Converters {
     )
   }
 
-  def fromApp(app: Application): ServingApp = {
-    val stages = toGStages(app.graph)
-    val contract = ModelContract(modelName = app.name, predict = app.signature.some)
-    ServingApp(
+  def fromApp(app: Application): grpcEntity.Application = {
+    val stages    = toGStages(app.graph)
+    val signature = Signature.toProto(app.signature)
+
+    grpcEntity.Application(
       id = app.id.toString,
       name = app.name,
-      contract = contract.some,
+      signature = signature.some,
       pipeline = stages.toList,
       metadata = app.metadata
     )
   }
 
-  def toGServable(mv: ApplicationServable): Option[GServable] = {
-    mv.servable.flatMap { s =>
-      s.status match {
-        case status: Servable.Serving =>
-          GServable(
-            host = status.host,
-            port = status.port,
-            weight = mv.weight,
-            modelVersion = fromModelVersion(mv.modelVersion).some,
-            name = s.fullName,
-            metadata = s.metadata
-          ).some
-        case _ => None
-      }
+  def toGServable(mv: ApplicationServable): Option[grpcEntity.Servable] =
+    mv.servable.map { s =>
+      grpcEntity.Servable(
+        host = s.host.getOrElse(""),
+        port = s.port.getOrElse(0),
+        weight = mv.weight,
+        modelVersion = fromModelVersion(mv.modelVersion).some,
+        name = s.fullName,
+        metadata = s.metadata
+      )
     }
-  }
 
-  def toGStages(graph: ApplicationGraph): NonEmptyList[GStage] = {
+  def toGStages(graph: ApplicationGraph): NonEmptyList[grpcEntity.Stage] =
     graph.stages.zipWithIndex.map {
       case (st, i) =>
         val mapped = st.variants.toList.flatMap(toGServable)
-        GStage(i.toString, st.signature.some, mapped)
+        grpcEntity.Stage(i.toString, Signature.toProto(st.signature).some, mapped)
     }
-  }
 }

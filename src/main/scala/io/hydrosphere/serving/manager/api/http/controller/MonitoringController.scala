@@ -4,10 +4,12 @@ import akka.http.scaladsl.server.Route
 import cats.data.OptionT
 import cats.effect.Effect
 import cats.implicits._
+import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.api.http.controller.MonitoringRequests._
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, Monitoring, MonitoringRepository, ThresholdCmpOperator}
+
 import javax.ws.rs.Path
 import org.apache.logging.log4j.scala.Logging
 
@@ -16,11 +18,6 @@ class MonitoringController[F[_]](
   monitoringService: Monitoring[F],
   monRepo: MonitoringRepository[F]
 )(implicit F: Effect[F]) extends AkkaHttpControllerDsl with Logging {
-  implicit val configReq = jsonFormat4(MetricSpecConfigCreationRequest)
-  implicit val specReq = jsonFormat3(MetricSpecCreationRequest)
-  implicit val configView = jsonFormat4(MetricSpecConfigView)
-  implicit val specView = jsonFormat4(MetricSpecView)
-
   @Path("/")
   def createSpec: Route = path("metricspec") {
     post {
@@ -69,20 +66,24 @@ class MonitoringController[F[_]](
 }
 
 object MonitoringRequests {
+  @JsonCodec
   final case class MetricSpecConfigCreationRequest(
     modelVersionId: Long,
     threshold: Double,
     thresholdCmpOperator: ThresholdCmpOperator,
     deploymentConfigName: Option[String]
   )
+  @JsonCodec
   final case class MetricSpecCreationRequest(name: String, modelVersionId: Long, config: MetricSpecConfigCreationRequest)
 
+  @JsonCodec
   final case class MetricSpecConfigView(
     modelVersionId: Long,
     threshold: Double,
     thresholdCmpOperator: ThresholdCmpOperator,
     servable: Option[ServableView]
   )
+  @JsonCodec
   final case class MetricSpecView(  name: String,
     modelVersionId: Long,
     config: MetricSpecConfigView,

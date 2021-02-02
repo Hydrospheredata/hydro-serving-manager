@@ -11,7 +11,7 @@ trait StorageOps[F[_]] {
 
   def getAllFiles(folder: Path): F[Option[List[String]]]
 
-  def getSubDirs(path: Path): F[Option[List[String]]]
+  def getSubDirs(path: Path): F[List[String]]
 
   def exists(path: Path): F[Boolean]
 
@@ -22,7 +22,7 @@ trait StorageOps[F[_]] {
   def removeFolder(path: Path): F[Option[Unit]]
 
   def getTempDir(prefix: String): F[Path]
-  
+
   def readText(path: Path): F[Option[List[String]]]
 
   def readBytes(path: Path): F[Option[Array[Byte]]]

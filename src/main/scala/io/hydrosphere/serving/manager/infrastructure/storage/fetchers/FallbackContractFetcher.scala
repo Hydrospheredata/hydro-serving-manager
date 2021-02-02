@@ -1,40 +1,50 @@
 package io.hydrosphere.serving.manager.infrastructure.storage.fetchers
 
 import java.nio.file.Path
+import cats.data.{EitherT, OptionT}
+import cats.effect.Sync
+import cats.implicits._
 
-import cats.Monad
-import cats.data.OptionT
-import io.hydrosphere.serving.contract.model_contract.ModelContract
+import io.hydrosphere.serving.proto.contract.signature.ModelSignature
+
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
-import scala.util.Try
-
-class FallbackContractFetcher[F[_]: Monad](
-  source: StorageOps[F]
-) extends ModelFetcher[F] with Logging {
+class FallbackContractFetcher[F[_]](
+    source: StorageOps[F]
+)(implicit F: Sync[F])
+    extends ModelFetcher[F]
+    with UnsafeLogging {
   override def fetch(directory: Path): F[Option[FetcherResult]] = {
-    OptionT(getContract(directory)).map { contract =>
+    val contract = getContract(directory)
+
+    contract.map { signature =>
       FetcherResult(
         modelName = directory.getFileName.toString,
-        modelContract = contract,
+        modelSignature = signature,
         metadata = Map.empty
       )
     }.value
   }
 
-  private def getContract(modelPath: Path): F[Option[ModelContract]] = {
-    val txtContract = for {
-      metaFile <- OptionT(source.readText(modelPath.resolve("contract.prototxt")))
-      text = metaFile.mkString
-      contract <- OptionT.fromOption(Try(ModelContract.fromAscii(text)).toOption)
+  //TODO: get
+  private def getContract(modelPath: Path) = {
+    val txtContract: F[ModelSignature] = for {
+      metaFile <- source.readText(modelPath.resolve("contract.prototxt"))
+      contract <- F.delay(ModelSignature.fromAscii(metaFile.get.mkString))
     } yield contract
 
-    val binContract = for {
+    val binContract: OptionT[F, ModelSignature] = for {
       metaFile <- OptionT(source.readBytes(modelPath.resolve("contract.protobin")))
-      contract <- OptionT.fromOption(Try(ModelContract.parseFrom(metaFile)).toOption)
+      contract <- OptionT.liftF(F.delay(ModelSignature.parseFrom(metaFile)))
     } yield contract
 
-    txtContract.orElse(binContract).value
+    val faillessTxtContract = EitherT(txtContract.attempt).toOption
+    val faillessBinContract = OptionT(binContract.value)
+
+    faillessTxtContract
+      .orElse(faillessBinContract)
+      .flatMap(proto => EitherT.fromEither[F](Signature.fromProto(proto)).toOption)
   }
 }

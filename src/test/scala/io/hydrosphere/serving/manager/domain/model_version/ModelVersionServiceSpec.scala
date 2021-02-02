@@ -1,14 +1,13 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
 import java.time.Instant
-
 import cats.MonadError
 import cats.effect.IO
-import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
+import io.hydrosphere.serving.proto.contract.signature.ModelSignature
 
 import scala.collection.mutable.ListBuffer
 
@@ -20,55 +19,63 @@ class ModelVersionServiceSpec extends GenericUnitTest {
       val versionService = ModelVersionService.apply[IO]()(
         MonadError[IO, Throwable],
         modelVersionRepository = versionRepo,
-        applicationRepo = null,
+        applicationRepo = null
       )
       assert(versionService.getNextModelVersion(1).unsafeRunSync() === 1)
     }
     it("should calculate second version") {
       val versionRepo = mock[ModelVersionRepository[IO]]
-      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(IO(
-        Some(ModelVersion.Internal(
-          id = 1,
-          image = DockerImage("asd", "asd"),
-          created = Instant.now(),
-          finished = None,
-          modelVersion = 1,
-          modelContract = ModelContract.defaultInstance,
-          runtime = DockerImage("asd", "asd"),
-          model = Model(1, "asd"),
-          status = ModelVersionStatus.Released,
-          installCommand = None,
-          metadata = Map.empty
-        )))
+      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(
+        IO(
+          Some(
+            ModelVersion.Internal(
+              id = 1,
+              image = DockerImage("asd", "asd"),
+              created = Instant.now(),
+              finished = None,
+              modelVersion = 1,
+              modelSignature = Signature.defaultSignature,
+              runtime = DockerImage("asd", "asd"),
+              model = Model(1, "asd"),
+              status = ModelVersionStatus.Released,
+              installCommand = None,
+              metadata = Map.empty
+            )
+          )
+        )
       )
       val versionService = ModelVersionService.apply[IO]()(
         MonadError[IO, Throwable],
         modelVersionRepository = versionRepo,
-        applicationRepo = null,
+        applicationRepo = null
       )
       assert(versionService.getNextModelVersion(1).unsafeRunSync() === 2)
     }
     it("should calculate third version") {
       val versionRepo = mock[ModelVersionRepository[IO]]
-      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(IO(
-        Some(ModelVersion.Internal(
-          id = 1,
-          image = DockerImage("asd", "asd"),
-          created = Instant.now(),
-          finished = None,
-          modelVersion = 2,
-          modelContract = ModelContract.defaultInstance,
-          runtime = DockerImage("asd", "asd"),
-          model = Model(1, "asd"),
-          status = ModelVersionStatus.Released,
-          installCommand = None,
-          metadata = Map.empty
-        )))
+      when(versionRepo.lastModelVersionByModel(1L)).thenReturn(
+        IO(
+          Some(
+            ModelVersion.Internal(
+              id = 1,
+              image = DockerImage("asd", "asd"),
+              created = Instant.now(),
+              finished = None,
+              modelVersion = 2,
+              modelSignature = Signature.defaultSignature,
+              runtime = DockerImage("asd", "asd"),
+              model = Model(1, "asd"),
+              status = ModelVersionStatus.Released,
+              installCommand = None,
+              metadata = Map.empty
+            )
+          )
+        )
       )
       val versionService = ModelVersionService.apply[IO]()(
         MonadError[IO, Throwable],
         modelVersionRepository = versionRepo,
-        applicationRepo = null,
+        applicationRepo = null
       )
       assert(versionService.getNextModelVersion(1).unsafeRunSync() === 3)
     }
@@ -80,10 +87,9 @@ class ModelVersionServiceSpec extends GenericUnitTest {
           when(versionRepo.lastModelVersionByModel(1)).thenReturn(
             IO(None)
           )
-          val versionService = ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null)
-          versionService.getNextModelVersion(1).map { x =>
-            assert(x === 1)
-          }
+          val versionService =
+            ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null)
+          versionService.getNextModelVersion(1).map(x => assert(x === 1))
         }
       }
 
@@ -91,24 +97,27 @@ class ModelVersionServiceSpec extends GenericUnitTest {
         ioAssert {
           val versionRepo = mock[ModelVersionRepository[IO]]
           when(versionRepo.lastModelVersionByModel(1)).thenReturn(
-            IO(Some(ModelVersion.Internal(
-              id = 1,
-              image = DockerImage("", ""),
-              created = Instant.now(),
-              finished = None,
-              modelVersion = 4,
-              modelContract = ModelContract.defaultInstance,
-              runtime = DockerImage("", ""),
-              model = Model(1, "aaaa"),
-              status = ModelVersionStatus.Assembling,
-              installCommand = None,
-              metadata = Map.empty
-            )))
+            IO(
+              Some(
+                ModelVersion.Internal(
+                  id = 1,
+                  image = DockerImage("", ""),
+                  created = Instant.now(),
+                  finished = None,
+                  modelVersion = 4,
+                  modelSignature = Signature.defaultSignature,
+                  runtime = DockerImage("", ""),
+                  model = Model(1, "aaaa"),
+                  status = ModelVersionStatus.Assembling,
+                  installCommand = None,
+                  metadata = Map.empty
+                )
+              )
+            )
           )
-          val versionService = ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null)
-          versionService.getNextModelVersion(1).map { x =>
-            assert(x === 5)
-          }
+          val versionService =
+            ModelVersionService[IO]()(MonadError[IO, Throwable], versionRepo, null)
+          versionService.getNextModelVersion(1).map(x => assert(x === 5))
         }
       }
     }

@@ -1,12 +1,9 @@
 package io.hydrosphere.serving.manager.domain.application.requests
 
 import cats.data.NonEmptyList
+import io.circe.generic.JsonCodec
 
+@JsonCodec
 case class PipelineStageRequest(
   modelVariants: NonEmptyList[ModelVariantRequest]
 )
-
-object PipelineStageRequest {
-  import io.hydrosphere.serving.manager.infrastructure.protocol.CommonJsonProtocol._
-  implicit val format = jsonFormat1(PipelineStageRequest.apply)
-}

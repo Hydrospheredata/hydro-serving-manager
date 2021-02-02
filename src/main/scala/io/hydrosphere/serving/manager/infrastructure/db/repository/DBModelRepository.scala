@@ -6,10 +6,12 @@ import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
+import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelRepository}
 
 object DBModelRepository {
 
+  @JsonCodec
   case class ModelRow(
     model_id: Long,
     name: String

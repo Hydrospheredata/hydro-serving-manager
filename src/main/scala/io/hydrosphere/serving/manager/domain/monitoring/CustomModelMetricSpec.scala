@@ -1,18 +1,20 @@
 package io.hydrosphere.serving.manager.domain.monitoring
 
+import io.circe.generic.JsonCodec
+
 import java.util.UUID
+import io.hydrosphere.serving.manager.domain.servable.Servable
 
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
-
-
+@JsonCodec
 case class CustomModelMetricSpecConfiguration(
   modelVersionId: Long,
   threshold: Double,
   thresholdCmpOperator: ThresholdCmpOperator,
-  servable: Option[GenericServable],
+  servable: Option[Servable],
   deploymentConfigName: Option[String]
 )
 
+@JsonCodec
 case class CustomModelMetricSpec(
   name: String,
   modelVersionId: Long,
