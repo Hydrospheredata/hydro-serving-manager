@@ -1,8 +1,7 @@
 package io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark
 
 import java.nio.file.Path
-
-import cats.data.{NonEmptyList, OptionT}
+import cats.data.{EitherT, NonEmptyList, OptionT}
 import cats.effect.Sync
 import cats.implicits._
 import io.circe.parser._
@@ -21,17 +20,19 @@ class SparkModelFetcher[F[_]](storageOps: StorageOps[F])(implicit F: Sync[F])
   private def getMetadata(model: Path): F[SparkModelMetadata] =
     for {
       lines <- storageOps.readText(model.resolve("metadata/part-00000"))
-      text = lines.get.mkString
+      text <- lines.map(l => l.mkString) match {
+        case Some(value) => F.delay(value)
+        case None        => F.raiseError(new Throwable("Couldn't get metadata"))
+      }
       json     <- F.fromEither(parse(text))
       metadata <- F.fromEither(json.as[SparkModelMetadata])
     } yield metadata
 
   override def fetch(directory: Path): F[Option[FetcherResult]] = {
     val modelName = directory.getFileName.toString
-    val meta      = getMetadata(directory)
 
     val f = for {
-      metadata  <- OptionT.liftF(getMetadata(directory))
+      metadata  <- EitherT(getMetadata(directory).attempt).toOption
       signature <- OptionT(processPipeline(directory.resolve("stages")))
     } yield FetcherResult(
       modelName = modelName,

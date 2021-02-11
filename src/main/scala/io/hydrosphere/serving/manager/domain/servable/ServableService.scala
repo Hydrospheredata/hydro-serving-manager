@@ -145,7 +145,6 @@ object ServableService extends Logging {
             .start
         } yield DeferredResult(initServable, d)
 
-      // TODO: Do we need to upsert database?
       def awaitServable(servable: Servable): F[Servable] =
         for {
           ci <- cloudDriver.run(

@@ -69,7 +69,7 @@ object ApplicationDeployer extends Logging {
                       statusMessage = Option(x.getMessage)
                     )
                 }
-                F.delay(logger.error(s"Error while buidling application $failedApp", ex)) >>
+                F.delay(logger.error(s"Error while building application $failedApp", ex)) >>
                   applicationRepository.update(failedApp) >>
                   df.complete(failedApp).attempt.void
               }
@@ -186,10 +186,10 @@ object ApplicationDeployer extends Logging {
                   case Servable.Status.Serving => servable.pure[F]
                   case Servable.Status.NotServing =>
                     F.raiseError[Servable](
-                      DomainError
-                        .internalError(
-                          s"Servable ${servable.fullName} is in invalid state: ${servable.message}"
-                        )
+                      IncompleteAppDeployment(
+                        finishedApp,
+                        s"Servable ${servable.fullName} is in invalid state: ${servable.message}"
+                      )
                     )
                   case Servable.Status.NotAvailable =>
                     F.raiseError[Servable](

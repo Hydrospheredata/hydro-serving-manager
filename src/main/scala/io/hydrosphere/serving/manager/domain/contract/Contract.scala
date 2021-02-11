@@ -1,5 +1,6 @@
 package io.hydrosphere.serving.manager.domain.contract
 
+import cats.Eq
 import cats.data.Validated.Invalid
 import cats.data._
 import cats.implicits._

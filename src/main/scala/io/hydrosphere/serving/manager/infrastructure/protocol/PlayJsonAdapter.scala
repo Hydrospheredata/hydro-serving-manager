@@ -30,7 +30,7 @@ object PlayJsonAdapter {
   def playToCirce(p: JsValue): Json =
     p match {
       case JsNumber(i)   => i.asJson
-      case JsString(s)   => s.asJson
+      case JsString(s)   => s.asJson(Encoder[String])
       case JsBoolean(b)  => b.asJson
       case JsNull        => Json.Null
       case JsArray(arr)  => arr.map(playToCirce).asJson

@@ -307,8 +307,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           res.completed.get.map { x =>
             assert(x.status == Application.Status.Failed)
             assert(x.statusMessage.get === "Servable model-1-kek is in invalid state: error")
-            println(x.graph.stages.head)
-            assert(x.graph.stages.head.variants.head.servable.isDefined)
+
           }
         }
       }
