@@ -29,7 +29,6 @@ trait ApplicationDeployer[F[_]] {
 }
 
 object ApplicationDeployer extends Logging {
-
   case class IncompleteAppDeployment(app: Application, msg: String) extends Throwable
 
   def default[F[_]]()(implicit
@@ -151,7 +150,11 @@ object ApplicationDeployer extends Logging {
           }
         } yield name
 
-      private def startServices(app: Application, df: Deferred[F, Application]) =
+      private def startServices(app: Application, df: Deferred[F, Application]) = {
+        val servableMetadata = Map(
+          "applicationName" -> app.name,
+          "applicationId"   -> app.id.toString
+        )
         for {
           deployedStages <- app.graph.stages.traverse { stage =>
             for {
@@ -162,12 +165,15 @@ object ApplicationDeployer extends Logging {
                   newMetricServables <-
                     mvMetrics
                       .filter(_.config.servable.isEmpty)
-                      .traverse(monitoringService.deployServable)
+                      .traverse { x =>
+                        val foo = x;
+                        monitoringService.deployServable(x)
+                      }
                   _ <- F.delay(logger.debug(s"Deployed MetricServables: ${newMetricServables}"))
                   result <- servableService.deploy(
                     i.modelVersion,
                     i.requiredDeploymentConfig,
-                    Map.empty
+                    servableMetadata
                   ) // NOTE maybe infer some app-specific labels?
                   servable <- result.completed.get
                 } yield i.copy(servable = servable.some)
@@ -209,6 +215,7 @@ object ApplicationDeployer extends Logging {
               }
           _ <- df.complete(finishedApp)
         } yield finishedApp
+      }
     }
   }
 }

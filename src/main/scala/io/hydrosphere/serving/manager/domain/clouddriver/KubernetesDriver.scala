@@ -191,6 +191,7 @@ object KubernetesDriver {
 
   def prepareService(name: String, modelVersionId: Long): Service = {
     skuber.Service(metadata = ObjectMeta(name = name))
+      .withClusterIP("None")
       .withSelector(CloudDriver.Labels.ServiceName -> name)
       .exposeOnPort(skuber.Service.Port("grpc", Protocol.TCP, DefaultConstants.DEFAULT_APP_PORT))
       .addLabels(Map(
