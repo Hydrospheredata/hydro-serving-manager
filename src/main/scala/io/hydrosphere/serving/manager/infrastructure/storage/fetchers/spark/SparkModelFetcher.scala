@@ -1,85 +1,89 @@
 package io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark
 
 import java.nio.file.Path
-
-import cats.data.OptionT
-import cats.instances.list._
-import cats.{Monad, Traverse}
-import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
+import cats.data.{EitherT, NonEmptyList, OptionT}
+import cats.effect.Sync
+import cats.implicits._
+import io.circe.parser._
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.mappers.SparkMlTypeMapper
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{FetcherResult, ModelFetcher}
-import org.apache.logging.log4j.scala.Logging
+import io.hydrosphere.serving.manager.util.UnsafeLogging
 
-import scala.util.Try
-
-
-class SparkModelFetcher[F[_]: Monad](storageOps: StorageOps[F]) extends ModelFetcher[F] with Logging {
-  private def getStageMetadata(stagesPath: Path, stage: String) = {
+class SparkModelFetcher[F[_]](storageOps: StorageOps[F])(implicit F: Sync[F])
+    extends ModelFetcher[F]
+    with UnsafeLogging {
+  private def getStageMetadata(stagesPath: Path, stage: String): F[SparkModelMetadata] =
     getMetadata(stagesPath.resolve(stage))
-  }
 
-  private def getMetadata(model: Path) = {
+  private def getMetadata(model: Path): F[SparkModelMetadata] =
     for {
-      lines <- OptionT(storageOps.readText(model.resolve("metadata/part-00000")))
-      text = lines.mkString
-      metadata <- OptionT.fromOption(Try(SparkModelMetadata.fromJson(text)).toOption)(Monad[F])
+      lines <- storageOps.readText(model.resolve("metadata/part-00000"))
+      text <- lines.map(l => l.mkString) match {
+        case Some(value) => F.delay(value)
+        case None        => F.raiseError(new Throwable("Couldn't get metadata"))
+      }
+      json     <- F.fromEither(parse(text))
+      metadata <- F.fromEither(json.as[SparkModelMetadata])
     } yield metadata
-  }
 
   override def fetch(directory: Path): F[Option[FetcherResult]] = {
     val modelName = directory.getFileName.toString
+
     val f = for {
-      metadata <- getMetadata(directory)
-      signature <- processPipeline(directory.resolve("stages"), metadata)
+      metadata  <- EitherT(getMetadata(directory).attempt).toOption
+      signature <- OptionT(processPipeline(directory.resolve("stages")))
     } yield FetcherResult(
       modelName = modelName,
-      modelContract = ModelContract(modelName, Some(signature)),
+      modelSignature = signature,
       metadata = metadata.toMap
     )
+
     f.value
   }
 
-  private def processPipeline(stagesDir: Path, pipelineMetadata: SparkModelMetadata) = {
+  private def processPipeline(stagesDir: Path) =
     for {
-      stages <- OptionT(storageOps.getSubDirs(stagesDir))
-      sM <- Traverse[List].traverse(stages)(x => getStageMetadata(stagesDir, x))
-      signature <- OptionT.fromOption(Try(SparkModelFetcher.processStages(sM)).toOption)(Monad[F])
+      stages    <- storageOps.getSubDirs(stagesDir)
+      sM        <- stages.traverse(x => getStageMetadata(stagesDir, x))
+      signature <- SparkModelFetcher.processStages(sM)
     } yield signature
-  }
 }
 
 object SparkModelFetcher {
-  def processStages(stagesMetadata: Seq[SparkModelMetadata]): ModelSignature = {
-    val mappers = stagesMetadata.map(SparkMlTypeMapper.apply)
-    val inputs = mappers.map(_.inputSchema)
-    val outputs = mappers.map(_.outputSchema)
-    val labels = mappers.flatMap(_.labelSchema)
+  def processStages[F[_]](
+      stagesMetadata: List[SparkModelMetadata]
+  )(implicit F: Sync[F]): F[Option[Signature]] =
+    F.delay {
+      val mappers = stagesMetadata.map(SparkMlTypeMapper.apply)
+      for {
+        inputs  <- mappers.traverse(_.inputSchema)
+        outputs <- mappers.traverse(_.outputSchema)
+        labels    = mappers.flatMap(_.labelSchema)
+        allLabels = labels.map(_.name)
+        allIns    = inputs.flatten.map(x => x.name -> x).toMap
+        allOuts   = outputs.flatten.map(x => x.name -> x).toMap
+        inputSchema =
+          if (allLabels.isEmpty)
+            (allIns -- allOuts.keys).map { case (_, y) => y }.toList
+          else {
+            val trainInputs = stagesMetadata
+              .filter { stage =>
+                val mapper = SparkMlTypeMapper(stage)
+                mapper.outputSchema.getOrElse(Nil).map(_.name).containsSlice(allLabels)
+              }
+              .flatTraverse(stage => SparkMlTypeMapper(stage).inputSchema)
+            val allTrains = trainInputs.getOrElse(Nil).map(x => x.name -> x).toMap
+            (allIns -- allOuts.keys -- allTrains.keys).map { case (_, y) => y }.toList
+          }
+        outputSchema = (allOuts -- allIns.keys).map { case (_, y) => y }.toList
 
-    val allLabels = labels.map(_.name)
-    val allIns = inputs.flatten.map(x => x.name -> x).toMap
-    val allOuts = outputs.flatten.map(x => x.name -> x).toMap
-
-    val inputSchema = if (allLabels.isEmpty) {
-      (allIns -- allOuts.keys).map { case (_, y) => y }.toList
-    } else {
-      val trainInputs = stagesMetadata
-        .filter { stage =>
-          val mapper = SparkMlTypeMapper(stage)
-          mapper.outputSchema.map(_.name).containsSlice(allLabels)
-        }
-        .map { stage =>
-          SparkMlTypeMapper(stage).inputSchema
-        }
-      val allTrains = trainInputs.flatten.map(x => x.name -> x).toMap
-      (allIns -- allOuts.keys -- allTrains.keys).map { case (_, y) => y }.toList
+        ins  <- NonEmptyList.fromList(inputSchema)
+        outs <- NonEmptyList.fromList(outputSchema)
+      } yield {
+        val signature = Signature("default_spark", ins, outs)
+        signature
+      }
     }
-    val outputSchema = (allOuts -- allIns.keys).map { case (_, y) => y }.toList
-
-    val signature = ModelSignature("default_spark", inputSchema, outputSchema)
-    signature
-  }
 }
-
-

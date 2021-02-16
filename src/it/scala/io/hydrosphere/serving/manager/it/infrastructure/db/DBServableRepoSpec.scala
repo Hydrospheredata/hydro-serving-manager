@@ -1,12 +1,14 @@
 package io.hydrosphere.serving.manager.it.infrastructure.db
 
 import java.time.Instant
-
 import cats.data.NonEmptyList
 import cats.implicits._
 import doobie.scalatest.IOChecker
-import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, K8sDeploymentConfig}
+import io.hydrosphere.serving.manager.domain.contract.Signature
+import io.hydrosphere.serving.manager.domain.deploy_config.{
+  DeploymentConfiguration,
+  K8sDeploymentConfig
+}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
@@ -19,12 +21,21 @@ import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
   val transactor = app.transactor
 
-  var mv1: ModelVersion.Internal = _
+  var mv1: ModelVersion.Internal       = _
   var depConf: DeploymentConfiguration = _
 
   describe("Queries") {
     it("should have correct queries") {
-      val row = ServableRow("name", 123, "status_text", Some("host"), Some(123), "status", None, Some("test-test"))
+      val row = ServableRow(
+        "name",
+        123,
+        "status_text",
+        Some("host"),
+        Some(123),
+        "status",
+        None,
+        Some("test-test")
+      )
       check(DBServableRepository.allQ)
       check(DBServableRepository.getManyQ(NonEmptyList.of("123", "test")))
       check(DBServableRepository.deleteQ("delete-me"))
@@ -36,7 +47,15 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
   }
   describe("Methods") {
     it("should upsert new Servable") {
-      val servable = Servable(mv1, "test-servable", Servable.Serving("Ok", "localhost", 9090), Nil, Map.empty, depConf.some)
+      val servable = Servable(
+        mv1,
+        "test-servable",
+        Servable.Status.Serving,
+        Nil,
+        "Ok",
+        "localhost".some,
+        9090.some
+      )
       val result = app.core.repos.servableRepo.upsert(servable).unsafeRunSync()
       println(result)
       assert(result.fullName == "model-name-1-test-servable")
@@ -54,7 +73,9 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
       assert(Servable.extractSuffix("claims_model", 1, "claims-model-1-far-moon") == "far-moon")
     }
     it("should get many servables") {
-      val res = app.core.repos.servableRepo.get("model-name-1-test-servable" :: "kek" :: Nil).unsafeRunSync()
+      val res = app.core.repos.servableRepo
+        .get("model-name-1-test-servable" :: "kek" :: Nil)
+        .unsafeRunSync()
       println(res)
       assert(res.size == 1)
       assert(res.head.modelVersion === mv1)
@@ -73,8 +94,21 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
     )
     val f = for {
       m <- app.core.repos.modelRepo.create(Model(1, "model-name"))
-      mv = ModelVersion.Internal(1, DockerImage("qwe", "asdasd"), Instant.now(), Some(Instant.now()), 1, ModelContract.defaultInstance, dummyImage, m, ModelVersionStatus.Released, None, Map.empty, MonitoringConfiguration())
-      mv <- app.core.repos.versionRepo.create(mv)
+      mv = ModelVersion.Internal(
+        1,
+        DockerImage("qwe", "asdasd"),
+        Instant.now(),
+        Some(Instant.now()),
+        1,
+        Signature.defaultSignature,
+        dummyImage,
+        m,
+        ModelVersionStatus.Released,
+        None,
+        Map.empty,
+        MonitoringConfiguration()
+      )
+      mv  <- app.core.repos.versionRepo.create(mv)
       res <- app.core.repos.depConfRepository.create(d)
     } yield {
       println(s"Created: $mv")

@@ -1,17 +1,28 @@
 package io.hydrosphere.serving.manager.domain
 
 import java.time.Instant
-
 import cats.effect.IO
 import cats.implicits._
-import io.hydrosphere.serving.contract.model_contract.ModelContract
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.monitoring.{CustomModelMetricSpec, CustomModelMetricSpecConfiguration, Monitoring, MonitoringRepository, ThresholdCmpOperator}
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableGC, ServableRepository, ServableService}
+import io.hydrosphere.serving.manager.domain.monitoring.{
+  CustomModelMetricSpec,
+  CustomModelMetricSpecConfiguration,
+  Monitoring,
+  MonitoringRepository,
+  ThresholdCmpOperator
+}
+import io.hydrosphere.serving.manager.domain.servable.{
+  Servable,
+  ServableGC,
+  ServableRepository,
+  ServableService
+}
+import io.hydrosphere.serving.proto.contract.signature.ModelSignature
 import org.mockito.Mockito
 
 class ServableGCSpec extends GenericUnitTest {
@@ -24,7 +35,7 @@ class ServableGCSpec extends GenericUnitTest {
         created = Instant.now(),
         finished = Instant.now().some,
         modelVersion = 1,
-        modelContract = ModelContract.defaultInstance,
+        modelSignature = Signature.defaultSignature,
         runtime = DockerImage("runtime", "tag"),
         status = ModelVersionStatus.Released,
         installCommand = None,
@@ -37,14 +48,20 @@ class ServableGCSpec extends GenericUnitTest {
       val servable = Servable(
         modelVersion = mv,
         nameSuffix = "asdasd",
-        status = Servable.Serving("ok", "localhost", 9090),
-        usedApps = List.empty
+        status = Servable.Status.Serving,
+        usedApps = List.empty,
+        port = Some(9090),
+        host = Some("localhost"),
+        message = "ok"
       )
       val metricServable = Servable(
         modelVersion = mv,
         nameSuffix = "monitoring",
-        status = Servable.Serving("ok", "localhost", 9090),
-        usedApps = List.empty
+        status = Servable.Status.Serving,
+        usedApps = List.empty,
+        port = Some(9090),
+        host = Some("localhost"),
+        message = "ok"
       )
 
       implicit val servableRepo = mock[ServableRepository[IO]]

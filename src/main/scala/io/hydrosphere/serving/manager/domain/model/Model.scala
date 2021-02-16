@@ -1,13 +1,9 @@
 package io.hydrosphere.serving.manager.domain.model
 
-import io.hydrosphere.serving.manager.grpc.entities.{Model => GModel}
+import io.circe.generic.JsonCodec
 
+@JsonCodec
 case class Model(
-  id: Long,
-  name: String
-) {
-  def toGrpc = GModel(
-    id = id,
-    name = name
-  )
-}
+    id: Long,
+    name: String
+) {}

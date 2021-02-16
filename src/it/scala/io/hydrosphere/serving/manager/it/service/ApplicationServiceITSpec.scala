@@ -1,46 +1,54 @@
 package io.hydrosphere.serving.manager.it.service
 
 import cats.data.{NonEmptyList, OptionT}
-import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.contract.model_field.ModelField
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
+import cats.syntax.option.none
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
-import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.application.requests._
+import io.hydrosphere.serving.manager.domain.contract.DataType.DT_DOUBLE
+import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
-import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 import org.scalatest.BeforeAndAfterAll
+import cats.syntax.option._
 
 class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAll {
+
   private val uploadFile = packModel("/models/dummy_model")
-  private val signature = ModelSignature(
+  private val signature = Signature(
     signatureName = "not-default-spark",
-    inputs = List(ModelField("test-input", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DT_DOUBLE))),
-    outputs = List(ModelField("test-output", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DT_DOUBLE)))
+    inputs = NonEmptyList.of(
+      Field.Tensor(
+        "test-input",
+        DT_DOUBLE,
+        TensorShape.scalar,
+        none
+      )
+    ),
+    outputs = NonEmptyList.of(
+      Field.Tensor(
+        "test-output",
+        DT_DOUBLE,
+        TensorShape.scalar,
+        none
+      )
+    )
   )
   private val upload1 = ModelUploadMetadata(
     name = "m1",
     runtime = dummyImage,
-    contract = Some(ModelContract(
-      predict = Some(signature)
-    ))
+    signature = signature.some
   )
   private val upload2 = ModelUploadMetadata(
     name = "m2",
     runtime = dummyImage,
-    contract = Some(ModelContract(
-      predict = Some(signature)
-    ))
+    signature = signature.some
   )
   private val upload3 = ModelUploadMetadata(
     name = "m3",
     runtime = dummyImage,
-    contract = Some(ModelContract(
-      predict = Some(signature)
-    ))
+    signature = signature.some
   )
 
   var mv1: ModelVersion.Internal = _
@@ -50,16 +58,21 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
   describe("Application service") {
     it("should create a simple application") {
       ioAssert {
+
         val create = CreateApplicationRequest(
           "simple-app",
           None,
-          ExecutionGraphRequest(NonEmptyList.of(
-            PipelineStageRequest(
-              NonEmptyList.of(ModelVariantRequest(
-                modelVersionId = mv1.id,
-                weight = 100
-              ))
-            ))
+          ExecutionGraphRequest(
+            NonEmptyList.of(
+              PipelineStageRequest(
+                NonEmptyList.of(
+                  ModelVariantRequest(
+                    modelVersionId = mv1.id,
+                    weight = 100
+                  )
+                )
+              )
+            )
           ),
           None,
           None
@@ -67,13 +80,13 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
         for {
           appResult <- app.core.appService.create(create)
           started = appResult.started
-          finished <- appResult.completed.get
+          finished  <- appResult.completed.get
           servables <- app.core.repos.servableRepo.all()
         } yield {
           assert(started.name === "simple-app")
-          assert(finished.status.isInstanceOf[Application.Ready.type], finished.status)
-          assert(started.signature.inputs === mv1.modelContract.predict.get.inputs)
-          assert(started.signature.outputs === mv1.modelContract.predict.get.outputs)
+          assert(finished.status.isInstanceOf[Application.Status.Ready.type], finished.status)
+          assert(started.signature.inputs === mv1.modelSignature.inputs)
+          assert(started.signature.outputs === mv1.modelSignature.outputs)
           val models = finished.graph.stages.flatMap(_.variants)
           assert(models.head.weight === 100)
           assert(models.head.modelVersion.id === mv1.id)
@@ -108,7 +121,7 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
           metadata = None
         )
         for {
-          app <- app.core.appService.create(appRequest)
+          app      <- app.core.appService.create(appRequest)
           finished <- app.completed.get
         } yield {
           println(app)
@@ -140,28 +153,32 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
             )
           )
         ),
-        kafkaStreaming = Some(List(
-          ApplicationKafkaStream(
-            sourceTopic = "source",
-            destinationTopic = "dest",
-            consumerId = None,
-            errorTopic = None
+        kafkaStreaming = Some(
+          List(
+            ApplicationKafkaStream(
+              sourceTopic = "source",
+              destinationTopic = "dest",
+              consumerId = None,
+              errorTopic = None
+            )
           )
-        )),
+        ),
         metadata = None
       )
       ioAssert {
         for {
           application <- app.core.appService.create(appRequest)
-          _ <- application.completed.get
-          appNew <- app.core.appService.update(UpdateApplicationRequest(
-            application.started.id,
-            application.started.name,
-            application.started.namespace,
-            appRequest.executionGraph,
-            None,
-            None
-          ))
+          _           <- application.completed.get
+          appNew <- app.core.appService.update(
+            UpdateApplicationRequest(
+              application.started.id,
+              application.started.name,
+              application.started.namespace,
+              appRequest.executionGraph,
+              None,
+              None
+            )
+          )
           finishedNew <- appNew.completed.get
           gotNewApp <- OptionT(app.core.repos.appRepo.get(appNew.started.id))
             .getOrElse(throw new IllegalArgumentException("no applicaiton"))
@@ -206,20 +223,20 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
               )
             )
           )
-          appNew <- app.core.appService.update(UpdateApplicationRequest(
-            application.started.id,
-            application.started.name,
-            application.started.namespace,
-            newGraph,
-            None,
-            None
-          ))
+          appNew <- app.core.appService.update(
+            UpdateApplicationRequest(
+              application.started.id,
+              application.started.name,
+              application.started.namespace,
+              newGraph,
+              None,
+              None
+            )
+          )
 
           gotNewApp <- OptionT(app.core.repos.appRepo.get(appNew.started.id))
             .getOrElse(throw DomainError.notFound("app not found"))
-        } yield {
-          assert(appNew.started === gotNewApp, gotNewApp)
-        }
+        } yield assert(appNew.started === gotNewApp, gotNewApp)
       }
     }
   }
@@ -230,11 +247,11 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
     dockerClient.pull("hydrosphere/serving-runtime-dummy:latest")
 
     val f = for {
-      d1 <- app.core.modelService.uploadModel(uploadFile, upload1)
+      d1         <- app.core.modelService.uploadModel(uploadFile, upload1)
       completed1 <- d1.completed.get
-      d2 <- app.core.modelService.uploadModel(uploadFile, upload2)
+      d2         <- app.core.modelService.uploadModel(uploadFile, upload2)
       completed2 <- d2.completed.get
-      d3 <- app.core.modelService.uploadModel(uploadFile, upload3)
+      d3         <- app.core.modelService.uploadModel(uploadFile, upload3)
       completed3 <- d3.completed.get
     } yield {
       println(s"UPLOADED: $completed1")

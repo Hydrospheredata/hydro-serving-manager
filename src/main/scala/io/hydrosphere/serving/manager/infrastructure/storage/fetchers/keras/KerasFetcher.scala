@@ -11,12 +11,8 @@ class KerasFetcher[F[_]: Sync](source: StorageOps[F]) extends ModelFetcher[F] {
   override def fetch(directory: Path): F[Option[FetcherResult]] = {
     val f = for {
       importer <- OptionT(ModelConfigParser.importer(source, directory))
-      model <- OptionT(importer.importModel)
+      model    <- OptionT.liftF[F, FetcherResult](importer.importModel)
     } yield model
     f.value
   }
 }
-
-
-
-

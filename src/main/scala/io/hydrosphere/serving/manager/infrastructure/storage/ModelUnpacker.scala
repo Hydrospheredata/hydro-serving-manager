@@ -18,9 +18,9 @@ trait ModelUnpacker[F[_]] {
 }
 
 object ModelUnpacker {
-  def default[F[_] : Sync: StorageOps](): ModelUnpacker[F] = (archivePath: Path) => {
+  def default[F[_] : Sync](implicit storage: StorageOps[F]): ModelUnpacker[F] = (archivePath: Path) => {
     for {
-      tempUnpackedDir <- StorageOps[F].getTempDir(archivePath.getFileName.toString)
+      tempUnpackedDir <- storage.getTempDir(archivePath.getFileName.toString)
       model = ModelFileStructure.forRoot(tempUnpackedDir)
       _ <- Sync[F].delay {
         Files.createDirectories(model.filesPath)

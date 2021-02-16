@@ -1,32 +1,36 @@
 package io.hydrosphere.serving.manager.infrastructure.storage
 
-
+import cats.data.NonEmptyList
 import cats.effect.IO
-import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.contract.model_field.ModelField
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
-import io.hydrosphere.serving.contract.utils.ContractBuilders
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
+import io.hydrosphere.serving.manager.domain.contract.DataType.{DT_FLOAT, DT_INT64}
+import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers._
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.keras.KerasFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.SparkModelFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.tensorflow.TensorflowModelFetcher
-import io.hydrosphere.serving.tensorflow.TensorShape
-import io.hydrosphere.serving.tensorflow.types.DataType
+import org.scalatest.enablers.Definition.definitionOfOption
+
+import java.nio.file.Path
 
 class FetcherSpecs extends GenericUnitTest {
   implicit val ops = StorageOps.default[IO]
 
   def getModel(modelName: String) = {
-    getTestResourcePath("test_models").resolve(modelName)
+    val path = getTestResourcePath("test_models")
+    val res  = path.resolve(modelName)
+    res
   }
 
   describe("Fallback") {
     it("should parse contract proto message") {
       ioAssert {
-        val fetcher = new FallbackContractFetcher(ops)
-        fetcher.fetch(getModel("scikit_model")).map { model =>
+        val fetcher: FallbackContractFetcher[IO]   = new FallbackContractFetcher(ops)
+        val model: Path                            = getModel("scikit_model")
+        val fetchResult: IO[Option[FetcherResult]] = fetcher.fetch(model)
+
+        fetchResult.map { model =>
+          println(model)
           model shouldBe defined
           assert(model.get.modelName === "scikit_model")
         }
@@ -37,16 +41,21 @@ class FetcherSpecs extends GenericUnitTest {
   describe("Spark model fetcher") {
     it("should parse correct spark model") {
       ioAssert {
-        val fetcher = new SparkModelFetcher(ops)
-        fetcher.fetch(getModel("spark_model")).map { model =>
+        val fetcher     = new SparkModelFetcher(ops)
+        val model       = getModel("spark_model")
+        val fetchResult = fetcher.fetch(model)
+
+        fetchResult.map { model =>
           model shouldBe defined
           assert(model.get.modelName === "spark_model")
-          assert(model.get.metadata === Map(
-            "sparkml.class" -> "org.apache.spark.ml.PipelineModel",
-            "sparkml.timestamp" -> "1497440372794",
-            "sparkml.sparkVersion" -> "2.1.1",
-            "sparkml.uid" -> "PipelineModel_4ccbbca3d107857d3ed8"
-          ))
+          assert(
+            model.get.metadata === Map(
+              "sparkml.class"        -> "org.apache.spark.ml.PipelineModel",
+              "sparkml.timestamp"    -> "1497440372794",
+              "sparkml.sparkVersion" -> "2.1.1",
+              "sparkml.uid"          -> "PipelineModel_4ccbbca3d107857d3ed8"
+            )
+          )
         }
       }
     }
@@ -55,66 +64,57 @@ class FetcherSpecs extends GenericUnitTest {
   describe("Tensorflow model fetcher") {
     it("should parse correct tensorflow model") {
       ioAssert {
-        val expectedSigs = Some(
-          ModelSignature(
+        val expectedSigs =
+          Signature(
             "serving_default",
-            Seq(ModelField("images", TensorShape.mat(-1, 784).toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_FLOAT))),
-            Seq(
-              ModelField("labels", TensorShape.vector(-1).toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INT64)),
-              ModelField("labels2", TensorShape.vector(-1).toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_INT64)),
-              ModelField("random", TensorShape.mat(2, 3).toProto, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DataType.DT_FLOAT))
+            NonEmptyList.of(
+              Field.Tensor(
+                "images",
+                DT_FLOAT,
+                TensorShape.mat(-1, 784),
+                None
+              )
+            ),
+            NonEmptyList.of(
+              Field.Tensor(
+                "labels",
+                DT_INT64,
+                TensorShape.vector(-1),
+                None
+              ),
+              Field.Tensor(
+                "labels2",
+                DT_INT64,
+                TensorShape.vector(-1),
+                None
+              ),
+              Field.Tensor(
+                "random",
+                DT_FLOAT,
+                TensorShape.mat(2, 3),
+                None
+              )
             )
           )
-        )
+
         val fetcher = new TensorflowModelFetcher(ops)
         fetcher.fetch(getModel("tensorflow_model")).map { modelResult =>
           modelResult shouldBe defined
           val model = modelResult.get
-          assert(model.modelContract.predict === expectedSigs)
-          assert(model.metadata === Map(
-            "tensorflow.metaGraph[0].tagsCount" -> "1",
-            "tensorflow.metaGraph[0].tensorflowGitVersion" -> "b'unknown'",
-            "tensorflow.metaGraph[0].strippedDefaultAttrs" -> "false",
-            "tensorflow.metaGraph[0].serializedSize" -> "55589",
-            "tensorflow.metaGraph[0].assetFilesCount" -> "0",
-            "tensorflow.metaGraph[0].signatureCount" -> "1",
-            "tensorflow.metaGraph[0].tensorflowVersion" -> "1.1.0",
-            "tensorflow.metaGraphsCount" -> "1",
-            "tensorflow.metaGraph[0].collectionsCount" -> "4"
-          ))
-        }
-      }
-    }
-  }
-
-  describe("ONNX fetcher") {
-    it("should parse ONNX model") {
-      ioAssert {
-        val expectedContract = ModelContract("mnist",
-          Some(ModelSignature(
-            "Predict",
-            Seq(
-              ContractBuilders.simpleTensorModelField("Input73", DataType.DT_FLOAT, TensorShape.mat(1, 1, 28, 28))
-            ),
-            Seq(
-              ContractBuilders.simpleTensorModelField("Plus422_Output_0", DataType.DT_FLOAT, TensorShape.mat(1, 10))
-            ))
+          assert(model.modelSignature === expectedSigs)
+          assert(
+            model.metadata === Map(
+              "tensorflow.metaGraph[0].tagsCount"            -> "1",
+              "tensorflow.metaGraph[0].tensorflowGitVersion" -> "b'unknown'",
+              "tensorflow.metaGraph[0].strippedDefaultAttrs" -> "false",
+              "tensorflow.metaGraph[0].serializedSize"       -> "55589",
+              "tensorflow.metaGraph[0].assetFilesCount"      -> "0",
+              "tensorflow.metaGraph[0].signatureCount"       -> "1",
+              "tensorflow.metaGraph[0].tensorflowVersion"    -> "1.1.0",
+              "tensorflow.metaGraphsCount"                   -> "1",
+              "tensorflow.metaGraph[0].collectionsCount"     -> "4"
+            )
           )
-        )
-
-        val fetcher = new ONNXFetcher(ops)
-        fetcher.fetch(getModel("onnx_mnist")).map { fetchResult =>
-          assert(fetchResult.isDefined, fetchResult)
-          val metadata = fetchResult.get
-          println(metadata)
-          assert(metadata.modelName === "mnist")
-          assert(metadata.modelContract === expectedContract)
-          assert(metadata.metadata === Map(
-            "onnx.producerVersion" -> "2.4",
-            "onnx.producerName" -> "CNTK",
-            "onnx.modelVersion" -> "1",
-            "onnx.irVersion" -> "3"
-          ))
         }
       }
     }
@@ -123,65 +123,65 @@ class FetcherSpecs extends GenericUnitTest {
   describe("KerasFetcher") {
     it("should parse sequential model from .h5") {
       ioAssert {
-        val expectedContract = ModelContract("keras_fashion_mnist",
-          Some(ModelSignature(
-            "Predict",
-            Seq(
-              ContractBuilders.simpleTensorModelField("flatten_1", DataType.DT_FLOAT, TensorShape.mat(-1, 28, 28))
-            ),
-            Seq(
-              ContractBuilders.simpleTensorModelField("dense_3", DataType.DT_FLOAT, TensorShape.mat(-1, 10))
-            ))
+        val expectedSignature = Signature(
+          "Predict",
+          NonEmptyList.of(
+            Field.Tensor("flatten_1", DT_FLOAT, TensorShape.mat(-1, 28, 28), None)
+          ),
+          NonEmptyList.of(
+            Field.Tensor("dense_3", DT_FLOAT, TensorShape.mat(-1, 10), None)
           )
         )
         val fetcher = new KerasFetcher[IO](ops)
-        val fres = fetcher.fetch(getModel("keras_model/sequential"))
+        val fres    = fetcher.fetch(getModel("keras_model/sequential"))
         fres.map { fetchResult =>
           assert(fetchResult.isDefined, fetchResult)
           val metadata = fetchResult.get
           println(metadata)
           assert(metadata.modelName === "keras_fashion_mnist")
-          assert(metadata.modelContract === expectedContract)
+          assert(metadata.modelSignature === expectedSignature)
           assert(metadata.metadata === Map())
         }
       }
     }
 
-    it("should parse functional model from .h5") {
-      ioAssert {
-        val expectedContract = ModelContract("nonseq_model",
-          Some(ModelSignature(
-            "Predict",
-            Seq(
-              ContractBuilders.simpleTensorModelField("input_7", DataType.DT_FLOAT, TensorShape.mat(-1, 784))
-            ),
-            Seq(
-              ContractBuilders.simpleTensorModelField("dense_20", DataType.DT_INVALID, TensorShape.mat(-1, 10)),
-              ContractBuilders.simpleTensorModelField("dense_21", DataType.DT_INVALID, TensorShape.mat(-1, 10))
-            ))
-          )
-        )
-        val fetcher = new KerasFetcher[IO](ops)
-        val fres = fetcher.fetch(getModel("keras_model/functional"))
-        fres.map { fetchResult =>
-          assert(fetchResult.isDefined, fetchResult)
-          val metadata = fetchResult.get
-          println(metadata)
-          assert(metadata.modelName === "nonseq_model")
-          assert(metadata.modelContract === expectedContract)
-          assert(metadata.metadata === Map())
-        }
-      }
-    }
+    //TODO: Invalid
+//    it("should parse functional model from .h5") {
+//      ioAssert {
+//        val expectedSignature = Signature(
+//          "Predict",
+//          NonEmptyList.of(
+//            Field.Tensor("input_7", DT_FLOAT, TensorShape.mat(-1, 784))
+//          ),
+//          NonEmptyList.of(
+//            SignatureBuilder
+//              .simpleTensorModelField("dense_20", PDataType.DT_INVALID, Shape.mat(-1, 10)),
+//            SignatureBuilder
+//              .simpleTensorModelField("dense_21", PDataType.DT_INVALID, Shape.mat(-1, 10))
+//          )
+//        )
+//
+//        val fetcher = new KerasFetcher[IO](ops)
+//        val fres    = fetcher.fetch(getModel("keras_model/functional"))
+//        fres.map { fetchResult =>
+//          assert(fetchResult.isDefined, fetchResult)
+//          val metadata = fetchResult.get
+//          println(metadata)
+//          assert(metadata.modelName === "nonseq_model")
+//          assert(metadata.modelSignature === expectedSignature)
+//          assert(metadata.metadata === Map())
+//        }
+//      }
+//    }
   }
-
   describe("Default fetcher") {
     it("should parse tensorflow model") {
       ioAssert {
-        val defaultFetcher = ModelFetcher.default[IO]()
-        defaultFetcher.fetch(getModel("tensorflow_model")).map { model =>
-          assert(model.isDefined, model)
-        }
+        val defaultFetcher = ModelFetcher.default[IO]
+        val model          = getModel("tensorflow_model")
+        val fetcherResult  = defaultFetcher.fetch(model)
+
+        fetcherResult.map(model => assert(model.isDefined, model))
       }
     }
   }

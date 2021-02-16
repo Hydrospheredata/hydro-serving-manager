@@ -3,11 +3,13 @@ package io.hydrosphere.serving.manager.domain.clouddriver
 import cats.effect.IO
 import cats.implicits._
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
+import io.hydrosphere.serving.manager.config.{
+  CloudDriverConfiguration,
+  DockerRepositoryConfiguration
+}
 import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.kubernetes._
-import io.hydrosphere.serving.manager.infrastructure.protocol.PlayJsonAdapter
 import org.mockito.{Matchers, Mockito}
 import skuber.apps.v1.Deployment
 import skuber.autoscaling.HorizontalPodAutoscaler
@@ -20,28 +22,28 @@ import scala.reflect.ClassTag
 
 class KubernetesDriverSpec extends GenericUnitTest {
   private val cdConfig = CloudDriverConfiguration.Kubernetes("asd", 123, "test", "secret", None)
-  private val cdDrc = DockerRepositoryConfiguration.Remote("host", None, None, None, None)
+  private val cdDrc    = DockerRepositoryConfiguration.Remote("host", None, None, None, None)
 
-  def getOrMock[T](opt: Option[T])(implicit ct: ClassTag[T]) = opt.getOrElse(Mockito.mock(ct.runtimeClass.asInstanceOf[Class[T]]))
+  def getOrMock[T](opt: Option[T])(implicit ct: ClassTag[T]) =
+    opt.getOrElse(Mockito.mock(ct.runtimeClass.asInstanceOf[Class[T]]))
 
   def mockClient[F[_]](
-    pod: Option[K8SPods[F]] = None,
-    deployments: Option[K8SDeployments[F]] = None,
-    services: Option[K8SServices[F]] = None,
-    hpa: Option[K8SHorizontalPodAutoscalers[F]] = None,
-  ) = {
+      pod: Option[K8SPods[F]] = None,
+      deployments: Option[K8SDeployments[F]] = None,
+      services: Option[K8SServices[F]] = None,
+      hpa: Option[K8SHorizontalPodAutoscalers[F]] = None
+  ) =
     KubernetesClient[F](
       pods = getOrMock(pod),
       services = getOrMock(services),
       deployments = getOrMock(deployments),
       hpa = getOrMock(hpa)
     )
-  }
 
   describe("KubernetesDriver") {
-    val name = "asd"
+    val name           = "asd"
     val modelVersionId = 1
-    val image = DockerImage("yep/image", "tag")
+    val image          = DockerImage("yep/image", "tag")
 
     it("should create a Deployment and a Service with no DepConf for a Servable") {
       val config = None
@@ -64,18 +66,23 @@ class KubernetesDriverSpec extends GenericUnitTest {
         .withClusterIP("None")
         .withSelector(CloudDriver.Labels.ServiceName -> "asd")
         .exposeOnPort(skuber.Service.Port("grpc", Protocol.TCP, DefaultConstants.DEFAULT_APP_PORT))
-        .addLabels(Map(
-          CloudDriver.Labels.ServiceName -> "asd",
-          CloudDriver.Labels.ModelVersionId -> "1"
-        ))
+        .addLabels(
+          Map(
+            CloudDriver.Labels.ServiceName    -> "asd",
+            CloudDriver.Labels.ModelVersionId -> "1"
+          )
+        )
 
-      val service1Res = skuber.Service(metadata = ObjectMeta(name = "asd"))
+      val service1Res = skuber
+        .Service(metadata = ObjectMeta(name = "asd"))
         .withSelector(CloudDriver.Labels.ServiceName -> "asd")
         .exposeOnPort(skuber.Service.Port("grpc", Protocol.TCP, DefaultConstants.DEFAULT_APP_PORT))
-        .addLabels(Map(
-          CloudDriver.Labels.ServiceName -> "asd",
-          CloudDriver.Labels.ModelVersionId -> "1"
-        ))
+        .addLabels(
+          Map(
+            CloudDriver.Labels.ServiceName    -> "asd",
+            CloudDriver.Labels.ModelVersionId -> "1"
+          )
+        )
         .withClusterIP("None")
 
       when(services.create(service1)).thenReturn(service1Res.pure[IO])
@@ -86,12 +93,14 @@ class KubernetesDriverSpec extends GenericUnitTest {
       )
       val driver = new KubernetesDriver[IO](client, cdConfig, cdDrc)
 
-      val result = driver.run(
-        name = name,
-        modelVersionId = modelVersionId,
-        image = image,
-        config = config
-      ).unsafeRunSync()
+      val result = driver
+        .run(
+          name = name,
+          modelVersionId = modelVersionId,
+          image = image,
+          config = config
+        )
+        .unsafeRunSync()
       assert(result.status === CloudInstance.Status.Running("dns:///asd..svc.cluster.local", 9091))
     }
 
@@ -123,18 +132,20 @@ class KubernetesDriverSpec extends GenericUnitTest {
           .exposeOnPort(Service.Port(name = "grpc", port = 9090))
           .pure[IO]
       )
-      val hpa = mock[K8SHorizontalPodAutoscalers[IO]]
+      val hpa  = mock[K8SHorizontalPodAutoscalers[IO]]
       val hpa1 = KubernetesDriver.prepareHPA(name, Deployment(name), hpaConfig)
       when(hpa.create(hpa1)).thenReturn(hpa1.pure[IO])
       val client = mockClient(deployments = deps.some, services = svc.some, hpa = hpa.some)
       val driver = new KubernetesDriver[IO](client, cdConfig, cdDrc)
 
-      val result = driver.run(
-        name = name,
-        modelVersionId = modelVersionId,
-        image = image,
-        config = config
-      ).unsafeRunSync()
+      val result = driver
+        .run(
+          name = name,
+          modelVersionId = modelVersionId,
+          image = image,
+          config = config
+        )
+        .unsafeRunSync()
       assert(result.status === CloudInstance.Status.Running("dns:///asd..svc.cluster.local", 9090))
     }
 

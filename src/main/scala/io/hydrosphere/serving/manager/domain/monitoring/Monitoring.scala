@@ -7,7 +7,7 @@ import io.hydrosphere.serving.manager.api.http.controller.MonitoringRequests.Met
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationService
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
+import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.ServableService
 import io.hydrosphere.serving.manager.util.UUIDGenerator
 import org.apache.logging.log4j.scala.Logging
