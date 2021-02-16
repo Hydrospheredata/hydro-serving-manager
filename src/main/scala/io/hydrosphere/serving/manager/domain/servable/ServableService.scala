@@ -132,7 +132,8 @@ object ServableService extends Logging {
             metadata = metadata,
             host = None,
             port = None,
-            deploymentConfiguration = deployConfig.orElse(defaultDC)
+            deploymentConfiguration = deployConfig
+              .orElse(defaultDC)
           )
           _ <- servableRepository.upsert(initServable)
           _ <- awaitServable(initServable)
