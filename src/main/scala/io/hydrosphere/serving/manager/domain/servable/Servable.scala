@@ -6,20 +6,18 @@ import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurati
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable.Status
 
-
 // TODO: port/host
 @JsonCodec
 case class Servable(
-  modelVersion: ModelVersion.Internal,
-  nameSuffix: String,
-  status: Status,
-  usedApps: List[String],
-  message: String,
-  host: Option[String],
-  port: Option[Int],
-  metadata: Map[String, String] = Map.empty,
-  deploymentConfiguration: Option[DeploymentConfiguration] = None
-
+    modelVersion: ModelVersion.Internal,
+    nameSuffix: String,
+    status: Status,
+    message: String,
+    host: Option[String],
+    port: Option[Int],
+    usedApps: List[String] = Nil,
+    metadata: Map[String, String] = Map.empty,
+    deploymentConfiguration: Option[DeploymentConfiguration] = None
 ) {
   def fullName: String =
     Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, nameSuffix)

@@ -1,7 +1,6 @@
 package io.hydrosphere.serving.manager
 
 import java.nio.charset.StandardCharsets
-
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
@@ -30,7 +29,10 @@ import io.hydrosphere.serving.manager.api.http.controller.{
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
 import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationEvents
+import io.hydrosphere.serving.manager.domain.deploy_config.{
+  DeploymentConfigurationEvents,
+  DeploymentConfigurationRepository
+}
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
@@ -104,7 +106,7 @@ object App {
         implicit val monitoringRepo             = DBMonitoringRepository.make()
         implicit val imageRepo                  = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
 
-        Resource.liftF(Core.make[F]())
+        Resource.liftF(Core.make[F](config))
       }
       grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
       discoveryService = new GrpcServingDiscovery[F](
