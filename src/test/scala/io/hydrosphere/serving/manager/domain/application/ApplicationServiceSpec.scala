@@ -179,7 +179,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
                 modelVersion,
                 "hi",
                 Servable.Status.Serving,
-                Nil,
                 message = "ok",
                 host = Some("hoat"),
                 port = Some(9090)
@@ -271,10 +270,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
                 modelVersion,
                 "kek",
                 Servable.Status.NotServing,
-                Nil,
                 message = "error",
-                None,
-                None
+                host = None,
+                port = None
               )
             )
         }
@@ -545,11 +543,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
                 mv,
                 "test",
                 Servable.Status.Serving,
-                Nil,
                 message = "Ok",
                 host = Some("host"),
-                port = Some(9090),
-                Map.empty
+                port = Some(9090)
               )
             )
         }

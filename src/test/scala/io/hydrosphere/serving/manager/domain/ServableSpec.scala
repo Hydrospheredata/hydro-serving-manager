@@ -1,22 +1,13 @@
 package io.hydrosphere.serving.manager.domain
 
-import java.time.Instant
-import java.util.concurrent.atomic.AtomicInteger
-
-import akka.stream.scaladsl.Source
-import cats.data.OptionT
+import cats.data.{NonEmptyList, OptionT}
 import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, IO, Resource, Timer}
+import cats.effect.{Concurrent, IO, Timer}
 import cats.implicits._
-import fs2.concurrent.Queue
-
-//import io.hydrosphere.serving.contract.model_contract.ModelContract
-//import io.hydrosphere.serving.contract.model_signature.ModelSignature
-
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
 import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
+import io.hydrosphere.serving.manager.domain.contract.{DataType, Field, Signature, TensorShape}
 import io.hydrosphere.serving.manager.domain.deploy_config.{
   DeploymentConfiguration,
   DeploymentConfigurationService
@@ -24,20 +15,15 @@ import io.hydrosphere.serving.manager.domain.deploy_config.{
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.monitoring.{
-  CustomModelMetricSpec,
-  MonitoringRepository
-}
-import io.hydrosphere.serving.manager.domain.servable.Servable
-import io.hydrosphere.serving.manager.domain.servable.ServableMonitor.MonitoringEntry
+import io.hydrosphere.serving.manager.domain.monitoring.MonitoringRepository
 import io.hydrosphere.serving.manager.domain.servable._
-import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
+import org.mockito.Matchers
 
+import java.time.Instant
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
 
 // TODO
 
@@ -47,383 +33,181 @@ class ServableSpec extends GenericUnitTest {
   implicit val uuidGen: UUIDGenerator[IO] = UUIDGenerator.default[IO]()
   implicit val timer: Timer[IO]           = IO.timer(ExecutionContext.global)
 
+  val signature = Signature(
+    signatureName = "test",
+    inputs = NonEmptyList.of(
+      Field.Tensor("a", DataType.DT_STRING, TensorShape.varVector)
+    ),
+    outputs = NonEmptyList.of(
+      Field.Tensor("b", DataType.DT_STRING, TensorShape.varVector)
+    )
+  )
+
+  val externalMv = ModelVersion.External(
+    id = 1,
+    created = Instant.now(),
+    modelVersion = 1,
+    modelSignature = signature,
+    model = Model(1, "name"),
+    metadata = Map.empty
+  )
+
+  val mv = ModelVersion.Internal(
+    id = 10,
+    image = DockerImage("name", "tag"),
+    created = Instant.now(),
+    finished = None,
+    modelVersion = 1,
+    modelSignature = signature,
+    runtime = DockerImage("runtime", "tag"),
+    model = Model(1, "name"),
+    status = ModelVersionStatus.Released,
+    installCommand = None,
+    metadata = Map.empty
+  )
+  val servable = Servable(mv, "test", Servable.Status.Starting, "msg", None, None)
+
+  describe("Default Deployment Configuration") {
+    val defaultDC = DeploymentConfiguration(
+      name = "default",
+      container = None,
+      pod = None,
+      deployment = None,
+      hpa = None
+    )
+    it("should use it if no DC specified for servable") {
+      implicit val servableRepo = mock[ServableRepository[IO]]
+      when(servableRepo.get(Matchers.anyString())).thenReturn(None.pure[IO])
+      when(servableRepo.upsert(Matchers.any())).thenReturn(servable.pure[IO])
+      implicit val appRepo     = mock[ApplicationRepository[IO]]
+      implicit val versionRepo = mock[ModelVersionRepository[IO]]
+      implicit val monRepo     = mock[MonitoringRepository[IO]]
+      implicit val depConf     = mock[DeploymentConfigurationService[IO]]
+
+      implicit val cloudDriver = mock[CloudDriver[IO]]
+      val cloudInstance        = CloudInstance(1, "kek", CloudInstance.Status.Starting)
+      when(
+        cloudDriver.run(
+          name = Matchers.anyString(),
+          modelVersionId = Matchers.anyLong(),
+          image = Matchers.any(),
+          config = Matchers.eq(defaultDC.some)
+        )
+      ).thenReturn(IO(cloudInstance))
+
+      val servableService = ServableService[IO](
+        defaultDC = defaultDC.some
+      )
+      val res = servableService
+        .deploy(
+          modelVersion = mv,
+          deployConfig = None,
+          metadata = Map.empty
+        )
+        .unsafeRunSync()
+      assert(res.started.deploymentConfiguration.exists(_.name == defaultDC.name))
+    }
+    it("should not use it if DC specified for servable") {
+      val customDC = DeploymentConfiguration(
+        name = "custom-config",
+        container = None,
+        pod = None,
+        deployment = None,
+        hpa = None
+      )
+
+      implicit val servableRepo = mock[ServableRepository[IO]]
+      when(servableRepo.get(Matchers.anyString())).thenReturn(None.pure[IO])
+      when(servableRepo.upsert(Matchers.any())).thenReturn(servable.pure[IO])
+      implicit val appRepo     = mock[ApplicationRepository[IO]]
+      implicit val versionRepo = mock[ModelVersionRepository[IO]]
+      implicit val monRepo     = mock[MonitoringRepository[IO]]
+      implicit val depConf     = mock[DeploymentConfigurationService[IO]]
+
+      implicit val cloudDriver = mock[CloudDriver[IO]]
+      val cloudInstance        = CloudInstance(1, "kek", CloudInstance.Status.Starting)
+      when(
+        cloudDriver.run(
+          name = Matchers.anyString(),
+          modelVersionId = Matchers.anyLong(),
+          image = Matchers.any(),
+          config = Matchers.eq(customDC.some)
+        )
+      ).thenReturn(IO(cloudInstance))
+
+      val servableService = ServableService[IO](
+        defaultDC = defaultDC.some
+      )
+      val res = servableService
+        .deploy(
+          modelVersion = mv,
+          deployConfig = customDC.some,
+          metadata = Map.empty
+        )
+        .unsafeRunSync()
+      assert(res.started.deploymentConfiguration.exists(_.name == customDC.name))
+    }
+  }
+}
+
+//class ServableSpec extends GenericUnitTest {
+//  implicit val rng: RNG[IO]               = RNG.default[IO].unsafeRunSync()
+//  implicit val nameGen: NameGenerator[IO] = NameGenerator.haiku[IO]()
+//  implicit val uuidGen: UUIDGenerator[IO] = UUIDGenerator.default[IO]()
+//  implicit val timer: Timer[IO]           = IO.timer(ExecutionContext.global)
+//
+//  val signature = Signature(
+//    signatureName = "test",
+//    inputs = NonEmptyList.of(
+//      Field.Tensor("a", DataType.DT_STRING, TensorShape.varVector)
+//    ),
+//    outputs = NonEmptyList.of(
+//      Field.Tensor("b", DataType.DT_STRING, TensorShape.varVector)
+//    )
+//  )
+//
 //  val externalMv = ModelVersion.External(
 //    id = 1,
 //    created = Instant.now(),
 //    modelVersion = 1,
-//    modelContract = ModelContract.defaultInstance,
+//    modelSignature = signature,
 //    model = Model(1, "name"),
 //    metadata = Map.empty
 //  )
+//
 //  val mv = ModelVersion.Internal(
 //    id = 10,
 //    image = DockerImage("name", "tag"),
 //    created = Instant.now(),
 //    finished = None,
 //    modelVersion = 1,
-//    modelContract = ModelContract.defaultInstance,
+//    modelSignature = signature,
 //    runtime = DockerImage("runtime", "tag"),
 //    model = Model(1, "name"),
 //    status = ModelVersionStatus.Released,
 //    installCommand = None,
 //    metadata = Map.empty
 //  )
-//  val servable = Servable(mv, "test", Servable.Starting("Init", None, None), Nil)
-
-//  describe("Servable probe") {
-//    it("should succed on good status and ping") {
-//      implicit val driver = new CloudDriver[IO] {
-//        override def instances: IO[List[CloudInstance]] = ???
-//        override def instance(name: String): IO[Option[CloudInstance]] =
-//          name match {
-//            case "name-1-test" =>
-//              IO {
-//                println("Instance is ready")
-//                CloudInstance(
-//                  mv.id,
-//                  Servable.fullName(mv.model.name, mv.modelVersion, "test"),
-//                  CloudInstance.Status.Running("node.cluster.domain", 9090)
-//                ).some
-//              }
-//            case _ => IO(None)
-//          }
-//        override def run(
-//            name: String,
-//            modelVersionId: Long,
-//            image: DockerImage,
-//            hostSelector: Option[DeploymentConfiguration] = None
-//        ): IO[CloudInstance]                        = ???
-//        override def remove(name: String): IO[Unit] = ???
+//  val servable = Servable(mv, "test", Servable.Status.Starting, "msg", None, None)
 //
-//        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-//
-//        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String] = ???
-//      }
-//      implicit val clientCtor = new PredictionClient.Factory[IO] {
-//        override def make(host: String, port: Int): Resource[IO, PredictionClient[IO]] = {
-//          val client = new PredictionClient[IO] {
-//            override def status(): IO[StatusResponse] =
-//              IO {
-//                println("Ping - SERVING")
-//                StatusResponse(
-//                  status = StatusResponse.ServiceStatus.SERVING,
-//                  message = "Ok"
-//                )
-//              }
-//          }
-//          Resource.liftF(IO(client))
-//        }
-//      }
-//      val probe = ServableProbe.default[IO]()
-//      val res   = probe.probe(servable).unsafeRunSync()
-//      assert(res.isInstanceOf[Servable.Serving])
-//    }
-//
-//    it("should fail on non-serving status") {
-//      implicit val clientCtor = new PredictionClient.Factory[IO] {
-//        override def make(host: String, port: Int): Resource[IO, PredictionClient[IO]] = {
-//          val client = new PredictionClient[IO] {
-//            override def status(): IO[StatusResponse] =
-//              IO {
-//                println("Ping - NOT_SERVING")
-//                StatusResponse(
-//                  status = StatusResponse.ServiceStatus.NOT_SERVING,
-//                  message = "WTF"
-//                )
-//              }
-//          }
-//          Resource.liftF(IO(client))
-//        }
-//      }
-//      implicit val driver = new CloudDriver[IO] {
-//        override def instances: IO[List[CloudInstance]] = ???
-//        override def instance(name: String): IO[Option[CloudInstance]] =
-//          name match {
-//            case "name-1-test" =>
-//              IO {
-//                println("Instance is ready")
-//                CloudInstance(
-//                  mv.id,
-//                  Servable.fullName(mv.model.name, mv.modelVersion, "test"),
-//                  CloudInstance.Status.Running("node.cluster.domain", 9090)
-//                ).some
-//              }
-//            case _ => IO(None)
-//          }
-//        override def run(
-//            name: String,
-//            modelVersionId: Long,
-//            image: DockerImage,
-//            hostSelector: Option[DeploymentConfiguration] = None
-//        ): IO[CloudInstance]                                                         = ???
-//        override def remove(name: String): IO[Unit]                                  = ???
-//        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-//        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String]  = ???
-//      }
-//      val probe  = ServableProbe.default[IO]()
-//      val result = probe.probe(servable).unsafeRunSync()
-//      assert(result.isInstanceOf[Servable.NotServing])
-//    }
-//
-//    it("should propagate GRPC errors") {
-//      implicit val clientCtor = new PredictionClient.Factory[IO] {
-//        override def make(host: String, port: Int): Resource[IO, PredictionClient[IO]] = {
-//          val client = new PredictionClient[IO] {
-//            override def status(): IO[StatusResponse] =
-//              IO.raiseError(new RuntimeException("GRPC test error"))
-//          }
-//          Resource.liftF(IO(client))
-//        }
-//      }
-//      implicit val driver = new CloudDriver[IO] {
-//        override def instances: IO[List[CloudInstance]] = ???
-//        override def instance(name: String): IO[Option[CloudInstance]] =
-//          name match {
-//            case "name-1-test" =>
-//              IO {
-//                println("Instance is ready")
-//                CloudInstance(
-//                  mv.id,
-//                  Servable.fullName(mv.model.name, mv.modelVersion, "test"),
-//                  CloudInstance.Status.Running("node.cluster.domain", 9090)
-//                ).some
-//              }
-//            case _ => IO(None)
-//          }
-//        override def run(
-//            name: String,
-//            modelVersionId: Long,
-//            image: DockerImage,
-//            hostSelector: Option[DeploymentConfiguration] = None
-//        ): IO[CloudInstance]                                                         = ???
-//        override def remove(name: String): IO[Unit]                                  = ???
-//        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-//        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String]  = ???
-//      }
-//      val probe  = ServableProbe.default[IO]()
-//      val result = probe.probe(servable).unsafeRunSync()
-//      assert(
-//        result === Servable
-//          .NotAvailable("Ping error: GRPC test error", "node.cluster.domain".some, 9090.some)
-//      )
-//    }
-//  }
-
-//  describe("Servable monitoring queue") {
-//    it("should handle Serving status") {
-//      implicit val probe = new ServableProbe[IO] {
-//        override def probe(servable: Servable): IO[Servable.Status] =
-//          IO(Servable.Serving("Ok", "host", 9090))
-//      }
-//      var res = Option.empty[Servable]
-//      implicit val repo = new ServableRepository[IO] {
-//        override def all(): IO[List[Servable]] = ???
-//        override def upsert(servable: Servable): IO[Servable] =
-//          IO {
-//            res = servable.some
-//            servable
-//          }
-//        override def delete(name: String): IO[Int]                            = ???
-//        override def get(name: String): IO[Option[Servable]]                  = ???
-//        override def get(names: Seq[String]): IO[List[Servable]]              = ???
-//        override def findForModelVersion(versionId: Long): IO[List[Servable]] = ???
-//      }
-//      val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
-//      println("Created queue")
-//      val cancellableMonitor =
-//        ServableMonitor.withQueue[IO](queue, 1.seconds, 10.seconds).unsafeRunSync()
-//      println("Created Monitor")
-//      val fbr     = cancellableMonitor.fiber
-//      val monitor = cancellableMonitor.mon
-//      val d       = monitor.monitor(servable).unsafeRunSync()
-//      println("Submitted servable")
-//      val result = d.get.unsafeRunSync()
-//      println("Got result")
-//      fbr.cancel.unsafeRunSync()
-//      assert(queue.tryDequeue1.unsafeRunSync() === None)
-//      assert(result.status.isInstanceOf[Servable.Serving])
-//      assert(res.get === result)
-//    }
-//
-//    it("should wait Starting status to get to the final state") {
-//      implicit val probe = new ServableProbe[IO] {
-//        private val probeState = new AtomicInteger(0)
-//
-//        override def probe(servable: Servable): IO[Servable.Status] =
-//          probeState match {
-//            case x if x.getAndIncrement() < 10 => IO(Servable.Starting("Wait pls", None, None))
-//            case _                             => IO(Servable.Serving("Ok", "host", 9090))
-//          }
-//      }
-//      var res = Option.empty[Servable]
-//      implicit val repo = new ServableRepository[IO] {
-//        override def all(): IO[List[Servable]] = ???
-//        override def upsert(servable: Servable): IO[Servable] =
-//          IO {
-//            res = servable.some
-//            servable
-//          }
-//        override def delete(name: String): IO[Int]                            = ???
-//        override def get(name: String): IO[Option[Servable]]                  = ???
-//        override def get(names: Seq[String]): IO[List[Servable]]              = ???
-//        override def findForModelVersion(versionId: Long): IO[List[Servable]] = ???
-//      }
-//      val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
-//      println("Created queue")
-//      val cancellableMonitor =
-//        ServableMonitor.withQueue[IO](queue, 1.seconds, 10.seconds).unsafeRunSync()
-//      println("Created Monitor")
-//      val fbr     = cancellableMonitor.fiber
-//      val monitor = cancellableMonitor.mon
-//      val d       = monitor.monitor(servable).unsafeRunSync()
-//      println("Submitted servable")
-//      val result = d.get.unsafeRunSync()
-//      println("Got result")
-//      fbr.cancel.unsafeRunSync()
-//      assert(queue.tryDequeue1.unsafeRunSync() === None)
-//      assert(result.status.isInstanceOf[Servable.Serving])
-//      assert(res.get === result)
-//    }
-//
-//    it("should set NotServable after NotAvailable status probed several times") {
-//      implicit val probe = new ServableProbe[IO] {
-//        override def probe(servable: Servable): IO[Servable.Status] =
-//          IO(Servable.NotAvailable("not available yet", None, None))
-//      }
-//      var res = Option.empty[Servable]
-//      implicit val repo = new ServableRepository[IO] {
-//        override def all(): IO[List[Servable]] = ???
-//        override def upsert(servable: Servable): IO[Servable] =
-//          IO {
-//            res = servable.some
-//            servable
-//          }
-//        override def delete(name: String): IO[Int]                            = ???
-//        override def get(name: String): IO[Option[Servable]]                  = ???
-//        override def get(names: Seq[String]): IO[List[Servable]]              = ???
-//        override def findForModelVersion(versionId: Long): IO[List[Servable]] = ???
-//      }
-//      val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
-//      println("Created queue")
-//      val cancellableMonitor =
-//        ServableMonitor.withQueue[IO](queue, 1.seconds, 10.seconds).unsafeRunSync()
-//      println("Created Monitor")
-//      val fbr     = cancellableMonitor.fiber
-//      val monitor = cancellableMonitor.mon
-//      val d       = monitor.monitor(servable).unsafeRunSync()
-//      println("Submitted servable")
-//      val result = d.get.unsafeRunSync()
-//      println("Got result")
-//      fbr.cancel.unsafeRunSync()
-//      assert(queue.tryDequeue1.unsafeRunSync() === None)
-//      assert(result.status.isInstanceOf[Servable.NotServing])
-//      assert(res.get === result)
-//    }
-//
-//    it("should set NotAvailable status on probe error") {
-//      implicit val probe = new ServableProbe[IO] {
-//        override def probe(servable: Servable): IO[Servable.Status] =
-//          IO.raiseError(new Exception("OOPSIE"))
-//      }
-//      var res = Option.empty[Servable]
-//      implicit val repo = new ServableRepository[IO] {
-//        override def all(): IO[List[Servable]] = ???
-//        override def upsert(servable: Servable): IO[Servable] =
-//          IO {
-//            res = servable.some
-//            servable
-//          }
-//        override def delete(name: String): IO[Int]                            = ???
-//        override def get(name: String): IO[Option[Servable]]                  = ???
-//        override def get(names: Seq[String]): IO[List[Servable]]              = ???
-//        override def findForModelVersion(versionId: Long): IO[List[Servable]] = ???
-//      }
-//      val queue = Queue.unbounded[IO, MonitoringEntry[IO]].unsafeRunSync()
-//      println("Created queue")
-//      val cancellableMonitor =
-//        ServableMonitor.withQueue[IO](queue, 1.seconds, 10.seconds).unsafeRunSync()
-//      println("Created Monitor")
-//      val fbr     = cancellableMonitor.fiber
-//      val monitor = cancellableMonitor.mon
-//      val d       = monitor.monitor(servable).unsafeRunSync()
-//      println("Submitted servable")
-//      val result = d.get.unsafeRunSync()
-//      println("Got result")
-//      fbr.cancel.unsafeRunSync()
-//      assert(queue.tryDequeue1.unsafeRunSync() === None)
-//      assert(result.status.isInstanceOf[Servable.NotServing])
-//      assert(res.get === result)
-//    }
-//  }
-
 //  describe("CRUD") {
-//    def depConfService =
-//      new DeploymentConfigurationService[IO] {
-//        override def all(): IO[List[DeploymentConfiguration]] = ???
-//        override def create(
-//            deploymentConfiguration: DeploymentConfiguration
-//        ): IO[DeploymentConfiguration]                                 = ???
-//        override def delete(name: String): IO[DeploymentConfiguration] = ???
-//        override def get(name: String): IO[DeploymentConfiguration]    = ???
-//      }
-//
 //    it("should not deploy an external ModelVersion") {
-//      val cloudDriver = new CloudDriver[IO] {
-//        override def instances: IO[List[CloudInstance]]                = ???
-//        override def instance(name: String): IO[Option[CloudInstance]] = ???
-//        override def run(
-//            name: String,
-//            modelVersionId: Long,
-//            image: DockerImage,
-//            hostSelector: Option[DeploymentConfiguration] = None
-//        ): IO[CloudInstance] =
-//          IO.raiseError(new IllegalStateException("Shouldn't reach this"))
-//        override def remove(name: String): IO[Unit]                                  = ???
-//        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-//        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String]  = ???
-//      }
-//      val servableRepo = new ServableRepository[IO] {
-//        override def all(): IO[List[Servable]]                                = ???
-//        override def upsert(servable: Servable): IO[Servable]                 = ???
-//        override def delete(name: String): IO[Int]                            = ???
-//        override def get(name: String): IO[Option[Servable]]                  = ???
-//        override def get(names: Seq[String]): IO[List[Servable]]              = ???
-//        override def findForModelVersion(versionId: Long): IO[List[Servable]] = ???
-//      }
-//      val versionRepo = new ModelVersionRepository[IO] {
-//        override def create(entity: ModelVersion): IO[ModelVersion]                       = ???
-//        override def get(id: Long): IO[Option[ModelVersion]]                              = IO(Some(externalMv))
-//        override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
-//        override def delete(id: Long): IO[Int]                                            = ???
-//        override def all(): IO[List[ModelVersion]]                                        = ???
-//        override def listForModel(modelId: Long): IO[List[ModelVersion]]                  = ???
-//        override def update(entity: ModelVersion): IO[Int]                                = ???
-//        override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]]     = ???
-//      }
-//      val monitor = new ServableMonitor[IO] {
-//        override def monitor(s: Servable): IO[Deferred[IO, Servable]] =
-//          IO.raiseError(new IllegalStateException("Shouldn't reach this"))
-//      }
-//      val appRepo = new ApplicationRepository[IO] {
-//        override def create(entity: Application): IO[Application]                   = ???
-//        override def get(id: Long): IO[Option[Application]]                         = ???
-//        override def get(name: String): IO[Option[Application]]                     = ???
-//        override def update(value: Application): IO[Int]                            = ???
-//        override def delete(id: Long): IO[Int]                                      = ???
-//        override def all(): IO[List[Application]]                                   = ???
-//        override def findVersionUsage(versionIdx: Long): IO[List[Application]]      = ???
-//        override def findServableUsage(servableName: String): IO[List[Application]] = ???
-//      }
+//      val depConfService = mock[DeploymentConfigurationService[IO]]
 //
-//      val monitoringRepo = new MonitoringRepository[IO] {
-//        override def all(): IO[List[CustomModelMetricSpec]]                     = ???
-//        override def get(id: String): IO[Option[CustomModelMetricSpec]]         = ???
-//        override def forModelVersion(id: Long): IO[List[CustomModelMetricSpec]] = ???
-//        override def upsert(spec: CustomModelMetricSpec): IO[Unit]              = ???
-//        override def delete(id: String): IO[Unit]                               = ???
-//      }
+//      val cloudDriver = mock[CloudDriver[IO]]
+//      when(cloudDriver.run(Matchers.any(), Matchers.any(), Matchers.any(), Matchers.any()))
+//        .thenReturn(IO.raiseError(new IllegalStateException("Shouldn't reach this")))
 //
-//      val service = ServableService[IO]()(
+//      val servableRepo = mock[ServableRepository[IO]]
+//
+//      val versionRepo = mock[ModelVersionRepository[IO]]
+//      when(versionRepo.get(externalMv.id)).thenReturn(externalMv.some.pure[IO])
+//
+//      val appRepo = mock[ApplicationRepository[IO]]
+//
+//      val monitoringRepo = mock[MonitoringRepository[IO]]
+//
+//      val service = ServableService[IO](None)(
 //        Concurrent[IO],
 //        timer,
 //        nameGen,
@@ -432,7 +216,6 @@ class ServableSpec extends GenericUnitTest {
 //        servableRepo,
 //        appRepo,
 //        versionRepo,
-//        monitor,
 //        monitoringRepo,
 //        depConfService
 //      )
@@ -445,69 +228,31 @@ class ServableSpec extends GenericUnitTest {
 //    }
 //
 //    it("should be able to create Servable") {
+//      val depConfService = mock[DeploymentConfigurationService[IO]]
+//      val driverState    = ListBuffer.empty[CloudInstance]
+//      val cloudDriver    = mock[CloudDriver[IO]]
+//      when(cloudDriver.run(Matchers.any(), Matchers.any(), Matchers.any(), Matchers.any()))
+//        .thenAnswer {
+//          (name: String, id: Long, _: DockerImage, _: Option[DeploymentConfiguration]) =>
+//            val instance = CloudInstance(id, name, CloudInstance.Status.Starting)
+//            driverState += instance
+//            IO(instance)
+//        }
+//      val repoState    = ListBuffer.empty[Servable]
+//      val servableRepo = mock[ServableRepository[IO]]
+//      when(servableRepo.upsert(any)).thenAnswer { (servable: Servable) =>
+//        repoState += servable
+//        IO(servable)
+//      }
+//      when(servableRepo.get(any[String])).thenAnswer { (name: String) =>
+//        IO(repoState.find(_.fullName == name))
+//      }
+//      when(servableRepo.all()).thenAnswer(repoState.toList.pure[IO])
 //
-//      val driverState = ListBuffer.empty[CloudInstance]
-//      val cloudDriver = new CloudDriver[IO] {
-//        override def instances: IO[List[CloudInstance]]                = ???
-//        override def instance(name: String): IO[Option[CloudInstance]] = ???
-//        override def run(
-//            name: String,
-//            modelVersionId: Long,
-//            image: DockerImage,
-//            hostSelector: Option[DeploymentConfiguration] = None
-//        ): IO[CloudInstance] = {
-//          val instance = CloudInstance(modelVersionId, name, CloudInstance.Status.Starting)
-//          driverState += instance
-//          IO(instance)
-//        }
-//        override def remove(name: String): IO[Unit]                                  = ???
-//        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-//        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String]  = ???
-//      }
-//      val repoState = ListBuffer.empty[Servable]
-//      val servableRepo = new ServableRepository[IO] {
-//        override def all(): IO[List[Servable]] = IO(repoState.toList)
-//        override def upsert(servable: Servable): IO[Servable] = {
-//          repoState += servable
-//          IO(servable)
-//        }
-//        override def delete(name: String): IO[Int] = ???
-//        override def get(name: String): IO[Option[Servable]] =
-//          IO(repoState.find(_.fullName == name))
-//        override def get(names: Seq[String]): IO[List[Servable]]              = ???
-//        override def findForModelVersion(versionId: Long): IO[List[Servable]] = ???
-//      }
-//      val versionRepo = new ModelVersionRepository[IO] {
-//        override def create(entity: ModelVersion): IO[ModelVersion]                       = ???
-//        override def get(id: Long): IO[Option[ModelVersion]]                              = ???
-//        override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
-//        override def delete(id: Long): IO[Int]                                            = ???
-//        override def all(): IO[List[ModelVersion]]                                        = ???
-//        override def listForModel(modelId: Long): IO[List[ModelVersion]]                  = ???
-//        override def update(entity: ModelVersion): IO[Int]                                = ???
-//        override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]]     = ???
-//      }
+//      val versionRepo  = mock[ModelVersionRepository[IO]]
 //      val monitorState = ListBuffer.empty[Servable.Status]
-//      val monitor = new ServableMonitor[IO] {
-//        override def monitor(s: Servable): IO[Deferred[IO, Servable]] = {
-//          val servable = Servable.Serving("Ok", "imaginary.host.some-cool-cluster", 6969)
-//          monitorState += servable
-//          val d = Deferred.unsafe[IO, Servable]
-//          d.complete(s.copy(status = servable)).unsafeRunSync()
-//          IO(d)
-//        }
-//      }
-//      val appRepo = new ApplicationRepository[IO] {
-//        override def create(entity: Application): IO[Application]                   = ???
-//        override def get(id: Long): IO[Option[Application]]                         = ???
-//        override def get(name: String): IO[Option[Application]]                     = ???
-//        override def update(value: Application): IO[Int]                            = ???
-//        override def delete(id: Long): IO[Int]                                      = ???
-//        override def all(): IO[List[Application]]                                   = ???
-//        override def findVersionUsage(versionIdx: Long): IO[List[Application]]      = ???
-//        override def findServableUsage(servableName: String): IO[List[Application]] = ???
-//      }
-//      val service = ServableService[IO]()(
+//      val appRepo      = mock[ApplicationRepository[IO]]
+//      val service = ServableService[IO](None)(
 //        Concurrent[IO],
 //        timer,
 //        nameGen,
@@ -516,15 +261,14 @@ class ServableSpec extends GenericUnitTest {
 //        servableRepo,
 //        appRepo,
 //        versionRepo,
-//        monitor,
 //        null,
 //        depConfService
 //      )
 //      val result = service.deploy(mv, None, Map.empty).unsafeRunSync().completed.get.unsafeRunSync()
 //      assert(result.modelVersion === mv)
-//      driverState should not be empty
-//      monitorState should not be empty
-//      repoState should not be empty
+//      assert(driverState.nonEmpty)
+//      assert(monitorState.nonEmpty)
+//      assert(repoState.nonEmpty)
 //    }
 //
 //    it("should be able to delete Servable") {
@@ -534,7 +278,7 @@ class ServableSpec extends GenericUnitTest {
 //        created = Instant.now(),
 //        finished = None,
 //        modelVersion = 1,
-//        modelContract = ModelContract.defaultInstance,
+//        modelSignature = signature,
 //        runtime = DockerImage("runtime", "tag"),
 //        model = Model(1, "test-model"),
 //        status = ModelVersionStatus.Assembling,
@@ -545,27 +289,20 @@ class ServableSpec extends GenericUnitTest {
 //      val initServable = Servable(
 //        modelVersion = mv,
 //        nameSuffix = "delete-me",
-//        Servable.Serving("Ok", "host", 9090),
-//        Nil
+//        status = Servable.Status.Serving,
+//        usedApps = Nil,
+//        message = "Ok",
+//        host = "host".some,
+//        port = 9090.some
 //      )
 //
 //      val driverState = ListBuffer.empty[String]
-//      val cloudDriver = new CloudDriver[IO] {
-//        override def instances: IO[List[CloudInstance]]                = ???
-//        override def instance(name: String): IO[Option[CloudInstance]] = ???
-//        override def run(
-//            name: String,
-//            modelVersionId: Long,
-//            image: DockerImage,
-//            hostSelector: Option[DeploymentConfiguration] = None
-//        ) = ???
-//        override def remove(name: String): IO[Unit] = {
-//          driverState += name
-//          IO.unit
-//        }
-//        override def getByVersionId(modelVersionId: Long): IO[Option[CloudInstance]] = ???
-//        override def getLogs(name: String, follow: Boolean): fs2.Stream[IO, String]  = ???
+//      val cloudDriver = mock[CloudDriver[IO]]
+//      when(cloudDriver.remove(any)).thenAnswer { name: String =>
+//        driverState += name
+//        IO.unit
 //      }
+//
 //      val repoState = ListBuffer.empty[Servable]
 //      repoState += initServable
 //      val servableRepo = new ServableRepository[IO] {
@@ -966,4 +703,4 @@ class ServableSpec extends GenericUnitTest {
 //      assert(result.isLeft)
 //    }
 //  }
-}
+//}
