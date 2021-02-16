@@ -6,10 +6,10 @@ properties([
     choice(choices: ['local', 'global'], name: 'releaseType', description: 'It\'s local release or global?'),
    ])
 ])
-
+ 
 SERVICENAME = 'hydro-serving-manager'
 SEARCHPATH = './project/Dependencies.scala'
-SEARCHGRPC = '  val servingGrpcScala = '
+SEARCHGRPC = 'val servingGrpcScala'
 REGISTRYURL = 'hydrosphere'
 SERVICEIMAGENAME = 'serving-manager'
 GITHUBREPO  = "github.com/Hydrospheredata/hydro-serving-manager.git"
@@ -20,7 +20,7 @@ def checkoutRepo(String repo){
 
 def getVersion(){
     try{
-      if (params.release == 'global'){
+      if (params.releaseType == 'global'){
         //remove only quotes
         version = sh(script: "cat \"version\" | sed 's/\\\"/\\\\\"/g'", returnStdout: true ,label: "get version").trim()
       } else {
@@ -219,7 +219,7 @@ node('hydrocentral') {
 
         stage('Release'){
             if (BRANCH_NAME == 'master' || BRANCH_NAME == 'main'){ //Run only manual from master{
-                if (params.release == 'global'){
+                if (params.releaseType == 'global'){
                     oldVersion = getVersion()
                     bumpVersion(getVersion(),params.newVersion,params.patchVersion,'version')
                     newVersion = getVersion()
@@ -230,7 +230,7 @@ node('hydrocentral') {
                 buildDocker()
                 pushDocker(REGISTRYURL, SERVICEIMAGENAME+":$newVersion")
                 //Update helm and docker-compose if release 
-                if (params.release == 'global'){
+                if (params.releaseType == 'global'){
                     releaseService(oldVersion, newVersion)
                 } else {
                     dir('release'){
