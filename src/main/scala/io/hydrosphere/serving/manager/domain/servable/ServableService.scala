@@ -70,7 +70,9 @@ object ServableService extends Logging {
   def filterByMetadata(metadata: Map[String, String]): ServableFiler =
     _.filter(s => s.metadata.toSet.subsetOf(metadata.toSet))
 
-  def apply[F[_]]()(implicit
+  def apply[F[_]](
+      defaultDC: Option[DeploymentConfiguration] = None
+  )(implicit
       F: Concurrent[F],
       timer: Timer[F],
       nameGenerator: NameGenerator[F],
@@ -79,7 +81,6 @@ object ServableService extends Logging {
       servableRepository: ServableRepository[F],
       appRepo: ApplicationRepository[F],
       versionRepository: ModelVersionRepository[F],
-      monitor: ServableMonitor[F],
       monitoringRepository: MonitoringRepository[F],
       deploymentConfigService: DeploymentConfigurationService[F]
   ): ServableService[F] =
@@ -131,7 +132,7 @@ object ServableService extends Logging {
             metadata = metadata,
             host = None,
             port = None,
-            deploymentConfiguration = deployConfig
+            deploymentConfiguration = deployConfig.orElse(defaultDC)
           )
           _ <- servableRepository.upsert(initServable)
           _ <- awaitServable(initServable)

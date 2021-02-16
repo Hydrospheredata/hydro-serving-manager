@@ -2,6 +2,7 @@ package io.hydrosphere.serving.manager
 
 import cats.effect._
 import cats.implicits._
+import io.hydrosphere.serving.manager.config.ManagerConfiguration
 import io.hydrosphere.serving.manager.domain.application.{
   ApplicationDeployer,
   ApplicationRepository,
@@ -59,7 +60,9 @@ final case class Core[F[_]](
 )
 
 object Core {
-  def make[F[_]]()(implicit
+  def make[F[_]](
+      config: ManagerConfiguration
+  )(implicit
       F: ConcurrentEffect[F],
       ec: ExecutionContext,
       timer: Timer[F],
@@ -91,7 +94,8 @@ object Core {
         implicit val deploymentConfigService: DeploymentConfigurationService[F] =
           DeploymentConfigurationService[F](deploymentConfigRepo)
         implicit val versionService: ModelVersionService[F] = ModelVersionService[F]()
-        implicit val servableService: ServableService[F]    = ServableService[F]()
+        implicit val servableService: ServableService[F] =
+          ServableService[F](config.defaultDeploymentConfiguration)
         implicit val monitoringService: Monitoring[F]       = Monitoring[F]()
         implicit val versionBuilder: ModelVersionBuilder[F] = ModelVersionBuilder()
         for {
