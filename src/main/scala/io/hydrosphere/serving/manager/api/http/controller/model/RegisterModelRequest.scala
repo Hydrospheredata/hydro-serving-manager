@@ -1,11 +1,13 @@
 package io.hydrosphere.serving.manager.api.http.controller.model
 
-import io.hydrosphere.serving.contract.model_contract.ModelContract
+import io.circe.generic.JsonCodec
+import io.hydrosphere.serving.manager.domain.contract.{Signature}
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 
+@JsonCodec
 case class RegisterModelRequest(
-  name: String,
-  contract: ModelContract,
-  metadata: Option[Map[String, String]] = None,
-  monitoringConfiguration: Option[MonitoringConfiguration]
+    name: String,
+    signature: Signature,
+    metadata: Option[Map[String, String]] = None,
+    monitoringConfiguration: Option[MonitoringConfiguration]
 )

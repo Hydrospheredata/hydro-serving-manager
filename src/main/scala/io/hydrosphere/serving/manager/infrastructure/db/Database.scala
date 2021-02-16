@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.infrastructure.db
 
-import cats.effect.{Async, ContextShift, Resource, Sync}
+import cats.effect.{Async, Blocker, ContextShift, Resource, Sync}
 import cats.implicits._
 import com.zaxxer.hikari.HikariDataSource
 import doobie.util.transactor.Transactor
@@ -22,14 +22,14 @@ object Database {
 
   def makeTransactor[F[_]](
     dataSource: HikariDataSource,
-    connectEc: ExecutionContext,
-    transactEc: ExecutionContext
+    transactEc: ExecutionContext,
+    blocker: Blocker
   )(
     implicit F: Async[F],
     cs: ContextShift[F]
   ): F[HikariTransactor[F]] = {
     F.delay {
-      Transactor.fromDataSource[F](dataSource, connectEc, transactEc)
+      Transactor.fromDataSource[F](dataSource, transactEc, blocker)
     }
   }
 

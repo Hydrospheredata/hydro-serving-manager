@@ -84,7 +84,7 @@ object DockerdClient extends Logging {
           F.delay(underlying.logs(id, DockerClient.LogsParam.stderr(), DockerClient.LogsParam.stdout()))
         }
         fs2.Stream.eval(rawStream)
-          .flatMap(x => fs2.Stream.fromIterator[F, LogMessage](x.asScala))
+          .flatMap(x => fs2.Stream.fromIterator[F](x.asScala))
           .map(logMessage => StandardCharsets.UTF_8.decode(logMessage.content()).toString)
       }
 

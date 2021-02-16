@@ -13,6 +13,7 @@ import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringR
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.FiniteDuration
 
+// TODO: check fullname
 trait ServableGC[F[_]] {
   def mark(modelVersion: ModelVersion.Internal): F[Unit]
 

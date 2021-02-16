@@ -1,7 +1,9 @@
 package io.hydrosphere.serving.manager.domain.application.requests
 
+import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.domain.application.ApplicationKafkaStream
 
+@JsonCodec
 case class CreateApplicationRequest(
   name: String,
   namespace: Option[String],
@@ -9,8 +11,3 @@ case class CreateApplicationRequest(
   kafkaStreaming: Option[List[ApplicationKafkaStream]],
   metadata: Option[Map[String, String]]
 )
-
-object CreateApplicationRequest {
-  import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
-  implicit val format = jsonFormat5(CreateApplicationRequest.apply)
-}

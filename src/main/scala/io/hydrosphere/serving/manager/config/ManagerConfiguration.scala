@@ -7,6 +7,7 @@ import cats.syntax.either._
 import com.amazonaws.regions.Regions
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
+import pureconfig.generic.auto._
 
 case class ManagerConfiguration(
   application: ApplicationConfig,

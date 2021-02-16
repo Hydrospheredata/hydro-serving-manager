@@ -2,66 +2,59 @@ package io.hydrosphere.serving.manager.domain.application
 
 import cats.data.NonEmptyList
 import cats.implicits._
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.DomainError
-
+import io.hydrosphere.serving.manager.domain.contract.Signature
 
 object GraphComposer {
-  type Result = (ApplicationGraph, ModelSignature)
+  type Result = (ApplicationGraph, Signature)
 
   final val INFERRED_PIPELINE_SIGNATURE = "INFERRED_PIPELINE_SIGNATURE"
 
-  def compose(
-    nodes: NonEmptyList[NonEmptyList[ApplicationServable]]
-  ): Either[DomainError, Result] = {
+  def compose(nodes: NonEmptyList[NonEmptyList[ApplicationServable]]): Either[DomainError, Result] =
     nodes match {
       case NonEmptyList(NonEmptyList(singleStage, Nil), Nil) =>
-        inferSimpleApp(singleStage) // don't perform checks
+        inferSimpleApp(singleStage).asRight // don't perform checks
       case stages =>
         inferPipelineApp(stages)
     }
-  }
 
   def inferSimpleApp(
-    version: ApplicationServable
-  ): Either[DomainError, Result] = {
-    for {
-      signature <- Either.fromOption(
-        version.modelVersion.modelContract.predict,
-        DomainError.notFound(s"Can't find predict signature for model ${version.modelVersion.fullName}")
+      version: ApplicationServable
+  ): Result = {
+    val signature = version.modelVersion.modelSignature;
+
+    val stages = NonEmptyList.of(
+      ApplicationStage(
+        variants = NonEmptyList.of(version.copy(weight = 100)),
+        signature = signature
       )
-    } yield {
-      val stages = NonEmptyList.of(
-        ApplicationStage(
-          variants = NonEmptyList.of(version.copy(weight = 100)),
-          signature = signature
-        )
-      )
-      ApplicationGraph(stages) -> signature
-    }
+    )
+    ApplicationGraph(stages) -> signature
   }
 
   def inferPipelineApp(
-    stages: NonEmptyList[NonEmptyList[ApplicationServable]]
+      stages: NonEmptyList[NonEmptyList[ApplicationServable]]
   ): Either[DomainError, Result] = {
     val parsedStages = stages.traverse { stage =>
       val stageWeight = stage.map(_.weight).foldLeft(0)(_ + _)
-      if (stageWeight == 100) {
+      if (stageWeight == 100)
         for {
-          stageSig <- ApplicationValidator
-            .inferStageSignature(stage.map(_.modelVersion).toList)
+          stageSig <-
+            ApplicationValidator
+              .inferStageSignature(stage.map(_.modelVersion))
         } yield ApplicationStage(variants = stage, signature = stageSig)
-      } else {
+      else
         Left(
           DomainError
             .invalidRequest(s"Sum of weights must equal 100. Current sum: $stageWeight")
         )
-      }
     }
     parsedStages.map { s =>
-      val signature = ModelSignature(signatureName = INFERRED_PIPELINE_SIGNATURE,
+      val signature = Signature(
+        signatureName = INFERRED_PIPELINE_SIGNATURE,
         inputs = s.head.signature.inputs,
-        outputs = s.last.signature.outputs)
+        outputs = s.last.signature.outputs
+      )
       ApplicationGraph(s) -> signature
     }
   }

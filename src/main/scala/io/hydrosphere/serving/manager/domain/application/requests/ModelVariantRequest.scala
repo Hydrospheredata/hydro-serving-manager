@@ -1,13 +1,9 @@
 package io.hydrosphere.serving.manager.domain.application.requests
+import io.circe.generic.JsonCodec
 
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
-
+@JsonCodec
 case class ModelVariantRequest(
   modelVersionId: Long,
   weight: Int,
   deploymentConfigName: Option[String] = None
 )
-
-object ModelVariantRequest {
-  implicit val format = jsonFormat3(ModelVariantRequest.apply)
-}

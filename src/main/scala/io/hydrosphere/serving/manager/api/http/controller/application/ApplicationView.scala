@@ -1,40 +1,39 @@
 package io.hydrosphere.serving.manager.api.http.controller.application
 
 import cats.data.NonEmptyList
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
+import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationGraphView.StageView
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationGraph, ApplicationKafkaStream}
+import io.hydrosphere.serving.manager.domain.application.{
+  Application,
+  ApplicationGraph,
+  ApplicationKafkaStream
+}
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
-import io.swagger.annotations.ApiModelProperty
 
+@JsonCodec
 case class ApplicationGraphView(
-  stages: NonEmptyList[StageView]
+    stages: NonEmptyList[StageView]
 )
 
 object ApplicationGraphView {
+  @JsonCodec
   case class VariantView(
-    modelVersion: ModelVersion.Internal,
-    deploymentConfiguration: Option[DeploymentConfiguration],
-    weight: Int
+      modelVersion: ModelVersion.Internal,
+      deploymentConfiguration: Option[DeploymentConfiguration],
+      weight: Int
   )
-  object VariantView {
-    implicit val jsformat = jsonFormat3(VariantView.apply)
-  }
-  case class StageView(
-    modelVariants: NonEmptyList[VariantView],
-    signature: ModelSignature
-  )
-  object StageView {
-    implicit val jsformat = jsonFormat2(StageView.apply)
-  }
 
-  implicit val format = jsonFormat1(ApplicationGraphView.apply)
+  @JsonCodec
+  case class StageView(
+      modelVariants: NonEmptyList[VariantView],
+      signature: Signature
+  )
 
   def fromGraph(graph: ApplicationGraph): ApplicationGraphView = {
-    val stages = graph.stages.map{ s =>
-      val variants = s.variants.map{ss =>
+    val stages = graph.stages.map { s =>
+      val variants = s.variants.map { ss =>
         VariantView(ss.modelVersion, ss.requiredDeploymentConfig, ss.weight)
       }
       StageView(variants, s.signature)
@@ -43,24 +42,23 @@ object ApplicationGraphView {
   }
 }
 
+@JsonCodec
 case class ApplicationView(
-  id: Long,
-  name: String,
-  status: String,
-  signature: ModelSignature,
-  executionGraph: ApplicationGraphView,
-  kafkaStreaming: List[ApplicationKafkaStream],
-  message: Option[String],
-  metadata: Map[String, String]
+    id: Long,
+    name: String,
+    status: String,
+    signature: Signature,
+    executionGraph: ApplicationGraphView,
+    kafkaStreaming: List[ApplicationKafkaStream],
+    message: Option[String],
+    metadata: Map[String, String]
 )
 
 object ApplicationView {
-  implicit val appView = jsonFormat8(ApplicationView.apply)
-
   def fromApplication(app: Application): ApplicationView = {
-    val status = app.status.productPrefix
+    val status  = app.status.entryName
     val message = app.statusMessage
-    val graph = ApplicationGraphView.fromGraph(app.graph)
+    val graph   = ApplicationGraphView.fromGraph(app.graph)
     ApplicationView(
       id = app.id,
       name = app.name,

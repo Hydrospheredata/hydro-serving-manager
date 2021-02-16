@@ -4,9 +4,11 @@ import cats.effect.Bracket
 import cats.implicits._
 import doobie._
 import doobie.implicits._
+import doobie.implicits.javatime._
 import doobie.postgres.implicits._
+import io.hydrosphere.serving.manager.util.SprayDoobie._
 import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
+import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableEvents, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
@@ -18,11 +20,15 @@ import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import DBDeploymentConfigurationRepository._
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import spray.json._
+import io.hydrosphere.serving.manager.util.JsonOps._
 
+import io.circe.syntax._
+import io.circe.generic.JsonCodec
+import io.hydrosphere.serving.manager.infrastructure.db.Metas._
 
 object DBServableRepository {
 
+  @JsonCodec
   case class ServableRow(
     service_name: String,
     model_version_id: Long,
@@ -36,47 +42,58 @@ object DBServableRepository {
 
   type JoinedServableRow = (ServableRow, ModelVersionRow, ModelRow, Option[DeploymentConfiguration], Option[List[String]])
 
-  def fromServable(s: GenericServable): ServableRow = {
-    val (status, statusText, host, port) = s.status match {
-      case Servable.Serving(msg, h, p) => ("Serving", msg, h.some, p.some)
-      case Servable.NotServing(msg, h, p) => ("NotServing", msg, h, p)
-      case Servable.Starting(msg, h, p) => ("Starting", msg, h, p)
-      case Servable.NotAvailable(msg, h, p) => ("NotAvailable", msg, h, p)
-    }
+  Read[(ServableRow, ModelVersionRow)]
+
+  def fromServable(s: Servable): ServableRow = {
     ServableRow(
       service_name = s.fullName,
       model_version_id = s.modelVersion.id,
-      status_text = statusText,
-      host = host,
-      port = port,
-      status = status,
-      metadata = s.metadata.maybeEmpty.map(_.toJson.compactPrint),
+      status_text = s.status.entryName,
+      host = s.host,
+      port = s.port,
+      status = s.message,
+      metadata = s.metadata.maybeEmpty.map(_.asJson.noSpaces),
       deployment_configuration = s.deploymentConfiguration.map(_.name)
     )
   }
 
-  def toServable(sr: ServableRow, mvr: ModelVersionRow, mr: ModelRow, deploymentConfig: Option[DeploymentConfiguration], apps: Option[List[String]]) = {
-    val modelVersion = DBModelVersionRepository.toModelVersion(mvr, mr)
+  def toServable(
+    sr: ServableRow,
+    mvr: ModelVersionRow,
+    mr: ModelRow,
+    deploymentConfig: Option[DeploymentConfiguration],
+    apps: Option[List[String]]) = {
+
     val suffix = Servable.extractSuffix(mr.name, mvr.model_version, sr.service_name)
-    val status = (sr.status, sr.host, sr.port) match {
-      case ("Serving", Some(host), Some(port)) => Servable.Serving(sr.status_text, host, port)
-      case ("NotServing", host, port) => Servable.NotServing(sr.status_text, host, port)
-      case ("NotAvailable", host, port) => Servable.NotAvailable(sr.status_text, host, port)
-      case (_, host, port) => Servable.Starting(sr.status_text, host, port)
-    }
-    modelVersion match {
-      case imv: ModelVersion.Internal =>
-        Right(Servable(
-          modelVersion = imv,
-          nameSuffix = suffix,
-          status = status,
-          usedApps = apps.getOrElse(Nil),
-          metadata = sr.metadata.map(_.parseJson.convertTo[Map[String, String]]).getOrElse(Map.empty),
-          deploymentConfiguration = deploymentConfig
-        ))
-      case emv: ModelVersion.External =>
-        Left(DomainError.internalError(s"Impossible Servable ${sr.service_name} with external ModelVersion: ${emv}"))
-    }
+    val status =
+      Servable.Status.withNameInsensitiveOption(sr.status).getOrElse(Servable.Status.NotAvailable)
+
+    DBModelVersionRepository.toModelVersion(mvr, mr).flatMap(mvr =>
+      mvr match {
+        case imv: ModelVersion.Internal =>
+          Right(
+            Servable(
+              modelVersion = imv,
+              nameSuffix = suffix,
+              status = status,
+              usedApps = apps.getOrElse(Nil),
+              metadata = sr.metadata
+                .flatMap(m => m.parseJsonAs[Map[String, String]].toOption)
+                .getOrElse(Map.empty),
+              message = sr.status_text,
+              host = sr.host,
+              port = sr.port,
+              deploymentConfiguration = deploymentConfig
+            )
+          )
+        case emv: ModelVersion.External =>
+          Left(
+            DomainError.internalError(
+              s"Impossible Servable ${sr.service_name} with external ModelVersion: ${emv}"
+            )
+          )
+      }
+    )
   }
 
   def toServableT = (toServable _).tupled
@@ -143,7 +160,7 @@ object DBServableRepository {
 
   def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F], servablePub: ServableEvents.Publisher[F],
   ) = new ServableRepository[F] {
-    override def findForModelVersion(versionId: Long): F[List[GenericServable]] = {
+    override def findForModelVersion(versionId: Long): F[List[Servable]] = {
       for {
         rows <- findForModelVersionQ(versionId).to[List].transact(tx)
       } yield rows.map(x => toServableT(x).toOption).collect {
@@ -151,7 +168,7 @@ object DBServableRepository {
       }
     }
 
-    override def all(): F[List[GenericServable]] = {
+    override def all(): F[List[Servable]] = {
       for {
         rows <- allQ.to[List].transact(tx)
       } yield rows.map(x => toServableT(x).toOption).collect {
@@ -159,7 +176,7 @@ object DBServableRepository {
       }
     }
 
-    override def upsert(servable: GenericServable): F[GenericServable] = {
+    override def upsert(servable: Servable): F[Servable] = {
       val row = fromServable(servable)
       upsertQ(row).run.transact(tx)
         .as(servable)
@@ -171,13 +188,13 @@ object DBServableRepository {
         .flatTap(_ => servablePub.remove(name))
     }
 
-    override def get(name: String): F[Option[GenericServable]] = {
+    override def get(name: String): F[Option[Servable]] = {
       for {
         row <- getQ(name).option.transact(tx)
       } yield row.flatMap(x => toServableT(x).toOption)
     }
 
-    override def get(names: Seq[String]): F[List[GenericServable]] = {
+    override def get(names: Seq[String]): F[List[Servable]] = {
       val okCase = for {
         nonEmptyNames <- OptionT.fromOption[F](NonEmptyList.fromList(names.toList))
         rows <- OptionT.liftF(getManyQ(nonEmptyNames).to[List].transact(tx))

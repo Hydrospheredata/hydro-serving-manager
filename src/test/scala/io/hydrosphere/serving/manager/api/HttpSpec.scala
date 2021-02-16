@@ -5,21 +5,33 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.deploy_config._
 import skuber.LabelSelector
 import skuber.Pod.{Affinity, EqualToleration, ExistsToleration, TolerationEffect}
-import skuber.Pod.Affinity.{NodeAffinity, NodeSelectorOperator, NodeSelectorRequirement, NodeSelectorTerm, PodAffinity, PodAffinityTerm, PodAntiAffinity, WeightedPodAffinityTerm}
-import skuber.Pod.Affinity.NodeAffinity.{PreferredSchedulingTerm, RequiredDuringSchedulingIgnoredDuringExecution}
-import spray.json._
+import skuber.Pod.Affinity.{
+  NodeAffinity,
+  NodeSelectorOperator,
+  NodeSelectorRequirement,
+  NodeSelectorTerm,
+  PodAffinity,
+  PodAffinityTerm,
+  PodAntiAffinity,
+  WeightedPodAffinityTerm
+}
+import skuber.Pod.Affinity.NodeAffinity.{
+  PreferredSchedulingTerm,
+  RequiredDuringSchedulingIgnoredDuringExecution
+}
+import io.circe.syntax._
 
 class HttpSpec extends GenericUnitTest {
   describe("DeploymentConfiguraion API") {
     it("should return a json") {
       val container = K8sContainerConfig(
         resources = Requirements(
-          limits =  Map(
-            "cpu" -> "2",
+          limits = Map(
+            "cpu"    -> "2",
             "memory" -> "2g"
           ).some,
           requests = Map(
-            "cpu" -> "2",
+            "cpu"    -> "2",
             "memory" -> "2g"
           ).some
         ).some,
@@ -29,33 +41,43 @@ class HttpSpec extends GenericUnitTest {
       ).some
 
       val podRequired = RequiredDuringSchedulingIgnoredDuringExecution(
-        nodeSelectorTerms = List(NodeSelectorTerm(
-          matchExpressions = List(NodeSelectorRequirement(
-            key = "exp1",
-            operator = NodeSelectorOperator.Exists,
-            values = List("a", "b", "c")
-          )),
-          matchFields = List(NodeSelectorRequirement(
-            key = "fields1",
-            operator = NodeSelectorOperator.Exists,
-            values = List("aa", "bb", "cc")
-          )),
-        ))
+        nodeSelectorTerms = List(
+          NodeSelectorTerm(
+            matchExpressions = List(
+              NodeSelectorRequirement(
+                key = "exp1",
+                operator = NodeSelectorOperator.Exists,
+                values = List("a", "b", "c")
+              )
+            ),
+            matchFields = List(
+              NodeSelectorRequirement(
+                key = "fields1",
+                operator = NodeSelectorOperator.Exists,
+                values = List("aa", "bb", "cc")
+              )
+            )
+          )
+        )
       ).some
 
       val podPreferred = List(
         PreferredSchedulingTerm(
           preference = NodeSelectorTerm(
-            matchExpressions = List(NodeSelectorRequirement(
-              key = "exp2",
-              operator = NodeSelectorOperator.Exists,
-              values = List("aaaa", "bvzv", "czxc")
-            )),
-            matchFields = List(NodeSelectorRequirement(
-              key = "fields3",
-              operator = NodeSelectorOperator.Exists,
-              values = List("aaa", "cccc", "zxcc")
-            )),
+            matchExpressions = List(
+              NodeSelectorRequirement(
+                key = "exp2",
+                operator = NodeSelectorOperator.Exists,
+                values = List("aaaa", "bvzv", "czxc")
+              )
+            ),
+            matchFields = List(
+              NodeSelectorRequirement(
+                key = "fields3",
+                operator = NodeSelectorOperator.Exists,
+                values = List("aaa", "cccc", "zxcc")
+              )
+            )
           ),
           weight = 100
         )
@@ -72,7 +94,7 @@ class HttpSpec extends GenericUnitTest {
             labelSelector = LabelSelector(
               LabelSelector.ExistsRequirement("kek"),
               LabelSelector.NotInRequirement("key", List("a", "b")),
-              LabelSelector.NotExistsRequirement("kek"),
+              LabelSelector.NotExistsRequirement("kek")
             ).some,
             namespaces = List("namespace1"),
             topologyKey = "top"
@@ -85,13 +107,13 @@ class HttpSpec extends GenericUnitTest {
               labelSelector = LabelSelector(
                 LabelSelector.InRequirement("kek", List("a", "b")),
                 LabelSelector.IsEqualRequirement("key", "a"),
-                LabelSelector.IsNotEqualRequirement("kek", "b"),
+                LabelSelector.IsNotEqualRequirement("kek", "b")
               ).some,
               namespaces = List("namespace2"),
               topologyKey = "toptop"
+            )
           )
         )
-      )
       ).some
 
       val podAntiAffinity = PodAntiAffinity(
@@ -100,7 +122,7 @@ class HttpSpec extends GenericUnitTest {
             labelSelector = LabelSelector(
               LabelSelector.ExistsRequirement("kek"),
               LabelSelector.NotInRequirement("key", List("a", "b")),
-              LabelSelector.NotExistsRequirement("kek"),
+              LabelSelector.NotExistsRequirement("kek")
             ).some,
             namespaces = List("namespace1"),
             topologyKey = "top"
@@ -113,7 +135,7 @@ class HttpSpec extends GenericUnitTest {
               labelSelector = LabelSelector(
                 LabelSelector.InRequirement("kek", List("a", "b")),
                 LabelSelector.IsEqualRequirement("key", "a"),
-                LabelSelector.IsNotEqualRequirement("kek", "b"),
+                LabelSelector.IsNotEqualRequirement("kek", "b")
               ).some,
               namespaces = List("namespace2"),
               topologyKey = "toptop"
@@ -144,7 +166,7 @@ class HttpSpec extends GenericUnitTest {
 
       val pod = K8sPodConfig(
         nodeSelector = Map(
-          "im" -> "a map",
+          "im"  -> "a map",
           "foo" -> "bar"
         ).some,
         affinity = podConfigAffinity.some,
@@ -169,7 +191,7 @@ class HttpSpec extends GenericUnitTest {
         hpa = hpa
       )
 
-      println(result.toJson.compactPrint)
+      println(result.asJson.noSpaces)
 
       succeed
     }

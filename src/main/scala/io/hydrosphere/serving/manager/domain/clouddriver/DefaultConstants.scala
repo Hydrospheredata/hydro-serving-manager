@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
-import io.hydrosphere.serving.manager.domain.servable.Servable.GenericServable
+import io.hydrosphere.serving.manager.domain.servable.Servable
 
 
 object DefaultConstants {
@@ -95,7 +95,7 @@ object DefaultConstants {
   )
 
 
-  def getModelLabels(service: GenericServable): Map[String, String] = {
+  def getModelLabels(service: Servable): Map[String, String] = {
     Map[String, String](
       LABEL_SERVICE_NAME -> service.nameSuffix,
       LABEL_HS_SERVICE_MARKER -> LABEL_HS_SERVICE_MARKER,
@@ -103,7 +103,7 @@ object DefaultConstants {
     )
   }
 
-  def getRuntimeLabels(service: GenericServable): Map[String, String] =
+  def getRuntimeLabels(service: Servable): Map[String, String] =
     Map[String, String](
       LABEL_HS_SERVICE_MARKER -> LABEL_HS_SERVICE_MARKER,
       DefaultConstants.LABEL_DEPLOYMENT_TYPE -> DefaultConstants.DEPLOYMENT_TYPE_APP

@@ -1,41 +1,45 @@
 package io.hydrosphere.serving.manager.domain.model
 
-import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.contract.model_field.ModelField
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
+import io.circe.generic.JsonCodec
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
-import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
-import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.FetcherResult
 
+@JsonCodec
 case class ModelVersionMetadata(
-  modelName: String,
-  contract: ModelContract,
-  runtime: DockerImage,
-  installCommand: Option[String],
-  metadata: Map[String, String],
-  monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration()
+    modelName: String,
+    signature: Signature,
+    runtime: DockerImage,
+    installCommand: Option[String],
+    metadata: Map[String, String],
+    monitoringConfiguration: MonitoringConfiguration = MonitoringConfiguration()
 )
 
 object ModelVersionMetadata {
-  def combineMetadata(fetcherResult: Option[FetcherResult], upload: ModelUploadMetadata): ModelVersionMetadata = {
-    val contract = upload.contract
-      .orElse(fetcherResult.map(_.modelContract))
-      .getOrElse(ModelContract.defaultInstance)
+  def combineMetadata(
+      fetcherResult: Option[FetcherResult],
+      upload: ModelUploadMetadata
+  ): Option[ModelVersionMetadata] = {
+    val x = upload.signature.orElse(fetcherResult.map(_.modelSignature))
+    val y =
+      fetcherResult.map(_.metadata).getOrElse(Map.empty) ++ upload.metadata.getOrElse(Map.empty)
+    val z = upload.monitoringConfiguration.getOrElse(MonitoringConfiguration())
+    val w = 1
 
-    val metadata = fetcherResult.map(_.metadata).getOrElse(Map.empty) ++ upload.metadata.getOrElse(Map.empty)
-
-    ModelVersionMetadata(
+    for {
+      signature <- upload.signature.orElse(fetcherResult.map(_.modelSignature))
+      metadata =
+        fetcherResult.map(_.metadata).getOrElse(Map.empty) ++ upload.metadata.getOrElse(Map.empty)
+      monitoringConfiguration = upload.monitoringConfiguration.getOrElse(MonitoringConfiguration())
+    } yield ModelVersionMetadata(
       modelName = upload.name,
-      contract = contract,
+      signature = signature,
       runtime = upload.runtime,
       installCommand = upload.installCommand,
       metadata = metadata,
-      monitoringConfiguration = upload.monitoringConfiguration.getOrElse(MonitoringConfiguration())
+      monitoringConfiguration = monitoringConfiguration
     )
   }
-
 }

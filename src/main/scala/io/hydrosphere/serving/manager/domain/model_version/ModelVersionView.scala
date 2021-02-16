@@ -1,31 +1,34 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
+import io.circe.generic.JsonCodec
+
 import java.time.Instant
 
-import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.application.Application
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 
+@JsonCodec
 case class ModelVersionView(
-  id: Long,
-  created: Instant,
-  finished: Option[Instant],
-  modelVersion: Long,
-  modelContract: ModelContract,
-  model: Model,
-  status: String,
-  metadata: Map[String, String],
-  applications: List[String],
-  image: Option[DockerImage],
-  runtime: Option[DockerImage],
-  monitoringConfiguration: MonitoringConfiguration,
-  isExternal: Boolean
+    id: Long,
+    created: Instant,
+    finished: Option[Instant],
+    modelVersion: Long,
+    modelSignature: Signature,
+    model: Model,
+    status: String,
+    metadata: Map[String, String],
+    applications: List[String],
+    image: Option[DockerImage],
+    runtime: Option[DockerImage],
+    monitoringConfiguration: MonitoringConfiguration,
+    isExternal: Boolean
 )
 
 object ModelVersionView {
-  def fromVersion(amv: ModelVersion, applications: List[Application]): ModelVersionView = {
+  def fromVersion(amv: ModelVersion, applications: List[Application]): ModelVersionView =
     amv match {
       case internalMV: ModelVersion.Internal =>
         ModelVersionView(
@@ -34,7 +37,7 @@ object ModelVersionView {
           created = internalMV.created,
           finished = internalMV.finished,
           modelVersion = internalMV.modelVersion,
-          modelContract = internalMV.modelContract,
+          modelSignature = internalMV.modelSignature,
           runtime = Some(internalMV.runtime),
           model = internalMV.model,
           status = internalMV.status.toString,
@@ -50,7 +53,7 @@ object ModelVersionView {
           created = externalMV.created,
           finished = Some(externalMV.created),
           modelVersion = externalMV.modelVersion,
-          modelContract = externalMV.modelContract,
+          modelSignature = externalMV.modelSignature,
           runtime = None,
           model = externalMV.model,
           status = ModelVersionStatus.Released.toString,
@@ -60,5 +63,4 @@ object ModelVersionView {
           monitoringConfiguration = externalMV.monitoringConfiguration
         )
     }
-  }
 }
