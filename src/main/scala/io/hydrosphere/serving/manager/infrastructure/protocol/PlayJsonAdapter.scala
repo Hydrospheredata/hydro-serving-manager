@@ -37,18 +37,18 @@ object PlayJsonAdapter {
       case JsObject(obj) => obj.view.mapValues(playToCirce).toMap.asJson
     }
 
-  implicit def writeAdapter[T](v: T)(implicit W: Writes[T]): Json = playToCirce(W.writes(v))
-  implicit def readAdapter[T](json: Json)(implicit R: Reads[T]): Result[T] =
+  def writeAdapter[T](v: T)(implicit W: Writes[T]): Json = playToCirce(W.writes(v))
+  def readAdapter[T](json: Json)(implicit R: Reads[T]): Result[T] =
     R.reads(circeToPlay(json)).asEither.leftMap { x =>
       val error = x.flatMap(_._2.map(_.message)).mkString
       DecodingFailure(error, Nil)
     }
 
-  implicit def encoder[T](implicit W: Writes[T]) =
+  def encoder[T](implicit W: Writes[T]) =
     new Encoder[T] {
       override def apply(a: T): Json = writeAdapter(a)
     }
-  implicit def decoder[T](implicit R: Reads[T]) =
+  def decoder[T](implicit R: Reads[T]) =
     new Decoder[T] {
       override def apply(h: HCursor): Result[T] = readAdapter[T](h.value)
     }

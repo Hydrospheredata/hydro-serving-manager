@@ -108,8 +108,8 @@ object DBServableRepository {
 
   def upsertQ(sr: ServableRow) =
     sql"""
-         |INSERT INTO hydro_serving.servable(service_name, model_version_id, status_text, host, port, status, deployment_configuration)
-         | VALUES(${sr.service_name}, ${sr.model_version_id}, ${sr.status_text}, ${sr.host}, ${sr.port}, ${sr.status}, ${sr.deployment_configuration})
+         |INSERT INTO hydro_serving.servable(service_name, model_version_id, status_text, host, port, status, deployment_configuration, metadata)
+         | VALUES(${sr.service_name}, ${sr.model_version_id}, ${sr.status_text}, ${sr.host}, ${sr.port}, ${sr.status}, ${sr.deployment_configuration}, ${sr.metadata})
          | ON CONFLICT (service_name)
          |  DO UPDATE
          |   SET service_name = ${sr.service_name},
@@ -118,7 +118,8 @@ object DBServableRepository {
          |       host = ${sr.host},
          |       port = ${sr.port},
          |       status = ${sr.status},
-         |       deployment_configuration = ${sr.deployment_configuration}
+         |       deployment_configuration = ${sr.deployment_configuration},
+         |       metadata = ${sr.metadata}
       """.stripMargin.update
 
   def deleteQ(name: String) =

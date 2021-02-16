@@ -3,36 +3,51 @@ package io.hydrosphere.serving.manager.it.infrastructure.db
 import cats.data.NonEmptyList
 import cats.syntax.option._
 import doobie.scalatest.IOChecker
-import io.hydrosphere.serving.contract.model_contract.ModelContract
-import io.hydrosphere.serving.contract.model_field.ModelField
-import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
-import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationGraph, ApplicationServable, ApplicationStage}
+import io.hydrosphere.serving.manager.domain.application.{
+  Application,
+  ApplicationGraph,
+  ApplicationServable,
+  ApplicationStage
+}
+import io.hydrosphere.serving.manager.domain.contract.DataType.DT_DOUBLE
+import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
-import io.hydrosphere.serving.tensorflow.types.DataType.DT_DOUBLE
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.ApplicationRow
+import io.hydrosphere.serving.proto.contract.signature.ModelSignature
 
 class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
-  val transactor = app.transactor
+  val transactor         = app.transactor
   private val uploadFile = packModel("/models/dummy_model")
-  private val signature = ModelSignature(
+  private val signature = Signature(
     signatureName = "not-default-spark",
-    inputs = List(ModelField("test-input", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DT_DOUBLE))),
-    outputs = List(ModelField("test-output", None, DataProfileType.NONE, ModelField.TypeOrSubfields.Dtype(DT_DOUBLE)))
+    inputs = NonEmptyList.of(
+      Field.Tensor(
+        "test-input",
+        DT_DOUBLE,
+        TensorShape.scalar,
+        none
+      )
+    ),
+    outputs = NonEmptyList.of(
+      Field.Tensor(
+        "test-output",
+        DT_DOUBLE,
+        TensorShape.scalar,
+        none
+      )
+    )
   )
   private val upload1 = ModelUploadMetadata(
     name = "m1",
     runtime = dummyImage,
-    contract = ModelContract(
-      predict = signature.some
-    ).some
+    signature = signature.some
   )
   var mv1: ModelVersion.Internal = _
-  var servable: Servable.OkServable = _
+  var servable: Servable         = _
 
   describe("Queries") {
     val appRow = ApplicationRow(
@@ -40,12 +55,12 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
       application_name = "test",
       namespace = Some("namespace"),
       status = "Ready",
-      application_contract = ModelContract.defaultInstance.toProtoString,
+      application_contract = ModelSignature.defaultInstance.toProtoString,
       execution_graph = "",
       used_servables = List("asd", "q123"),
       kafka_streams = List("azxcxz"),
       status_message = Some("Ok"),
-      used_model_versions = List(1,2,3),
+      used_model_versions = List(1, 2, 3),
       metadata = None
     )
 
@@ -72,10 +87,17 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
         id = 0,
         name = "repo-spec-app",
         namespace = None,
-        status = Application.Ready,
-        signature = ModelSignature.defaultInstance,
+        status = Application.Status.Ready,
+        signature = Signature.defaultSignature,
         kafkaStreaming = List.empty,
-        graph = ApplicationGraph(NonEmptyList.of(ApplicationStage(NonEmptyList.of(ApplicationServable(mv1, 100)), ModelSignature.defaultInstance)))
+        graph = ApplicationGraph(
+          NonEmptyList.of(
+            ApplicationStage(
+              NonEmptyList.of(ApplicationServable(mv1, 100)),
+              Signature.defaultSignature
+            )
+          )
+        )
       )
       val result = app.core.repos.appRepo.create(application).unsafeRunSync()
       println(result)
@@ -104,9 +126,17 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
     super.beforeAll()
 
     val f = for {
-      d1 <- app.core.modelService.uploadModel(uploadFile, upload1)
+      d1         <- app.core.modelService.uploadModel(uploadFile, upload1)
       completed1 <- d1.completed.get
-      s = Servable(completed1, "test-suffix", Servable.Serving("ok", "localhost", 9090), Nil)
+      s = Servable(
+        completed1,
+        "test-suffix",
+        Servable.Status.Serving,
+        Nil,
+        message = "ok",
+        host = "localhost".some,
+        port = 9090.some
+      )
       _ <- app.core.repos.servableRepo.upsert(s)
     } yield {
       println(s"UPLOADED: $completed1")

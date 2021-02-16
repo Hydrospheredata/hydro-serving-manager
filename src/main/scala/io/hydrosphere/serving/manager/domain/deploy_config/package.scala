@@ -40,8 +40,10 @@ package object deploy_config {
   )
 
   object K8sPodConfig {
-    implicit val affEncoder: Encoder[Affinity] = encoder[Affinity]
-    implicit val affDecoder: Decoder[Affinity] = decoder[Affinity]
+    implicit val affEncoder: Encoder[Affinity]      = encoder[Affinity]
+    implicit val affDecoder: Decoder[Affinity]      = decoder[Affinity]
+    implicit val tolerationEnc: Encoder[Toleration] = encoder[Toleration]
+    implicit val tolerationDec: Decoder[Toleration] = decoder[Toleration]
   }
 
   @JsonCodec

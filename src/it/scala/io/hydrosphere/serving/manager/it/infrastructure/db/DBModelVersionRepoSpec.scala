@@ -1,23 +1,22 @@
 package io.hydrosphere.serving.manager.it.infrastructure.db
 
 import java.time.Instant
-
 import cats.data.OptionT
 import cats.effect.IO
 import doobie.scalatest.IOChecker
-import io.hydrosphere.serving.contract.model_contract.ModelContract
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
-import spray.json._
+import io.circe.syntax._
+import io.hydrosphere.serving.manager.domain.contract.Signature
 
 class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
-  val transactor = app.transactor
-  val time = Instant.now()
-  var model: Model = _
+  val transactor                     = app.transactor
+  val time                           = Instant.now()
+  var model: Model                   = _
   var version: ModelVersion.Internal = _
 
   describe("Queries") {
@@ -27,7 +26,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       created_timestamp = time,
       finished_timestamp = Some(time),
       model_version = 1337,
-      model_contract = "contract",
+      model_signature = "contract".asJson,
       image_name = dummyImage.name,
       image_tag = dummyImage.tag,
       image_sha256 = dummyImage.sha256,
@@ -38,7 +37,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
       install_command = Some("echo 123"),
       metadata = Some("{}"),
       is_external = false,
-      monitoring_configuration = MonitoringConfiguration().toJson
+      monitoring_configuration = MonitoringConfiguration().asJson
     )
     it("should have valid queries") {
       check(DBModelVersionRepository.allQ)
@@ -54,17 +53,23 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
     it("should insert a version") {
       val q = for {
         result <- app.core.repos.versionRepo.create(version)
-      } yield {
-        assert(result.id == 1)
-      }
+      } yield assert(result.id == 1)
       q.unsafeToFuture()
     }
 
     it("should insert a external version") {
-      val ev = ModelVersion.External(0, Instant.now(), 1337, ModelContract.defaultInstance, model, Map.empty, MonitoringConfiguration())
+      val ev = ModelVersion.External(
+        0,
+        Instant.now(),
+        1337,
+        Signature.defaultSignature,
+        model,
+        Map.empty,
+        MonitoringConfiguration()
+      )
       val q = for {
         result <- app.core.repos.versionRepo.create(ev)
-        got <- app.core.repos.versionRepo.get(result.id)
+        got    <- app.core.repos.versionRepo.get(result.id)
       } yield {
         assert(got.isDefined)
         assert(got.get.isInstanceOf[ModelVersion.External])
@@ -74,13 +79,15 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
 
     it("should update a version") {
       val q = for {
-        existing <- OptionT(app.core.repos.versionRepo.get(1)).getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
+        existing <- OptionT(app.core.repos.versionRepo.get(1))
+          .getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
         updatedEx = existing match {
           case x: ModelVersion.Internal => x.copy(status = ModelVersionStatus.Assembling)
           case x: ModelVersion.External => fail("Unexpected External model")
         }
         changed <- app.core.repos.versionRepo.update(updatedEx)
-        result <- OptionT(app.core.repos.versionRepo.get(1)).getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
+        result <- OptionT(app.core.repos.versionRepo.get(1))
+          .getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
       } yield {
         assert(changed == 1)
         assert(result.id == 1)
@@ -91,27 +98,21 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
     it("should fetch all versions") {
       val q = for {
         all <- app.core.repos.versionRepo.all()
-      } yield {
-        assert(all.size == 2)
-      }
+      } yield assert(all.size == 2)
       q.unsafeToFuture()
     }
     it("should get a version") {
       val q = for {
         result <- OptionT(app.core.repos.versionRepo.get("model-name", 1))
           .getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
-      } yield {
-        assert(result.id == 1)
-      }
+      } yield assert(result.id == 1)
       q.unsafeToFuture()
     }
     it("should get many versions") {
       val q = for {
         result <- OptionT(app.core.repos.versionRepo.get("model-name", 1))
           .getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
-      } yield {
-        assert(result.id == 1)
-      }
+      } yield assert(result.id == 1)
       q.unsafeToFuture()
     }
     it("should delete a version") {
@@ -120,7 +121,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
         result <- OptionT(app.core.repos.versionRepo.get("model-name", 2))
           .getOrElseF(IO.raiseError(new RuntimeException("Version not found")))
         changed <- app.core.repos.versionRepo.delete(result.id)
-        empty <- app.core.repos.versionRepo.get("model-name", 2)
+        empty   <- app.core.repos.versionRepo.get("model-name", 2)
       } yield {
         assert(changed == 1)
         assert(empty.isEmpty, empty)
@@ -142,7 +143,7 @@ class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
         created = time,
         finished = Some(time),
         modelVersion = 1,
-        modelContract = ModelContract.defaultInstance,
+        modelSignature = Signature.defaultSignature,
         runtime = dummyImage,
         model = model,
         status = ModelVersionStatus.Released,

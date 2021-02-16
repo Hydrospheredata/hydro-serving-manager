@@ -28,7 +28,6 @@ class FallbackContractFetcher[F[_]](
     }.value
   }
 
-  //TODO: get
   private def getContract(modelPath: Path) = {
     val txtContract: F[ModelSignature] = for {
       metaFile <- source.readText(modelPath.resolve("contract.prototxt"))

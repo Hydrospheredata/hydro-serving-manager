@@ -71,5 +71,7 @@ dockerfile in docker := {
 }
 
 resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven/"
+resolvers +=
+  "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/staging"
 
 libraryDependencies ++= Dependencies.all

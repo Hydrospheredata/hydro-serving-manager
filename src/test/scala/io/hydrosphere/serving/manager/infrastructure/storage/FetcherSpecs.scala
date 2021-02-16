@@ -2,19 +2,9 @@ package io.hydrosphere.serving.manager.infrastructure.storage
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import io.hydrosphere.serving.proto.contract.field.ModelField
-import io.hydrosphere.serving.proto.contract.signature.{ModelSignature, SignatureBuilder}
-import io.hydrosphere.serving.proto.contract.tensor.definitions.Shape
-import io.hydrosphere.serving.proto.contract.types.{DataProfileType, DataType => PDataType}
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.contract.DataType.{DT_FLOAT, DT_INT64}
-import io.hydrosphere.serving.manager.domain.contract.{
-  DataProfileType,
-  DataType,
-  Field,
-  Signature,
-  TensorShape
-}
+import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers._
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.keras.KerasFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.SparkModelFetcher
@@ -132,12 +122,6 @@ class FetcherSpecs extends GenericUnitTest {
 
   describe("KerasFetcher") {
     it("should parse sequential model from .h5") {
-//      Field.Tensor(
-//        "labels",
-//        DT_INT64,
-//        TensorShape.vector(-1),
-//        None
-//      ),
       ioAssert {
         val expectedSignature = Signature(
           "Predict",
@@ -176,6 +160,7 @@ class FetcherSpecs extends GenericUnitTest {
 //              .simpleTensorModelField("dense_21", PDataType.DT_INVALID, Shape.mat(-1, 10))
 //          )
 //        )
+//
 //        val fetcher = new KerasFetcher[IO](ops)
 //        val fres    = fetcher.fetch(getModel("keras_model/functional"))
 //        fres.map { fetchResult =>
@@ -189,7 +174,6 @@ class FetcherSpecs extends GenericUnitTest {
 //      }
 //    }
   }
-
   describe("Default fetcher") {
     it("should parse tensorflow model") {
       ioAssert {

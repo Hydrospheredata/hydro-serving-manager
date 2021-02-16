@@ -305,8 +305,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
           res.completed.get.map { x =>
             assert(x.status == Application.Status.Failed)
             assert(x.statusMessage.get === "Servable model-1-kek is in invalid state: error")
-            println(x.graph.stages.head)
-            assert(x.graph.stages.head.variants.head.servable.isDefined)
+
           }
         }
       }
@@ -423,18 +422,19 @@ class ApplicationServiceSpec extends GenericUnitTest {
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
         val servableService = mock[ServableService[IO]]
-        when(servableService.deploy(modelVersion, None, Map.empty)).thenReturn {
-          val s = Servable(
-            modelVersion = modelVersion,
-            nameSuffix = "test",
-            status = Servable.Status.Serving,
-            usedApps = Nil,
-            message = "Ok",
-            host = Some("host"),
-            port = Some(9090)
-          )
-          DeferredResult.completed[IO, Servable](s)
-        }
+        when(servableService.deploy(Matchers.eq(modelVersion), Matchers.eq(None), Matchers.any()))
+          .thenReturn {
+            val s = Servable(
+              modelVersion = modelVersion,
+              nameSuffix = "test",
+              status = Servable.Status.Serving,
+              usedApps = Nil,
+              message = "Ok",
+              host = Some("host"),
+              port = Some(9090)
+            )
+            DeferredResult.completed[IO, Servable](s)
+          }
 
         val spec = CustomModelMetricSpec(
           name = "test1",
@@ -473,7 +473,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
             )
           )
         )
-        appDeployer.deploy("test", graph, List.empty, Map.empty).flatMap { res =>
+        val app = appDeployer.deploy("test", graph, List.empty, Map.empty)
+
+        app.flatMap { res =>
           res.completed.get.map { finished =>
             Mockito.verify(monitoringService).deployServable(spec)
             assert(finished.name === "test")

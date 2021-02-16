@@ -1,9 +1,9 @@
 package io.hydrosphere.serving.manager.domain.contract
 
+import cats.Eq
 import cats.data.EitherNec
 import cats.implicits._
 import io.circe.generic.JsonCodec
-
 import io.hydrosphere.serving.proto.contract.field.ModelField
 import io.hydrosphere.serving.proto.contract.field.ModelField.TypeOrSubfields
 
@@ -14,6 +14,7 @@ sealed trait Field extends Product with Serializable {
 }
 
 object Field {
+  implicit val fieldEq: Eq[Field] = (x: Field, y: Field) => x.name === y.name && x.shape === y.shape
 
   @JsonCodec
   final case class Tensor(
