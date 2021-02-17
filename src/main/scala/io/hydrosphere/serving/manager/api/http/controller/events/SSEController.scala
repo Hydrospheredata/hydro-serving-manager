@@ -18,7 +18,6 @@ import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurati
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.ServableEvents
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol
 
 import streamz.converter._
 import io.circe.syntax._
@@ -27,58 +26,56 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class SSEController[F[_]](
-  applicationSubscriber: ApplicationEvents.Subscriber[F],
-  modelSubscriber: ModelVersionEvents.Subscriber[F],
-  servableSubscriber: ServableEvents.Subscriber[F],
-  metricSpecSubscriber: MetricSpecEvents.Subscriber[F],
-  depSubscriber: DeploymentConfigurationEvents.Subscriber[F]
-)(
-  implicit F: ConcurrentEffect[F],
-  cs: ContextShift[F],
-  ec: ExecutionContext,
-  actorSystem: ActorSystem,
+    applicationSubscriber: ApplicationEvents.Subscriber[F],
+    modelSubscriber: ModelVersionEvents.Subscriber[F],
+    servableSubscriber: ServableEvents.Subscriber[F],
+    metricSpecSubscriber: MetricSpecEvents.Subscriber[F],
+    depSubscriber: DeploymentConfigurationEvents.Subscriber[F]
+)(implicit
+    F: ConcurrentEffect[F],
+    cs: ContextShift[F],
+    ec: ExecutionContext,
+    actorSystem: ActorSystem
 ) extends AkkaHttpControllerDsl {
 
   implicit val am = ActorMaterializer.create(actorSystem)
 
-  def subscribe = pathPrefix("events") {
-    get {
-      val id = UUID.randomUUID().toString
-      complete {
-        val appsSSE = applicationSubscriber.subscribe
-          .flatMap(x => fs2.Stream.emits(SSEController.fromAppDiscovery(x)))
+  def subscribe =
+    pathPrefix("events") {
+      get {
+        val id = UUID.randomUUID().toString
+        complete {
+          val appsSSE = applicationSubscriber.subscribe
+            .flatMap(x => fs2.Stream.emits(SSEController.fromAppDiscovery(x)))
 
-        val modelSSE = modelSubscriber.subscribe
-          .flatMap(x => fs2.Stream.emits(SSEController.fromModelDiscovery(x)))
+          val modelSSE = modelSubscriber.subscribe
+            .flatMap(x => fs2.Stream.emits(SSEController.fromModelDiscovery(x)))
 
-        val servableSSE = servableSubscriber.subscribe
-          .flatMap(x => fs2.Stream.emits(SSEController.fromServableDiscovery(x)))
+          val servableSSE = servableSubscriber.subscribe
+            .flatMap(x => fs2.Stream.emits(SSEController.fromServableDiscovery(x)))
 
-        val msSSE = metricSpecSubscriber.subscribe
-          .flatMap(x => fs2.Stream.emits(SSEController.fromMetricSpecDiscovery(x)))
+          val msSSE = metricSpecSubscriber.subscribe
+            .flatMap(x => fs2.Stream.emits(SSEController.fromMetricSpecDiscovery(x)))
 
-        val depSSE = depSubscriber.subscribe
-          .flatMap(x => fs2.Stream.emits(SSEController.fromDepConfDiscovery(x)))
+          val depSSE = depSubscriber.subscribe
+            .flatMap(x => fs2.Stream.emits(SSEController.fromDepConfDiscovery(x)))
 
-        val joined = appsSSE merge modelSSE merge servableSSE merge msSSE merge depSSE
+          val joined = appsSSE merge modelSSE merge servableSSE merge msSSE merge depSSE
 
-        Source.fromGraph(joined.toSource)
-          .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
-          .watchTermination() { (_, b) =>
-            b.foreach { _ =>
-              logger.debug(s"SSE $id terminated")
-            }
-          }
+          Source
+            .fromGraph(joined.toSource)
+            .keepAlive(5.seconds, () => ServerSentEvent.heartbeat)
+            .watchTermination()((_, b) => b.foreach(_ => logger.debug(s"SSE $id terminated")))
+        }
       }
     }
-  }
 
   val routes = subscribe
 
 }
 
-object SSEController extends CompleteJsonProtocol {
-  def fromDepConfDiscovery(x: DeploymentConfigurationEvents.Event): List[ServerSentEvent] = {
+object SSEController {
+  def fromDepConfDiscovery(x: DeploymentConfigurationEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -96,9 +93,8 @@ object SSEController extends CompleteJsonProtocol {
           )
         }
     }
-  }
 
-  def fromServableDiscovery(x: ServableEvents.Event): List[ServerSentEvent] = {
+  def fromServableDiscovery(x: ServableEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -116,9 +112,8 @@ object SSEController extends CompleteJsonProtocol {
           )
         }
     }
-  }
 
-  def fromModelDiscovery(x: ModelVersionEvents.Event): List[ServerSentEvent] = {
+  def fromModelDiscovery(x: ModelVersionEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -136,9 +131,8 @@ object SSEController extends CompleteJsonProtocol {
           )
         }
     }
-  }
 
-  def fromAppDiscovery(x: ApplicationEvents.Event): List[ServerSentEvent] = {
+  def fromAppDiscovery(x: ApplicationEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -156,9 +150,8 @@ object SSEController extends CompleteJsonProtocol {
           )
         }
     }
-  }
 
-  def fromMetricSpecDiscovery(x: MetricSpecEvents.Event): List[ServerSentEvent] = {
+  def fromMetricSpecDiscovery(x: MetricSpecEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
       case DiscoveryEvent.ItemUpdate(items) =>
@@ -176,5 +169,4 @@ object SSEController extends CompleteJsonProtocol {
           )
         }
     }
-  }
 }

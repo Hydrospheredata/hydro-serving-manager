@@ -6,13 +6,11 @@ import doobie._
 import doobie.implicits._
 import doobie.implicits.javatime._
 import doobie.postgres.implicits._
-import io.hydrosphere.serving.manager.util.SprayDoobie._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableEvents, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelVersionRepository.ModelVersionRow
-import io.hydrosphere.serving.manager.infrastructure.protocol.CompleteJsonProtocol._
 import io.hydrosphere.serving.manager.util.CollectionOps._
 import cats.data.NonEmptyList
 import cats.data.OptionT
@@ -30,21 +28,22 @@ object DBServableRepository {
 
   @JsonCodec
   case class ServableRow(
-    service_name: String,
-    model_version_id: Long,
-    status_text: String,
-    host: Option[String],
-    port: Option[Int],
-    status: String,
-    metadata: Option[String],
-    deployment_configuration: Option[String]
+      service_name: String,
+      model_version_id: Long,
+      status_text: String,
+      host: Option[String],
+      port: Option[Int],
+      status: String,
+      metadata: Option[String],
+      deployment_configuration: Option[String]
   )
 
-  type JoinedServableRow = (ServableRow, ModelVersionRow, ModelRow, Option[DeploymentConfiguration], Option[List[String]])
+  type JoinedServableRow =
+    (ServableRow, ModelVersionRow, ModelRow, Option[DeploymentConfiguration], Option[List[String]])
 
   Read[(ServableRow, ModelVersionRow)]
 
-  def fromServable(s: Servable): ServableRow = {
+  def fromServable(s: Servable): ServableRow =
     ServableRow(
       service_name = s.fullName,
       model_version_id = s.modelVersion.id,
@@ -55,45 +54,47 @@ object DBServableRepository {
       metadata = s.metadata.maybeEmpty.map(_.asJson.noSpaces),
       deployment_configuration = s.deploymentConfiguration.map(_.name)
     )
-  }
 
   def toServable(
-    sr: ServableRow,
-    mvr: ModelVersionRow,
-    mr: ModelRow,
-    deploymentConfig: Option[DeploymentConfiguration],
-    apps: Option[List[String]]) = {
+      sr: ServableRow,
+      mvr: ModelVersionRow,
+      mr: ModelRow,
+      deploymentConfig: Option[DeploymentConfiguration],
+      apps: Option[List[String]]
+  ) = {
 
     val suffix = Servable.extractSuffix(mr.name, mvr.model_version, sr.service_name)
     val status =
       Servable.Status.withNameInsensitiveOption(sr.status).getOrElse(Servable.Status.NotAvailable)
 
-    DBModelVersionRepository.toModelVersion(mvr, mr).flatMap(mvr =>
-      mvr match {
-        case imv: ModelVersion.Internal =>
-          Right(
-            Servable(
-              modelVersion = imv,
-              nameSuffix = suffix,
-              status = status,
-              usedApps = apps.getOrElse(Nil),
-              metadata = sr.metadata
-                .flatMap(m => m.parseJsonAs[Map[String, String]].toOption)
-                .getOrElse(Map.empty),
-              message = sr.status_text,
-              host = sr.host,
-              port = sr.port,
-              deploymentConfiguration = deploymentConfig
+    DBModelVersionRepository
+      .toModelVersion(mvr, mr)
+      .flatMap(mvr =>
+        mvr match {
+          case imv: ModelVersion.Internal =>
+            Right(
+              Servable(
+                modelVersion = imv,
+                nameSuffix = suffix,
+                status = status,
+                usedApps = apps.getOrElse(Nil),
+                metadata = sr.metadata
+                  .flatMap(m => m.parseJsonAs[Map[String, String]].toOption)
+                  .getOrElse(Map.empty),
+                message = sr.status_text,
+                host = sr.host,
+                port = sr.port,
+                deploymentConfiguration = deploymentConfig
+              )
             )
-          )
-        case emv: ModelVersion.External =>
-          Left(
-            DomainError.internalError(
-              s"Impossible Servable ${sr.service_name} with external ModelVersion: ${emv}"
+          case emv: ModelVersion.External =>
+            Left(
+              DomainError.internalError(
+                s"Impossible Servable ${sr.service_name} with external ModelVersion: ${emv}"
+              )
             )
-          )
-      }
-    )
+        }
+      )
   }
 
   def toServableT = (toServable _).tupled
@@ -148,7 +149,7 @@ object DBServableRepository {
     frag.query[JoinedServableRow]
   }
 
-  def findForModelVersionQ(versionId: Long) = {
+  def findForModelVersionQ(versionId: Long) =
     sql"""
          |SELECT *, (SELECT array_agg(application_name) AS used_apps FROM hydro_serving.application WHERE service_name = ANY(used_servables)) FROM hydro_serving.servable
          | LEFT JOIN hydro_serving.model_version ON hydro_serving.servable.model_version_id = hydro_serving.model_version.model_version_id
@@ -156,52 +157,53 @@ object DBServableRepository {
          | LEFT JOIN hydro_serving.deployment_configuration ON hydro_serving.servable.deployment_configuration = hydro_serving.deployment_configuration.name
          |   WHERE hydro_serving.servable.model_version_id = $versionId
       """.stripMargin.query[JoinedServableRow]
-  }
 
-  def make[F[_]]()(implicit F: Bracket[F, Throwable], tx: Transactor[F], servablePub: ServableEvents.Publisher[F],
-  ) = new ServableRepository[F] {
-    override def findForModelVersion(versionId: Long): F[List[Servable]] = {
-      for {
-        rows <- findForModelVersionQ(versionId).to[List].transact(tx)
-      } yield rows.map(x => toServableT(x).toOption).collect {
-        case Some(x) => x
+  def make[F[_]]()(implicit
+      F: Bracket[F, Throwable],
+      tx: Transactor[F],
+      servablePub: ServableEvents.Publisher[F]
+  ) =
+    new ServableRepository[F] {
+      override def findForModelVersion(versionId: Long): F[List[Servable]] =
+        for {
+          rows <- findForModelVersionQ(versionId).to[List].transact(tx)
+        } yield rows.map(x => toServableT(x).toOption).collect {
+          case Some(x) => x
+        }
+
+      override def all(): F[List[Servable]] =
+        for {
+          rows <- allQ.to[List].transact(tx)
+        } yield rows.map(x => toServableT(x).toOption).collect {
+          case Some(x) => x
+        }
+
+      override def upsert(servable: Servable): F[Servable] = {
+        val row = fromServable(servable)
+        upsertQ(row).run
+          .transact(tx)
+          .as(servable)
+          .flatTap(servablePub.update)
+      }
+
+      override def delete(name: String): F[Int] =
+        deleteQ(name).run
+          .transact(tx)
+          .flatTap(_ => servablePub.remove(name))
+
+      override def get(name: String): F[Option[Servable]] =
+        for {
+          row <- getQ(name).option.transact(tx)
+        } yield row.flatMap(x => toServableT(x).toOption)
+
+      override def get(names: Seq[String]): F[List[Servable]] = {
+        val okCase = for {
+          nonEmptyNames <- OptionT.fromOption[F](NonEmptyList.fromList(names.toList))
+          rows          <- OptionT.liftF(getManyQ(nonEmptyNames).to[List].transact(tx))
+        } yield rows.map(x => toServableT(x).toOption).collect {
+          case Some(x) => x
+        }
+        okCase.getOrElse(Nil)
       }
     }
-
-    override def all(): F[List[Servable]] = {
-      for {
-        rows <- allQ.to[List].transact(tx)
-      } yield rows.map(x => toServableT(x).toOption).collect {
-        case Some(x) => x
-      }
-    }
-
-    override def upsert(servable: Servable): F[Servable] = {
-      val row = fromServable(servable)
-      upsertQ(row).run.transact(tx)
-        .as(servable)
-        .flatTap(servablePub.update)
-    }
-
-    override def delete(name: String): F[Int] = {
-      deleteQ(name).run.transact(tx)
-        .flatTap(_ => servablePub.remove(name))
-    }
-
-    override def get(name: String): F[Option[Servable]] = {
-      for {
-        row <- getQ(name).option.transact(tx)
-      } yield row.flatMap(x => toServableT(x).toOption)
-    }
-
-    override def get(names: Seq[String]): F[List[Servable]] = {
-      val okCase = for {
-        nonEmptyNames <- OptionT.fromOption[F](NonEmptyList.fromList(names.toList))
-        rows <- OptionT.liftF(getManyQ(nonEmptyNames).to[List].transact(tx))
-      } yield rows.map(x => toServableT(x).toOption).collect {
-        case Some(x) => x
-      }
-      okCase.getOrElse(Nil)
-    }
-  }
 }

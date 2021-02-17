@@ -2,7 +2,7 @@ import sbt._
 
 object Dependencies {
   val akkaVersion       = "2.6.9"
-  val akkaHttpVersion   = "10.1.12"
+  val akkaHttpVersion   = "10.2.0"
   val log4j2Version     = "2.13.3"
   val postgresqlVersion = "42.2.4"
   val scalaTestVersion  = "3.2.2"
@@ -25,7 +25,7 @@ object Dependencies {
     "com.amazonaws" % "aws-java-sdk-route53" % awsSdkVersion
   )
 
-  lazy val kubernetesDependencies = Seq("io.skuber" %% "skuber" % "2.4.0")
+  lazy val kubernetesDependencies = Seq("io.skuber" %% "skuber" % "2.6.0")
 
   lazy val akkaDependencies = Seq(
     "com.typesafe.akka" %% "akka-actor"  % akkaVersion,
@@ -34,11 +34,10 @@ object Dependencies {
   )
 
   lazy val akkaHttpDependencies = Seq(
-    "com.typesafe.akka"            %% "akka-http-core"       % akkaHttpVersion,
-    "com.typesafe.akka"            %% "akka-http"            % akkaHttpVersion,
-    "com.typesafe.akka"            %% "akka-http-spray-json" % akkaHttpVersion,
-    "com.github.swagger-akka-http" %% "swagger-akka-http"    % "2.2.0" exclude ("javax.ws.rs", "jsr311-api"),
-    "ch.megard"                    %% "akka-http-cors"       % "1.0.0"
+    "com.typesafe.akka"            %% "akka-http-core"    % akkaHttpVersion,
+    "com.typesafe.akka"            %% "akka-http"         % akkaHttpVersion,
+    "com.github.swagger-akka-http" %% "swagger-akka-http" % "2.2.0" exclude ("javax.ws.rs", "jsr311-api"),
+    "ch.megard"                    %% "akka-http-cors"    % "1.0.0"
   )
 
   lazy val grpcDependencies = Seq(
