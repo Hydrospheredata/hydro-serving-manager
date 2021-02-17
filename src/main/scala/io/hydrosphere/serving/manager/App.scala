@@ -45,7 +45,6 @@ import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.util.random.RNG
 import io.hydrosphere.serving.manager.util.{FileUtils, UUIDGenerator}
 import org.apache.commons.io.IOUtils
-import spray.json._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
