@@ -25,7 +25,7 @@ object Dependencies {
     "com.amazonaws" % "aws-java-sdk-route53" % awsSdkVersion
   )
 
-  lazy val kubernetesDependencies = Seq("io.skuber" %% "skuber" % "2.4.0")
+  lazy val kubernetesDependencies = Seq("io.skuber" %% "skuber" % "2.6.0")
 
   lazy val akkaDependencies = Seq(
     "com.typesafe.akka" %% "akka-actor"  % akkaVersion,
