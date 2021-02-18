@@ -12,6 +12,10 @@ import io.circe.syntax._
 import cats.implicits._
 import scala.reflect.runtime.universe.TypeTag
 
+import doobie.implicits.javasql._
+import java.sql.Timestamp
+import java.time.Instant
+
 object Metas {
 
   // TODO: AnyVal
@@ -54,4 +58,5 @@ object Metas {
     decode[ApplicationGraph](str).leftMap(_.getMessage)
   }
 
+  implicit val natMeta: Meta[Instant] = Meta[Timestamp].imap(_.toInstant)(Timestamp.from(_))
 }
