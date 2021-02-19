@@ -8,8 +8,6 @@ import cats.data.NonEmptyList
 
 import doobie._
 import doobie.implicits._
-import doobie.implicits.javatime._
-import doobie.implicits.javasql._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
@@ -52,26 +50,6 @@ object DBModelVersionRepository {
       monitoring_configuration: Json
   )
 
-  final case class ModelVersionRow2(
-      model_version_id: Long,
-      model_id: Long,
-      finished_timestamp: Option[Instant],
-      model_version: Long,
-      model_contract: Json,
-      image_name: String,
-      image_tag: String,
-      image_sha256: Option[String],
-      runtime_name: String,
-      runtime_version: String,
-      status: String,
-      profile_types: Option[String],
-      install_command: Option[String],
-      metadata: Option[String],
-      is_external: Boolean,
-      monitoring_configuration: Json
-  )
-
-  Read[ModelVersionRow2]
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow)
 
   def toModelVersion(mvr: ModelVersionRow, mr: ModelRow): Either[Throwable, ModelVersion] = {
