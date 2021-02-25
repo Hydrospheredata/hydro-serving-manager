@@ -8,9 +8,72 @@ import io.hydrosphere.serving.proto.contract.tensor.definitions.{
   Shape,
   StringTensor
 }
-import io.circe.generic.auto._, io.circe.syntax._
+import io.circe.syntax._
+import io.circe.parser._
+import io.hydrosphere.serving.manager.domain.contract.DataType.DT_INT64
+import io.hydrosphere.serving.manager.domain.contract.Field.Tensor
+import io.hydrosphere.serving.manager.domain.contract.TensorShape
 
 class TensorJson extends GenericUnitTest {
+
+  describe("Json") {
+    it("with shape equals null should be decoded as Tensor with Dynamic shape") {
+      val rawJson = """{
+                      |			"name": "input",
+                      |			"profile": "NUMERICAL",
+                      |			"shape": null,
+                      |			"dtype": "DT_INT64"
+                      |		}""".stripMargin
+
+      val tensor = decode[Tensor](rawJson)
+
+      assert(tensor.isRight)
+      assert(tensor.right.get.shape == TensorShape.Dynamic)
+    }
+
+    it("with shape as object with dims field should be decoded as Tensor with Static shape") {
+      val rawJson = """{
+                      |			"name": "input",
+                      |			"profile": "NUMERICAL",
+                      |			"shape": {"dims": [1,2,3]},
+                      |			"dtype": "DT_INT64"
+                      |		}""".stripMargin
+
+      val tensor = decode[Tensor](rawJson)
+
+      assert(tensor.isRight)
+      assert(tensor.right.get.shape == TensorShape.Static(List(1, 2, 3)))
+    }
+
+    it("with shape as object with empty dims array should be decoded as Tensor with Static shape") {
+      val rawJson = """{
+                      |			"name": "input",
+                      |			"profile": "NUMERICAL",
+                      |			"shape": {"dims": []},
+                      |			"dtype": "DT_INT64"
+                      |		}""".stripMargin
+
+      val tensor = decode[Tensor](rawJson)
+
+      assert(tensor.isRight)
+      assert(tensor.right.get.shape == TensorShape.Static(List()))
+    }
+  }
+
+  describe("Tensor") {
+    it("with Dynamic shape should encoded correctly") {
+      val tensor = Tensor("input", DT_INT64, TensorShape.Dynamic, None)
+      val expectedRawJson =
+        """{"dtype":"DT_INT64","name":"input","profile":null,"shape":null}""".stripMargin
+      assert(tensor.asJson.noSpacesSortKeys.stripMargin === expectedRawJson)
+    }
+    it("with Static shape should encoded correctly") {
+      val tensor = Tensor("input", DT_INT64, TensorShape.Static(List(1, 2, 3)), None)
+      val expectedRawJson =
+        """{"dtype":"DT_INT64","name":"input","profile":null,"shape":{"dims":[1,2,3]}}""".stripMargin
+      assert(tensor.asJson.noSpacesSortKeys.stripMargin === expectedRawJson)
+    }
+  }
 
   describe("TensorJsonLens") {
     it("should convert matrix[1, 2, 1, 2]") {
