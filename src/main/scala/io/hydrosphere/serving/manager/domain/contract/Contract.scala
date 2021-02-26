@@ -9,6 +9,7 @@ import io.hydrosphere.serving.proto.contract.signature.ModelSignature
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.InvalidRequest
 import io.hydrosphere.serving.manager.domain.contract.DataType.DT_INT64
+import io.hydrosphere.serving.manager.infrastructure.protocol.FieldDerivation._
 
 @JsonCodec
 final case class Signature(

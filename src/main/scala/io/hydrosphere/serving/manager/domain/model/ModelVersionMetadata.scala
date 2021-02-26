@@ -21,13 +21,7 @@ object ModelVersionMetadata {
   def combineMetadata(
       fetcherResult: Option[FetcherResult],
       upload: ModelUploadMetadata
-  ): Option[ModelVersionMetadata] = {
-    val x = upload.signature.orElse(fetcherResult.map(_.modelSignature))
-    val y =
-      fetcherResult.map(_.metadata).getOrElse(Map.empty) ++ upload.metadata.getOrElse(Map.empty)
-    val z = upload.monitoringConfiguration.getOrElse(MonitoringConfiguration())
-    val w = 1
-
+  ): Option[ModelVersionMetadata] =
     for {
       signature <- upload.signature.orElse(fetcherResult.map(_.modelSignature))
       metadata =
@@ -41,5 +35,4 @@ object ModelVersionMetadata {
       metadata = metadata,
       monitoringConfiguration = monitoringConfiguration
     )
-  }
 }
