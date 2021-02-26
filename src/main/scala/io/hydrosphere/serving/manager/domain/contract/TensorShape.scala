@@ -9,7 +9,6 @@ import cats.syntax.eq._
   * If Some, then acts like a numpy ndarray shape
   * If None, then there is no static shape. Checks disabled.
   */
-@JsonCodec
 sealed trait TensorShape extends Product with Serializable
 
 case object TensorShape {
