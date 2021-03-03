@@ -11,7 +11,7 @@ case class ModelUploadMetadata(
     name: String,
     runtime: DockerImage,
     hostSelectorName: Option[String] = None,
-    signature: Option[Signature] = None,
+    modelSignature: Option[Signature] = None,
     profileTypes: Option[Map[String, DataProfileType]] = None,
     installCommand: Option[String] = None,
     metadata: Option[Map[String, String]] = None,

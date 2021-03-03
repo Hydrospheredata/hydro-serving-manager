@@ -23,7 +23,7 @@ object ModelVersionMetadata {
       upload: ModelUploadMetadata
   ): Option[ModelVersionMetadata] =
     for {
-      signature <- upload.signature.orElse(fetcherResult.map(_.modelSignature))
+      signature <- upload.modelSignature.orElse(fetcherResult.map(_.modelSignature))
       metadata =
         fetcherResult.map(_.metadata).getOrElse(Map.empty) ++ upload.metadata.getOrElse(Map.empty)
       monitoringConfiguration = upload.monitoringConfiguration.getOrElse(MonitoringConfiguration())
