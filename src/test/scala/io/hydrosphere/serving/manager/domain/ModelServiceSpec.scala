@@ -179,7 +179,7 @@ class ModelServiceSpec extends GenericUnitTest {
           name = modelName,
           runtime = modelRuntime,
           hostSelectorName = None,
-          signature = Some(signature),
+          modelSignature = Some(signature),
           profileTypes = None,
           installCommand = None
         )
@@ -271,7 +271,7 @@ class ModelServiceSpec extends GenericUnitTest {
           name = modelName,
           runtime = modelRuntime,
           hostSelectorName = None,
-          signature = Some(signature),
+          modelSignature = Some(signature),
           profileTypes = None
         )
         println(upload)
@@ -329,7 +329,7 @@ class ModelServiceSpec extends GenericUnitTest {
           name = "upload-name",
           runtime = DockerImage("test", "test"),
           hostSelectorName = None,
-          signature = Signature.defaultSignature.some,
+          modelSignature = Signature.defaultSignature.some,
           profileTypes = Some(Map("a" -> IMAGE)),
           installCommand = Some("echo hello"),
           metadata = Some(Map("author" -> "me"))
@@ -361,7 +361,7 @@ class ModelServiceSpec extends GenericUnitTest {
           name = "upload-name",
           runtime = DockerImage("test", "test"),
           hostSelectorName = None,
-          signature = None,
+          modelSignature = None,
           profileTypes = Some(Map("a" -> IMAGE)),
           installCommand = Some("echo hello"),
           metadata = Some(Map("author" -> "me", "overriden" -> "true"))
