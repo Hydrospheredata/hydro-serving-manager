@@ -92,6 +92,7 @@ object DBApplicationRepository {
       Map[String, DeploymentConfiguration]
   )
 
+  @JsonCodec
   final case class ApplicationRow(
       id: Long,
       application_name: String,
@@ -322,13 +323,15 @@ object DBApplicationRepository {
           .fromList(app)
           .fold(F.pure[AppInfo](Map.empty, Map.empty, Map.empty))(fetchAppsInfo)
 
+      // TODO: Servable name
       def fetchAppsInfo(apps: NonEmptyList[ApplicationRow]): F[AppInfo] = {
-        val graphsOrError = apps.traverse(ar => decode[ApplicationGraph](ar.execution_graph))
-        val nodesOrError =
+        val graphsOrError: Either[circe.Error, NonEmptyList[DBGraph]] =
+          apps.traverse(ar => decode[DBGraph](ar.execution_graph))
+        val nodesOrError: Either[circe.Error, NonEmptyList[DBGraphServable]] =
           graphsOrError.map(list => list.flatMap(ag => ag.stages.flatMap(_.variants)))
 
         for {
-          ids <- F.fromEither(nodesOrError.map(n => n.map(_.modelVersion.id)))
+          ids <- F.fromEither(nodesOrError.map(n => n.map(_.modelVersionId)))
           versions <-
             DBModelVersionRepository
               .findVersionsQ(ids)
@@ -339,7 +342,7 @@ object DBApplicationRepository {
               list.collect { case x: ModelVersion.Internal => x }
             })
           versionMap = internalVersions.map(v => v.id -> v).toMap
-          servableNames <- F.fromEither(nodesOrError.map(n => n.map(x => x.servable.get.fullName)))
+          servableNames <- F.fromEither(nodesOrError.map(n => n.map(x => x.servableName.get)))
           servables <-
             DBServableRepository
               .getManyQ(servableNames)
@@ -354,8 +357,8 @@ object DBApplicationRepository {
           deploymentNames <- F.fromEither(
             nodesOrError.map(n =>
               n.map(y =>
-                y.requiredDeploymentConfig match {
-                  case Some(dc) => dc.name
+                y.requiredDeployConfig match {
+                  case Some(dc) => dc
                 }
               )
             )

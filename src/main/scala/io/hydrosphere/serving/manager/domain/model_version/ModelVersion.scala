@@ -19,7 +19,6 @@ sealed trait ModelVersion extends Product with Serializable {
 }
 
 object ModelVersion {
-
   @JsonCodec
   case class Internal(
       id: Long,
