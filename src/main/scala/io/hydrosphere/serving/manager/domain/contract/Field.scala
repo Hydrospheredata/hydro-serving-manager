@@ -7,6 +7,7 @@ import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.proto.contract.field.ModelField
 import io.hydrosphere.serving.proto.contract.field.ModelField.TypeOrSubfields
 import io.hydrosphere.serving.manager.infrastructure.protocol.TensorShapeDerivation._
+import io.hydrosphere.serving.manager.infrastructure.protocol.FieldDerivation._
 
 @JsonCodec
 sealed trait Field extends Product with Serializable {
