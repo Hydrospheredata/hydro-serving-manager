@@ -17,6 +17,7 @@ case class DockerImage(
   def replaceHost(host: String): Either[Throwable, DockerImage] = name match {
     case DockerImage.referenceRegexp(_, _, capturedName, _, _) => DockerImage(s"$host/$capturedName", tag, sha256).asRight
     case x => new Exception(s"Can't parse image name $x").asLeft
+  }
 }
 
 object DockerImage {
