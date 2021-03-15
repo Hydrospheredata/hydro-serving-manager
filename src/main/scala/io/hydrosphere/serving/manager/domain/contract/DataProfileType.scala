@@ -6,6 +6,7 @@ import io.hydrosphere.serving.proto.contract.types.{DataProfileType => ProtoData
 sealed trait DataProfileType extends EnumEntry
 
 case object DataProfileType extends Enum[DataProfileType] with CirceEnum[DataProfileType] {
+  case object NONE extends DataProfileType
 
   case object CATEGORICAL extends DataProfileType
 
