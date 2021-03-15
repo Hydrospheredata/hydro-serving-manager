@@ -108,7 +108,7 @@ object KubernetesDriver {
     val podConf = crc.flatMap(_.pod)
     val containerConf = crc.flatMap(_.container)
 
-    val image = dockerImage.replaceUser(dockerRepoHost).toTry.get
+    val image = dockerImage.replaceHost(dockerRepoHost).toTry.get
 
     val depEnvs = containerConf.flatMap(_.env).getOrElse(Map.empty) ++
       Map(DefaultConstants.ENV_APP_PORT -> DefaultConstants.DEFAULT_APP_PORT.toString)
