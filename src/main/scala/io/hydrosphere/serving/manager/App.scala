@@ -28,6 +28,7 @@ import io.hydrosphere.serving.manager.api.http.controller.{
 }
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
 import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
+import io.hydrosphere.serving.manager.domain.application.migrations.ApplicationSignatureMigrationTool
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.deploy_config.{
   DeploymentConfigurationEvents,
@@ -54,7 +55,8 @@ case class App[F[_]](
     core: Core[F],
     grpcServer: GrpcServer[F],
     httpServer: HttpServer[F],
-    transactor: Transactor[F]
+    transactor: Transactor[F],
+    migrationTool: ApplicationSignatureMigrationTool[F]
 )
 
 object App {
@@ -107,6 +109,15 @@ object App {
 
         Resource.liftF(Core.make[F](config))
       }
+      migrator = {
+        implicit val tx1 = tx
+        ApplicationSignatureMigrationTool.default(
+          core.repos.appRepo,
+          core.repos.versionRepo,
+          core.repos.servableRepo,
+          core.repos.depConfRepository
+        )
+      }
       grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
       discoveryService = new GrpcServingDiscovery[F](
         appPubSub._2,
@@ -151,6 +162,6 @@ object App {
         externalModelRoutes = externalModelController.routes,
         deploymentConfRoutes = depConfController.routes
       )
-    } yield App(config, core, grpc, http, tx)
+    } yield App(config, core, grpc, http, tx, migrator)
   }
 }
