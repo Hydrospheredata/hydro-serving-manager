@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager.domain.application.migrations
 
-import cats.MonadError
 import cats.effect.Bracket
 import cats.implicits._
 import doobie.util.transactor.Transactor
@@ -94,54 +93,57 @@ object ApplicationSignatureMigrationTool extends Logging {
           }
         } yield ()
       }
-    }
 
-  def restoreApp[F[_]](
-      ar: ApplicationRow,
-      versions: Map[Long, ModelVersion.Internal],
-      servables: Map[String, Servable],
-      deploymentConfigs: Map[String, DeploymentConfiguration]
-  )(implicit F: MonadError[F, DomainError]): F[Application] =
-    for {
-      dbGraph <- F.fromEither(
-        decode[DBGraph](ar.execution_graph).leftMap(_ => DomainError.internalError("asd"))
-      )
-      versions <- dbGraph.stages.traverse { stage =>
+      def restoreApp(
+          ar: ApplicationRow,
+          versions: Map[Long, ModelVersion.Internal],
+          servables: Map[String, Servable],
+          deploymentConfigs: Map[String, DeploymentConfiguration]
+      ): Either[DomainError, Application] =
         for {
-          variants <- stage.variants.traverse { variant =>
+          dbGraph <- decode[DBGraph](ar.execution_graph).leftMap(_ =>
+            DomainError.internalError("Couldn't decode execution graph")
+          )
+          versions <- dbGraph.stages.traverse { stage =>
             for {
-              version <- F.fromOption(
-                versions.get(variant.modelVersionId),
-                DomainError.internalError("Can't find model version from model variant")
-              )
-              servable   = variant.servableName.flatMap(servables.get(_))
-              deployment = variant.requiredDeployConfig.flatMap(deploymentConfigs.get)
-            } yield ApplicationServable(
-              modelVersion = version,
-              weight = variant.weight,
-              servable = servable,
-              requiredDeploymentConfig = deployment
-            )
+              variants <- stage.variants.traverse { variant =>
+                for {
+                  version <- versions.get(variant.modelVersionId) match {
+                    case Some(value) => value.asRight
+                    case None =>
+                      DomainError
+                        .internalError("Couldn't find model version for model variant")
+                        .asLeft
+                  }
+                  servable   = variant.servableName.flatMap(servables.get)
+                  deployment = variant.requiredDeployConfig.flatMap(deploymentConfigs.get)
+                } yield ApplicationServable(
+                  modelVersion = version,
+                  weight = variant.weight,
+                  servable = servable,
+                  requiredDeploymentConfig = deployment
+                )
+              }
+            } yield variants
           }
-        } yield variants
-      }
-      graphOrError <- F.fromEither(GraphComposer.compose(versions))
-      (graph, signature) = graphOrError
-      kafkaStreams <- F.fromEither(
-        ar.kafka_streams.traverse(
-          decode[ApplicationKafkaStream](_).leftMap(_ => DomainError.internalError("error"))
+          graphOrError <- GraphComposer.compose(versions)
+          (graph, signature) = graphOrError
+          kafkaStreams <- ar.kafka_streams.traverse(
+            decode[ApplicationKafkaStream](_).leftMap(_ =>
+              DomainError.internalError("Couldn't decode kafka stream")
+            )
+          )
+        } yield Application(
+          id = ar.id,
+          name = ar.application_name,
+          signature = signature,
+          namespace = ar.namespace,
+          status = Application.Status
+            .withNameInsensitiveOption(ar.status)
+            .getOrElse(Application.Status.Failed),
+          statusMessage = ar.status_message,
+          kafkaStreaming = kafkaStreams,
+          graph = graph
         )
-      )
-    } yield Application(
-      id = ar.id,
-      name = ar.application_name,
-      signature = signature,
-      namespace = ar.namespace,
-      status = Application.Status
-        .withNameInsensitiveOption(ar.status)
-        .getOrElse(Application.Status.Failed),
-      statusMessage = ar.status_message,
-      kafkaStreaming = kafkaStreams,
-      graph = graph
-    )
+    }
 }

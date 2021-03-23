@@ -331,7 +331,8 @@ object DBApplicationRepository {
           graphsOrError.map(list => list.flatMap(ag => ag.stages.flatMap(_.variants)))
 
         for {
-          ids <- F.fromEither(nodesOrError.map(n => n.map(_.modelVersionId)))
+          nodesOrError <- F.fromEither(nodesOrError)
+          ids = nodesOrError.map(n => n.modelVersionId)
           versions <-
             DBModelVersionRepository
               .findVersionsQ(ids)
@@ -341,12 +342,10 @@ object DBApplicationRepository {
             F.fromEither(versions.traverse(DBModelVersionRepository.toModelVersionT).map { list =>
               list.collect { case x: ModelVersion.Internal => x }
             })
-          versionMap = internalVersions.map(v => v.id -> v).toMap
-          servableNames <- F.fromEither(nodesOrError)
+          versionMap    = internalVersions.map(v => v.id -> v).toMap
+          servableNames = nodesOrError.toList.flatMap(_.servableName)
           servables <- {
-            val list = servableNames.toList.flatMap(_.servableName);
-
-            NonEmptyList.fromList(list) match {
+            NonEmptyList.fromList(servableNames) match {
               case Some(value) =>
                 DBServableRepository
                   .getManyQ(value)
@@ -360,14 +359,10 @@ object DBApplicationRepository {
               case None => F.pure(List.empty)
             }
           }
-          servableMap = servables.map(x => x.fullName -> x).toMap
-          deploymentNames <- F.fromEither(
-            nodesOrError.map(graphServable => graphServable)
-          )
+          servableMap     = servables.map(x => x.fullName -> x).toMap
+          deploymentNames = nodesOrError.toList.flatMap(s => s.requiredDeployConfig)
           deployments <- {
-            val listOfNames = deploymentNames.toList.flatMap(_.requiredDeployConfig)
-
-            NonEmptyList.fromList(listOfNames) match {
+            NonEmptyList.fromList(deploymentNames) match {
               case Some(value) =>
                 DBDeploymentConfigurationRepository
                   .getManyQ(value)
