@@ -11,7 +11,6 @@ import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.circe
 import io.circe.generic.JsonCodec
-
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.contract.Signature
@@ -21,6 +20,7 @@ import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.util.CollectionOps._
 import io.circe.parser._
 import io.circe.syntax._
+import io.hydrosphere.serving.manager.infrastructure.db.Metas._
 
 @JsonCodec
 final case class DBGraphServable(
@@ -331,7 +331,8 @@ object DBApplicationRepository {
           graphsOrError.map(list => list.flatMap(ag => ag.stages.flatMap(_.variants)))
 
         for {
-          ids <- F.fromEither(nodesOrError.map(n => n.map(_.modelVersionId)))
+          nodesOrError <- F.fromEither(nodesOrError)
+          ids = nodesOrError.map(n => n.modelVersionId)
           versions <-
             DBModelVersionRepository
               .findVersionsQ(ids)
@@ -341,33 +342,36 @@ object DBApplicationRepository {
             F.fromEither(versions.traverse(DBModelVersionRepository.toModelVersionT).map { list =>
               list.collect { case x: ModelVersion.Internal => x }
             })
-          versionMap = internalVersions.map(v => v.id -> v).toMap
-          servableNames <- F.fromEither(nodesOrError.map(n => n.map(x => x.servableName.get)))
-          servables <-
-            DBServableRepository
-              .getManyQ(servableNames)
-              .to[List]
-              .map(list =>
-                list.map(x => DBServableRepository.toServableT(x)).collect {
-                  case Right(x) => x
-                }
-              )
-              .transact(tx)
-          servableMap = servables.map(x => x.fullName -> x).toMap
-          deploymentNames <- F.fromEither(
-            nodesOrError.map(n =>
-              n.map(y =>
-                y.requiredDeployConfig match {
-                  case Some(dc) => dc
-                }
-              )
-            )
-          )
-          deployments <-
-            DBDeploymentConfigurationRepository
-              .getManyQ(deploymentNames)
-              .to[List]
-              .transact(tx)
+          versionMap    = internalVersions.map(v => v.id -> v).toMap
+          servableNames = nodesOrError.toList.flatMap(_.servableName)
+          servables <- {
+            NonEmptyList.fromList(servableNames) match {
+              case Some(value) =>
+                DBServableRepository
+                  .getManyQ(value)
+                  .to[List]
+                  .map(list =>
+                    list.map(x => DBServableRepository.toServableT(x)).collect {
+                      case Right(x) => x
+                    }
+                  )
+                  .transact(tx)
+              case None => F.pure(List.empty)
+            }
+          }
+          servableMap     = servables.map(x => x.fullName -> x).toMap
+          deploymentNames = nodesOrError.toList.flatMap(s => s.requiredDeployConfig)
+          deployments <- {
+            NonEmptyList.fromList(deploymentNames) match {
+              case Some(value) =>
+                DBDeploymentConfigurationRepository
+                  .getManyQ(value)
+                  .to[List]
+                  .transact(tx)
+              case None => F.pure(List.empty)
+            }
+          }
+
           deploymentMap = deployments.map(x => x.name -> x).toMap
         } yield (versionMap, servableMap, deploymentMap)
       }
