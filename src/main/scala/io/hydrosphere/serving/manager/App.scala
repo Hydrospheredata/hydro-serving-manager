@@ -37,7 +37,7 @@ import io.hydrosphere.serving.manager.domain.deploy_config.{
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
-import io.hydrosphere.serving.manager.domain.servable.ServableEvents
+import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.Database
 import io.hydrosphere.serving.manager.infrastructure.db.repository._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
@@ -98,14 +98,15 @@ object App {
         implicit val (servablePub, servableSub) = servablePubSub
         implicit val (metricPub, metricSub)     = monitoringPubSub
         implicit val (depPub, depSUb)           = depPubSub
-        implicit val hsRepo                     = new DBDeploymentConfigurationRepository()
-        implicit val modelRepo                  = DBModelRepository.make()
-        implicit val modelVersionRepo           = DBModelVersionRepository.make()
-        implicit val servableRepo               = DBServableRepository.make()
-        implicit val appRepo                    = DBApplicationRepository.make()
-        implicit val buildLogRepo               = DBBuildLogRepository.make()
-        implicit val monitoringRepo             = DBMonitoringRepository.make()
-        implicit val imageRepo                  = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
+        implicit val hsRepo =
+          DeploymentConfigurationRepository.make(config.defaultDeploymentConfiguration)
+        implicit val modelRepo        = DBModelRepository.make()
+        implicit val modelVersionRepo = DBModelVersionRepository.make()
+        implicit val servableRepo     = ServableRepository.make(config.defaultDeploymentConfiguration)
+        implicit val appRepo          = DBApplicationRepository.make()
+        implicit val buildLogRepo     = DBBuildLogRepository.make()
+        implicit val monitoringRepo   = DBMonitoringRepository.make()
+        implicit val imageRepo        = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
 
         Resource.liftF(Core.make[F](config))
       }

@@ -60,5 +60,7 @@ package object deploy_config {
       hpa: Option[K8sHorizontalPodAutoscalerConfig]
   )
 
+  final val DEFAULT_DEPLOYMENT_CONFIG_NAME = "hydrosphere_manager_default"
+
   object DeploymentConfigurationEvents extends DiscoveryService[DeploymentConfiguration, String]
 }
