@@ -4,7 +4,11 @@ import cats.effect.Sync
 import com.spotify.docker.client.{DockerClient, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerRepositoryConfiguration
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
-import io.hydrosphere.serving.manager.infrastructure.image.repositories.{ECSImageRepository, LocalImageRepository, RemoteImageRepository}
+import io.hydrosphere.serving.manager.infrastructure.image.repositories.{
+  ECSImageRepository,
+  LocalImageRepository,
+  RemoteImageRepository
+}
 
 import scala.concurrent.ExecutionContext
 
@@ -15,14 +19,13 @@ trait ImageRepository[F[_]] {
 }
 
 object ImageRepository {
-  def fromConfig[F[_] : Sync](
-    dockerClient: DockerdClient[F],
-    dockerRepositoryConfiguration: DockerRepositoryConfiguration)
-    (implicit executionContext: ExecutionContext): ImageRepository[F] = {
+  def fromConfig[F[_]: Sync](
+      dockerClient: DockerdClient[F],
+      dockerRepositoryConfiguration: DockerRepositoryConfiguration
+  )(implicit executionContext: ExecutionContext): ImageRepository[F] =
     dockerRepositoryConfiguration match {
       case c: DockerRepositoryConfiguration.Remote => new RemoteImageRepository[F](dockerClient, c)
-      case c: DockerRepositoryConfiguration.Ecs => new ECSImageRepository[F](dockerClient, c)
-      case _ => new LocalImageRepository[F]
+      case c: DockerRepositoryConfiguration.Ecs    => new ECSImageRepository[F](dockerClient, c)
+      case DockerRepositoryConfiguration.Local     => new LocalImageRepository[F]
     }
-  }
 }

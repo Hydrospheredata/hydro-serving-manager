@@ -1,5 +1,6 @@
 package io.hydrosphere.serving.manager.config
 
+import cats.Show
 import cats.effect.Sync
 import cats.syntax.either._
 import com.amazonaws.regions.Regions
@@ -8,12 +9,10 @@ import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurati
 import pureconfig.error.CannotConvert
 import pureconfig.{ConfigReader, ConfigSource}
 import pureconfig.generic.auto._
-
-import java.nio.file.Path
+import cats.derived.semiauto
 
 case class ManagerConfiguration(
     application: ApplicationConfig,
-    localStorage: Option[Path],
     database: HikariConfiguration,
     cloudDriver: CloudDriverConfiguration,
     dockerRepository: DockerRepositoryConfiguration,
@@ -21,6 +20,10 @@ case class ManagerConfiguration(
 )
 
 object ManagerConfiguration {
+  implicit val show: Show[ManagerConfiguration] = {
+    implicit val depConfShow: Show[DeploymentConfiguration] = Show.fromToString
+    semiauto.show
+  }
   implicit val depConfigReader: ConfigReader[DeploymentConfiguration] =
     ConfigReader
       .fromString { str =>

@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager
 
-import java.nio.charset.StandardCharsets
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
@@ -41,11 +40,10 @@ import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableR
 import io.hydrosphere.serving.manager.infrastructure.db.Database
 import io.hydrosphere.serving.manager.infrastructure.db.repository._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
-import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
+import io.hydrosphere.serving.manager.infrastructure.grpc.GrpcChannel
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.util.random.RNG
-import io.hydrosphere.serving.manager.util.{FileUtils, UUIDGenerator}
-import org.apache.commons.io.IOUtils
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -69,10 +67,9 @@ object App {
     implicit val timeout                 = Timeout(5.minute)
     implicit val serviceExecutionContext = ExecutionContext.global
     implicit val grpcCtor                = GrpcChannel.plaintextFactory[F]
-//    implicit val predictionCtor          = PredictionClient.clientCtor[F](grpcCtor)
-    implicit val storageOps = StorageOps.default[F]
-    implicit val uuidGen    = UUIDGenerator.default[F]()
-    implicit val dc         = dockerClient
+    implicit val storageOps              = StorageOps.default[F]
+    implicit val uuidGen                 = UUIDGenerator.default[F]()
+    implicit val dc                      = dockerClient
     for {
       rngF <- Resource.liftF(RNG.default[F])
       cloudDriver =

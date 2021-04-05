@@ -3,9 +3,8 @@ package io.hydrosphere.serving.manager
 import cats.effect._
 import cats.implicits._
 import com.spotify.docker.client.DefaultDockerClient
-import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfiguration}
+import io.hydrosphere.serving.manager.config.ManagerConfiguration
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
-import io.hydrosphere.serving.manager.util.ReflectionUtils
 import org.apache.logging.log4j.scala.Logging
 
 object Boot extends IOApp with Logging {
@@ -13,7 +12,7 @@ object Boot extends IOApp with Logging {
     IO.suspend {
       for {
         configuration <- ManagerConfiguration.load[IO]()
-        _             <- IO(logger.info(s"Config loaded:\n${ReflectionUtils.prettyPrint(configuration)}"))
+        _             <- IO(logger.info(configuration.show))
         dockerClient  <- IO(DefaultDockerClient.fromEnv().readTimeoutMillis(60 * 60 * 1000).build())
         wrappedClient <- DockerdClient.create[IO](dockerClient)
         _ <- App.make[IO](configuration, wrappedClient).use { app =>

@@ -96,21 +96,22 @@ object Dependencies {
     akkaCirceDependencies ++
     enumeratumDependencies ++
     Seq(
-      "com.github.julien-truffaut" %% "monocle-core"      % monocleV,
-      "com.github.julien-truffaut" %% "monocle-macro"     % monocleV, // only for Scala 2.13
-      "org.typelevel"              %% "cats-effect"       % catsV,
-      "org.tpolecat"               %% "doobie-core"       % "0.9.0",
-      "org.tpolecat"               %% "doobie-postgres"   % "0.9.0",
-      "org.tpolecat"               %% "doobie-scalatest"  % "0.9.0" % "test, it",
-      "com.zaxxer"                  % "HikariCP"          % "2.6.3", // doobie-hikari depends on hikari 3.3.1 which has weird pool retries.
-      "org.postgresql"              % "postgresql"        % postgresqlVersion,
-      "org.flywaydb"                % "flyway-core"       % "4.2.0",
-      "com.spotify"                 % "docker-client"     % "8.16.0" exclude ("ch.qos.logback", "logback-classic"),
-      "com.google.guava"            % "guava"             % "22.0",
-      "com.github.pureconfig"      %% "pureconfig"        % "0.14.0",
-      "co.fs2"                     %% "fs2-core"          % fs2,
-      "co.fs2"                     %% "fs2-io"            % fs2,
-      "com.github.krasserm"        %% "streamz-converter" % "0.13-RC4", // uses FS2 2.x.x,
-      "com.github.mpilquist"       %% "simulacrum"        % "0.19.0"
+//      "com.github.julien-truffaut" %% "monocle-core"      % monocleV,
+//      "com.github.julien-truffaut" %% "monocle-macro"     % monocleV, // only for Scala 2.13
+      "org.typelevel"         %% "kittens"           % "2.2.1",
+      "org.typelevel"         %% "cats-effect"       % catsV,
+      "org.tpolecat"          %% "doobie-core"       % "0.9.0",
+      "org.tpolecat"          %% "doobie-postgres"   % "0.9.0",
+      "org.tpolecat"          %% "doobie-scalatest"  % "0.9.0" % "test, it",
+      "com.zaxxer"             % "HikariCP"          % "2.6.3", // doobie-hikari depends on hikari 3.3.1 which has weird pool retries.
+      "org.postgresql"         % "postgresql"        % postgresqlVersion,
+      "org.flywaydb"           % "flyway-core"       % "4.2.0",
+      "com.spotify"            % "docker-client"     % "8.16.0" exclude ("ch.qos.logback", "logback-classic"),
+      "com.google.guava"       % "guava"             % "22.0",
+      "com.github.pureconfig" %% "pureconfig"        % "0.14.0",
+      "co.fs2"                %% "fs2-core"          % fs2,
+      "co.fs2"                %% "fs2-io"            % fs2,
+      "com.github.krasserm"   %% "streamz-converter" % "0.13-RC4", // uses FS2 2.x.x,
+      "com.github.mpilquist"  %% "simulacrum"        % "0.19.0"
     )
 }
