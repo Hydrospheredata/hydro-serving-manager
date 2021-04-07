@@ -26,8 +26,7 @@ fork in (Test, test) := true
 fork in (IntegrationTest, test) := true
 fork in (IntegrationTest, testOnly) := true
 
-enablePlugins(BuildInfoPlugin, sbtdocker.DockerPlugin)
-//addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
+enablePlugins(BuildInfoPlugin, DockerPlugin)
 
 configs(IntegrationTest)
 ManagerDev.settings
@@ -46,11 +45,13 @@ buildInfoOptions += BuildInfoOption.ToJson
 
 imageNames in docker := Seq(ImageName(s"hydrosphere/serving-manager:${version.value}"))
 dockerfile in docker := {
-  val jarFile: File       = sbt.Keys.`package`.in(Compile, packageBin).value
-  val classpath           = (dependencyClasspath in Compile).value
-  val dockerFilesLocation = baseDirectory.value / "src/main/docker/"
-  val jarTarget           = s"/hydro-serving/app/manager.jar"
-  val osName              = sys.props.get("os.name").getOrElse("unknown")
+  val jarFile: File       = (Compile / packageBin / sbt.Keys.`package`).value
+  val classpath           = (Compile / dependencyClasspath).value
+  val localConfigFile     = baseDirectory.value / "src" / "main" / "resources" / "application.conf"
+  val dockerFilesLocation = baseDirectory.value / "src" / "main" / "docker/"
+  val jarTarget           = "/app/manager.jar"
+  val libFolder           = "/app/lib/"
+  val defaultConfigPath   = "/app/config/application.conf"
 
   new sbtdocker.Dockerfile {
     // Base image
@@ -60,13 +61,14 @@ dockerfile in docker := {
     run("apk", "add", "jq")
     run("rm", "-rf", "/var/cache/apk/*")
 
-    add(dockerFilesLocation, "/hydro-serving/app/")
+    add(dockerFilesLocation, "/app/")
     // Add all files on the classpath
-    add(classpath.files, "/hydro-serving/app/lib/")
+    add(classpath.files, libFolder)
     // Add the JAR file
     add(jarFile, jarTarget)
+    add(localConfigFile, defaultConfigPath)
 
-    cmd("/hydro-serving/app/start.sh")
+    entryPointShell("/app/start.sh")
   }
 }
 
