@@ -62,7 +62,8 @@ object Signature {
   def toProto(signature: Signature): ModelSignature =
     ModelSignature(
       signatureName = signature.signatureName,
-      inputs = signature.inputs.toList.map(Field.toProto)
+      inputs = signature.inputs.toList.map(Field.toProto),
+      outputs = signature.outputs.toList.map(Field.toProto)
     )
 
   def fromProto(signature: ModelSignature): Either[DomainError, Signature] = {
