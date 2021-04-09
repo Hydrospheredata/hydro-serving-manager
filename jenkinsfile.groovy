@@ -126,6 +126,7 @@ def buildDocker(){
     //run build command and store build tag
     tagVersion = getVersion()
     sh script: "sbt --batch -DappVersion=$tagVersion docker", label: "Run build docker task";
+    sh script: "sbt --batch -DappVersion=latest docker", label: "Run build docker task";
 }
 
 
@@ -234,6 +235,8 @@ node('hydrocentral') {
  
                 buildDocker()
                 pushDocker(REGISTRYURL, SERVICEIMAGENAME+":$newVersion")
+                //Update latest tag
+                pushDocker(REGISTRYURL, SERVICEIMAGENAME+":latest")
                 //Update helm and docker-compose if release 
                 if (params.releaseType == 'global'){
                     releaseService(oldVersion, newVersion)
