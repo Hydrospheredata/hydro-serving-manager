@@ -61,7 +61,7 @@ object ApplicationSignatureMigrationTool extends Logging {
                   .traverse(servableRepo.get)
                   .map(list =>
                     list.collect {
-                      case Some(servable) => servable.fullName -> servable
+                      case Some(servable) => servable.name -> servable
                     }.toMap
                   )
               depNames = graph.stages.flatMap(_.variants).toList.flatMap(_.requiredDeployConfig)

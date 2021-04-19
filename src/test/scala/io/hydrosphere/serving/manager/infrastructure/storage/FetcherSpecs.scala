@@ -30,7 +30,6 @@ class FetcherSpecs extends GenericUnitTest {
         val fetchResult: IO[Option[FetcherResult]] = fetcher.fetch(model)
 
         fetchResult.map { model =>
-          println(model)
           model shouldBe defined
           assert(model.get.modelName === "scikit_model")
         }
@@ -137,7 +136,6 @@ class FetcherSpecs extends GenericUnitTest {
         fres.map { fetchResult =>
           assert(fetchResult.isDefined, fetchResult)
           val metadata = fetchResult.get
-          println(metadata)
           assert(metadata.modelName === "keras_fashion_mnist")
           assert(metadata.modelSignature === expectedSignature)
           assert(metadata.metadata === Map())

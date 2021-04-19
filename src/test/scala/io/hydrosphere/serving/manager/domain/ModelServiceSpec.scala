@@ -424,13 +424,13 @@ class ModelServiceSpec extends GenericUnitTest {
         )
         val servable = Servable(
           modelVersion = servableFailedVersion,
-          nameSuffix = "123",
+          name = "123",
           status = Servable.Status.NotServing,
           usedApps = Nil,
           metadata = Map.empty,
           host = None,
           port = None,
-          message = "asd"
+          message = "asd".some
         )
         val okModel = Model(3, "ok")
         val okVersion1 = ModelVersion.Internal(

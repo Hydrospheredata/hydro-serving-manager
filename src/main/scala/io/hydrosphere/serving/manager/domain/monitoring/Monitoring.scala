@@ -67,8 +67,8 @@ object Monitoring extends Logging {
         spec <- OptionT(repo.get(specId)).getOrElseF(F.raiseError(DomainError.NotFound(s"MetricSpec with id ${specId} not found")))
         _ <- repo.delete(specId)
         _ <- spec.config.servable.traverse { servable =>
-          logger.debug(s"Servable ${servable.fullName} is attached to MetricSpec ${specId}. Deleting...")
-          servableService.stop(servable.fullName)
+          logger.debug(s"Servable ${servable.name} is attached to MetricSpec ${specId}. Deleting...")
+          servableService.stop(servable.name)
         }
         _ = logger.debug("Send MetricSpec remove event")
       } yield spec
@@ -107,7 +107,7 @@ object Monitoring extends Logging {
               "metric-spec-target-name" -> mvTarget.fullName
             )
             monitorServable <- servableService.deploy(mvMonitor, depConf, servableMetadata)
-            deployedSpec = spec.copy(config = spec.config.copy(servable = monitorServable.started.some))
+            deployedSpec = spec.copy(config = spec.config.copy(servable = monitorServable.some))
             _ <- repo.upsert(deployedSpec)
           } yield deployedSpec
       }

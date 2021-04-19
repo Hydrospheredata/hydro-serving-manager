@@ -47,29 +47,29 @@ class ServableGCSpec extends GenericUnitTest {
 
       val servable = Servable(
         modelVersion = mv,
-        nameSuffix = "asdasd",
+        name = "asdasd",
         status = Servable.Status.Serving,
         usedApps = List.empty,
         port = Some(9090),
         host = Some("localhost"),
-        message = "ok"
+        message = "ok".some
       )
       val metricServable = Servable(
         modelVersion = mv,
-        nameSuffix = "monitoring",
+        name = "monitoring",
         status = Servable.Status.Serving,
         usedApps = List.empty,
         port = Some(9090),
         host = Some("localhost"),
-        message = "ok"
+        message = "ok".some
       )
 
       implicit val servableRepo = mock[ServableRepository[IO]]
       when(servableRepo.findForModelVersion(mv.id)).thenReturn(List(servable).pure[IO])
 
       implicit val servableService = mock[ServableService[IO]]
-      when(servableService.stop(servable.fullName)).thenReturn(servable.pure[IO])
-      when(servableService.stop(metricServable.fullName)).thenReturn(metricServable.pure[IO])
+      when(servableService.stop(servable.name)).thenReturn(servable.pure[IO])
+      when(servableService.stop(metricServable.name)).thenReturn(metricServable.pure[IO])
 
       val metric1 =
         CustomModelMetricSpec(
@@ -106,8 +106,8 @@ class ServableGCSpec extends GenericUnitTest {
       ServableGC.gcModelVersion[IO](mv.id).unsafeRunSync()
 
       Mockito.verify(appRepo).findVersionUsage(mv.id)
-      Mockito.verify(servableService).stop(servable.fullName)
-      Mockito.verify(servableService).stop(metricServable.fullName)
+      Mockito.verify(servableService).stop(servable.name)
+      Mockito.verify(servableService).stop(metricServable.name)
       succeed
     }
   }

@@ -22,10 +22,7 @@ import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
 import org.mockito.Matchers
 
 import java.time.Instant
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
-
-// TODO
 
 class ServableSpec extends GenericUnitTest {
   implicit val rng: RNG[IO]               = RNG.default[IO].unsafeRunSync()
@@ -65,7 +62,7 @@ class ServableSpec extends GenericUnitTest {
     installCommand = None,
     metadata = Map.empty
   )
-  val servable = Servable(mv, "test", Servable.Status.Starting, "msg", None, None)
+  val servable = Servable(mv, "test", Servable.Status.Starting, None, None, None)
 
   describe("Default Deployment Configuration") {
     val defaultDC = DeploymentConfiguration(
@@ -105,7 +102,7 @@ class ServableSpec extends GenericUnitTest {
           metadata = Map.empty
         )
         .unsafeRunSync()
-      assert(res.started.deploymentConfiguration.exists(_.name == defaultDC.name))
+      assert(res.deploymentConfiguration.exists(_.name == defaultDC.name))
     }
     it("should not use it if DC specified for servable") {
       val customDC = DeploymentConfiguration(
@@ -145,7 +142,7 @@ class ServableSpec extends GenericUnitTest {
           metadata = Map.empty
         )
         .unsafeRunSync()
-      assert(res.started.deploymentConfiguration.exists(_.name == customDC.name))
+      assert(res.deploymentConfiguration.exists(_.name == customDC.name))
     }
   }
 }

@@ -3,19 +3,16 @@ package io.hydrosphere.serving.manager.infrastructure.docker
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
-
 import cats.effect.Async
 import cats.implicits._
-import com.spotify.docker.client.DockerClient.{
-  BuildParam,
-  ListContainersParam,
-  RemoveContainerParam
-}
+import com.spotify.docker.client.DockerClient.{BuildParam, EventsParam, ListContainersParam, RemoveContainerParam}
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient, LogMessage, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerClientConfig
 import org.apache.logging.log4j.scala.Logging
 import io.circe.syntax._
+import io.hydrosphere.serving.manager.domain.servable.{CloudInstanceEventAdapterError, CloudInstanceEvent}
+import io.hydrosphere.serving.manager.domain.servable.CloudInstanceEvent._
 
 import scala.collection.JavaConverters._
 
@@ -34,6 +31,7 @@ trait DockerdClient[F[_]] {
     listContainers(ListContainersParam.allContainers() :: Nil)
 
   def logs(id: String, follow: Boolean): fs2.Stream[F, String]
+  def events(): fs2.Stream[F, CloudInstanceEvent]
 
   def build(
       directory: Path,
@@ -87,6 +85,7 @@ object DockerdClient extends Logging {
         F.delay(underlying.listContainers(params: _*)).map(_.asScala.toList)
 
       override def logs(id: String, follow: Boolean): fs2.Stream[F, String] = {
+        println(s"get log for ${id} with ${follow}")
         val rawStream =
           if (follow)
             F.delay(
@@ -170,6 +169,27 @@ object DockerdClient extends Logging {
             .toList
         }
 
+      override def events(): fs2.Stream[F, CloudInstanceEvent] = {
+        println("get events")
+        val rawStream =
+          F.delay(
+            underlying.events(
+              EventsParam.event("create"),
+              EventsParam.event("start"),
+              EventsParam.event("stop"),
+              EventsParam.`type`("container"),
+              EventsParam.label("HS_INSTANCE_NAME"),
+              EventsParam.label("HS_INSTANCE_MV_ID")
+            )
+          )
+        fs2.Stream
+          .eval(rawStream)
+          .map(_.asScala)
+          .flatMap(x => fs2.Stream.fromIterator[F](x))
+          .map(_.toEvent)
+          .filter(_.isRight)
+          .map { case Right(value) => value }
+      }
     }
 
   def asyncProgressHandler[T](

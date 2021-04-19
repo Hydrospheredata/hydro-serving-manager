@@ -41,10 +41,11 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
       )
     )
   )
+
   private val upload1 = ModelUploadMetadata(
     name = "m1",
     runtime = dummyImage,
-    signature = signature.some
+    modelSignature = signature.some
   )
   var mv1: ModelVersion.Internal = _
   var servable: Servable         = _
@@ -115,7 +116,7 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
     }
     it("should find app usages") {
       val oldApp = app.core.repos.appRepo.get("repo-spec-app").unsafeRunSync().get
-      val result = app.core.repos.appRepo.findServableUsage(servable.fullName).unsafeRunSync()
+      val result = app.core.repos.appRepo.findServableUsage(servable.name).unsafeRunSync()
       assert(result.head.name == oldApp.name)
 
       val failResult = app.core.repos.appRepo.findServableUsage("hackermans").unsafeRunSync()

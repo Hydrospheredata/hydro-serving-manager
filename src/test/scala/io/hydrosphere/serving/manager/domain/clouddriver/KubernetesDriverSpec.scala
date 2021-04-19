@@ -26,17 +26,19 @@ class KubernetesDriverSpec extends GenericUnitTest {
   def getOrMock[T](opt: Option[T])(implicit ct: ClassTag[T]) =
     opt.getOrElse(Mockito.mock(ct.runtimeClass.asInstanceOf[Class[T]]))
 
-  def mockClient[F[_]](
+  protected def mockClient[F[_]](
       pod: Option[K8SPods[F]] = None,
       deployments: Option[K8SDeployments[F]] = None,
       services: Option[K8SServices[F]] = None,
-      hpa: Option[K8SHorizontalPodAutoscalers[F]] = None
+      hpa: Option[K8SHorizontalPodAutoscalers[F]] = None,
+      rs: Option[K8SReplicaSets[F]] = None
   ) =
     KubernetesClient[F](
       pods = getOrMock(pod),
       services = getOrMock(services),
       deployments = getOrMock(deployments),
-      hpa = getOrMock(hpa)
+      hpa = getOrMock(hpa),
+      rs = getOrMock(rs)
     )
 
   describe("KubernetesDriver") {

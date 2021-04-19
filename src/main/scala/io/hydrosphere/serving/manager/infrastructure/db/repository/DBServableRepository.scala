@@ -29,7 +29,7 @@ object DBServableRepository {
   case class ServableRow(
       service_name: String,
       model_version_id: Long,
-      status_text: String,
+      status_text: Option[String],
       host: Option[String],
       port: Option[Int],
       status: String,
@@ -40,16 +40,14 @@ object DBServableRepository {
   type JoinedServableRow =
     (ServableRow, ModelVersionRow, ModelRow, Option[DeploymentConfiguration], Option[List[String]])
 
-  Read[(ServableRow, ModelVersionRow)]
-
   def fromServable(s: Servable): ServableRow =
     ServableRow(
-      service_name = s.fullName,
+      service_name = s.name,
       model_version_id = s.modelVersion.id,
-      status_text = s.status.entryName,
+      status_text = s.message,
       host = s.host,
       port = s.port,
-      status = s.message,
+      status = s.status.entryName,
       metadata = s.metadata.maybeEmpty.map(_.asJson.noSpaces),
       deployment_configuration = s.deploymentConfiguration.map(_.name)
     )
@@ -60,9 +58,7 @@ object DBServableRepository {
       mr: ModelRow,
       deploymentConfig: Option[DeploymentConfiguration],
       apps: Option[List[String]]
-  ) = {
-
-    val suffix = Servable.extractSuffix(mr.name, mvr.model_version, sr.service_name)
+  ): Either[Throwable, Servable] = {
     val status =
       Servable.Status.withNameInsensitiveOption(sr.status).getOrElse(Servable.Status.NotAvailable)
 
@@ -74,7 +70,7 @@ object DBServableRepository {
             Right(
               Servable(
                 modelVersion = imv,
-                nameSuffix = suffix,
+                name =  sr.service_name,
                 status = status,
                 usedApps = apps.getOrElse(Nil),
                 metadata = sr.metadata

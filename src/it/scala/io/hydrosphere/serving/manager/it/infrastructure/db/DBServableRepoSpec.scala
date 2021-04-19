@@ -29,7 +29,7 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
       val row = ServableRow(
         "name",
         123,
-        "status_text",
+        "status_text".some,
         Some("host"),
         Some(123),
         "status",
@@ -51,14 +51,13 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
         mv1,
         "test-servable",
         Servable.Status.Serving,
-        Nil,
-        "Ok",
+        "Ok".some,
         "localhost".some,
         9090.some
       )
       val result = app.core.repos.servableRepo.upsert(servable).unsafeRunSync()
       println(result)
-      assert(result.fullName == "model-name-1-test-servable")
+      assert(result.name == "model-name-1-test-servable")
       assert(result.deploymentConfiguration.contains(depConf))
     }
     it("should get Servable by name") {
@@ -66,11 +65,8 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
       println(res)
       assert(res.isDefined, res)
       assert(res.get.modelVersion === mv1)
-      assert(res.get.nameSuffix == "test-servable")
+      assert(res.get.name == "test-servable")
       assert(res.get.deploymentConfiguration.contains(depConf))
-    }
-    it("should read names correctly") {
-      assert(Servable.extractSuffix("claims_model", 1, "claims-model-1-far-moon") == "far-moon")
     }
     it("should get many servables") {
       val res = app.core.repos.servableRepo
@@ -79,7 +75,7 @@ class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
       println(res)
       assert(res.size == 1)
       assert(res.head.modelVersion === mv1)
-      assert(res.head.nameSuffix == "test-servable")
+      assert(res.head.name == "test-servable")
     }
   }
 
