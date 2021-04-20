@@ -7,12 +7,12 @@ import cats.effect.Async
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.{BuildParam, EventsParam, ListContainersParam, RemoveContainerParam}
 import com.spotify.docker.client.messages._
-import com.spotify.docker.client.{DefaultDockerClient, DockerClient, LogMessage, ProgressHandler}
+import com.spotify.docker.client.{DefaultDockerClient, DockerClient, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerClientConfig
 import org.apache.logging.log4j.scala.Logging
 import io.circe.syntax._
-import io.hydrosphere.serving.manager.domain.servable.{CloudInstanceEventAdapterError, CloudInstanceEvent}
-import io.hydrosphere.serving.manager.domain.servable.CloudInstanceEvent._
+import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstanceEvent
+import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstanceEventAdapterInstances._
 
 import scala.collection.JavaConverters._
 
@@ -85,7 +85,6 @@ object DockerdClient extends Logging {
         F.delay(underlying.listContainers(params: _*)).map(_.asScala.toList)
 
       override def logs(id: String, follow: Boolean): fs2.Stream[F, String] = {
-        println(s"get log for ${id} with ${follow}")
         val rawStream =
           if (follow)
             F.delay(
@@ -170,7 +169,6 @@ object DockerdClient extends Logging {
         }
 
       override def events(): fs2.Stream[F, CloudInstanceEvent] = {
-        println("get events")
         val rawStream =
           F.delay(
             underlying.events(

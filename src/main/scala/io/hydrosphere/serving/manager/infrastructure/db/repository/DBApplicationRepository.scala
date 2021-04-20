@@ -19,7 +19,7 @@ import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import io.hydrosphere.serving.manager.domain.servable.{Servable, StatusComposer}
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableStatusComposer}
 import io.hydrosphere.serving.manager.domain.servable.Servable.{Status => ServableStatus}
 import io.hydrosphere.serving.manager.util.CollectionOps._
 import io.hydrosphere.serving.manager.infrastructure.db.Metas._
@@ -123,7 +123,7 @@ object DBApplicationRepository {
                                  )
 
   def getStatus(as: List[Servable]): (List[String], Application.Status) = {
-    val (msg, status) = StatusComposer.combineStatuses(as)
+    val (msg, status) = ServableStatusComposer.combineStatuses(as)
 
     status match {
       case ServableStatus.Serving => (msg, Application.Status.Ready)

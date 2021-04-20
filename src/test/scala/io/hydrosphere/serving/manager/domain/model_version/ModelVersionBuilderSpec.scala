@@ -12,12 +12,12 @@ import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DockerClient, LogMessage, LogStream, ProgressHandler}
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
+import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstanceEvent
 import io.hydrosphere.serving.manager.domain.contract.DataType.DT_INT64
 import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, ModelVersionBuilder}
-import io.hydrosphere.serving.manager.domain.servable.CloudInstanceEvent
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DockerProgress

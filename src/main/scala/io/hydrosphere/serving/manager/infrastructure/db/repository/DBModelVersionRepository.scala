@@ -31,24 +31,24 @@ import io.circe.generic.JsonCodec
 object DBModelVersionRepository {
   @JsonCodec
   final case class ModelVersionRow(
-      model_version_id: Long,
-      model_id: Long,
-      created_timestamp: Instant,
-      finished_timestamp: Option[Instant],
-      model_version: Long,
-      model_signature: Json,
-      image_name: String,
-      image_tag: String,
-      image_sha256: Option[String],
-      runtime_name: String,
-      runtime_version: String,
-      status: String,
-      profile_types: Option[String],
-      install_command: Option[String],
-      metadata: Option[String],
-      is_external: Boolean,
-      monitoring_configuration: Json
-  )
+                                    model_version_id: Long,
+                                    model_id: Long,
+                                    created_timestamp: Instant,
+                                    finished_timestamp: Option[Instant],
+                                    model_version: Long,
+                                    model_signature: Json,
+                                    image_name: String,
+                                    image_tag: String,
+                                    image_sha256: Option[String],
+                                    runtime_name: String,
+                                    runtime_version: String,
+                                    status: String,
+                                    profile_types: Option[String],
+                                    install_command: Option[String],
+                                    metadata: Option[String],
+                                    is_external: Boolean,
+                                    monitoring_configuration: Json
+                                  )
 
   type JoinedModelVersionRow = (ModelVersionRow, ModelRow)
 
@@ -262,19 +262,15 @@ object DBModelVersionRepository {
       """.stripMargin.update
 
   def make[F[_]]()(implicit
-      F: Bracket[F, Throwable],
-      tx: Transactor[F],
-      modelPub: ModelVersionEvents.Publisher[F]
+                   F: Bracket[F, Throwable],
+                   tx: Transactor[F],
+                   modelPub: ModelVersionEvents.Publisher[F]
   ): ModelVersionRepository[F] =
     new ModelVersionRepository[F] {
       override def all(): F[List[ModelVersion]] =
         for {
           rows <- allQ.to[List].transact(tx)
-        } yield rows.map(x =>
-          toModelVersion(x._1, x._2).toOption match {
-            case Some(value) => value
-          }
-        )
+        } yield rows.flatMap(x => toModelVersion(x._1, x._2).toOption)
 
       override def create(entity: ModelVersion): F[ModelVersion] =
         insertQ(fromModelVersion(entity))

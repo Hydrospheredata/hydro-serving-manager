@@ -8,7 +8,6 @@ import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRe
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
-import io.hydrosphere.serving.manager.domain.servable.CloudInstanceEvent
 import io.hydrosphere.serving.manager.infrastructure.kubernetes.KubernetesClient
 import skuber.Container.PullPolicy
 import skuber.Resource.Quantity

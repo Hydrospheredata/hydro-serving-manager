@@ -1,47 +1,19 @@
-package io.hydrosphere.serving.manager.domain.servable
+package io.hydrosphere.serving.manager.domain.clouddriver
 
+import cats.implicits._
 import com.spotify.docker.client.messages.{Event => DockerEvent}
+import skuber.Service
 import skuber.api.client.{EventType, WatchEvent}
 import skuber.apps.v1.ReplicaSet
-import cats.implicits._
-import skuber.api.client.EventType.EventType
-import skuber.{ObjectResource, Service}
 
-sealed trait CloudInstanceEvent {
-  def instanceName: String
-}
-
-final case class Starting(instanceName: String, warning: Option[String] = None) extends CloudInstanceEvent
-
-final case class Ready(instanceName: String, warning: Option[String] = None) extends CloudInstanceEvent
-
-final case class NotAvailable(instanceName: String, message: String) extends CloudInstanceEvent
-
-final case class NotServing(instanceName: String, message: String) extends CloudInstanceEvent
-
-final case class Available(instanceName: String) extends CloudInstanceEvent
-
-sealed trait CloudInstanceEventAdapterError extends Serializable
-
-final case object MissingLabelError extends CloudInstanceEventAdapterError
-
-final case object UnhandledEvent extends CloudInstanceEventAdapterError
-
-final case class MissingField(message: String) extends CloudInstanceEventAdapterError
-
-
-trait CloudInstanceAdapter[A] {
-  def toEvent(value: A): Either[CloudInstanceEventAdapterError, CloudInstanceEvent]
-}
-
-object CloudInstanceEvent {
+object CloudInstanceEventAdapterInstances {
   type ErrorOr[A] = Either[CloudInstanceEventAdapterError, A]
 
   implicit class Ops[A](value: A) {
-    def toEvent(implicit adapter: CloudInstanceAdapter[A]): ErrorOr[CloudInstanceEvent] = adapter.toEvent(value)
+    def toEvent(implicit adapter: CloudInstanceEventAdapter[A]): ErrorOr[CloudInstanceEvent] = adapter.toEvent(value)
   }
 
-  implicit val dockerEventsAdapter: CloudInstanceAdapter[DockerEvent] = (event: DockerEvent) => {
+  implicit val dockerEventsAdapter: CloudInstanceEventAdapter[DockerEvent] = (event: DockerEvent) => {
     val attributes = event.actor().attributes().some;
     val name = attributes.map(_.get("HS_INSTANCE_NAME"))
     val action = event.action().some
@@ -58,7 +30,7 @@ object CloudInstanceEvent {
     }
   }
 
-  implicit val rsAdapter: CloudInstanceAdapter[WatchEvent[ReplicaSet]] = (value: WatchEvent[ReplicaSet]) => {
+  implicit val rsAdapter: CloudInstanceEventAdapter[WatchEvent[ReplicaSet]] = (value: WatchEvent[ReplicaSet]) => {
     val replicaSet = value._object;
 
     val currentReplicasOrError: ErrorOr[Int] = replicaSet.status.map(_.replicas) match {
@@ -88,7 +60,7 @@ object CloudInstanceEvent {
     }
   }
 
-  implicit val serviceAdapter: CloudInstanceAdapter[WatchEvent[Service]] = (value: WatchEvent[Service]) => {
+  implicit val serviceAdapter: CloudInstanceEventAdapter[WatchEvent[Service]] = (value: WatchEvent[Service]) => {
     val service = value._object;
 
     val instanceNameOrError: ErrorOr[String] = service.metadata.labels.get("HS_INSTANCE_NAME") match {

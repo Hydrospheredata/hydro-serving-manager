@@ -1,7 +1,7 @@
 package io.hydrosphere.serving.manager.domain.servable
 import io.hydrosphere.serving.manager.domain.servable.Servable.Status
 
-object StatusComposer {
+object ServableStatusComposer {
   type CombineResult = (List[String], Servable.Status);
 
   def combineStatuses(servables: List[Servable]): (List[String], Servable.Status) = {

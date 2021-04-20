@@ -22,7 +22,6 @@ object ApplicationMonitoring extends Logging {
     }
 
     def updateApp(event: DiscoveryEvent[Servable, String]): F[Unit] = {
-      println("servable event")
       event match {
         case DiscoveryEvent.Initial => F.unit
         case DiscoveryEvent.ItemUpdate(items) => {

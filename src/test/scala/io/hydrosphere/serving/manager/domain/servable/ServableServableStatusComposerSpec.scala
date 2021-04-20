@@ -10,7 +10,7 @@ import cats.implicits._
 
 import java.time.Instant
 
-class ServableStatusComposerSpec extends GenericUnitTest {
+class ServableServableStatusComposerSpec extends GenericUnitTest {
   val mv: ModelVersion.Internal = ModelVersion.Internal(
     id = 10,
     image = DockerImage("name", "tag"),
@@ -53,7 +53,7 @@ class ServableStatusComposerSpec extends GenericUnitTest {
     it("returns status of that servable") {
       val servable = servingServable;
       val list: List[Servable] = List(servingServable);
-      val (messages, resultedStatus) = StatusComposer.combineStatuses(list);
+      val (messages, resultedStatus) = ServableStatusComposer.combineStatuses(list);
 
       assert(messages.isEmpty)
       assert(resultedStatus == servable.status)
@@ -64,7 +64,7 @@ class ServableStatusComposerSpec extends GenericUnitTest {
   describe("with one NotServing servable") {
     it("returns status of that servable") {
       val list: List[Servable] = List(notServingServable, servingServable);
-      val (messages, resultedStatus) = StatusComposer.combineStatuses(list);
+      val (messages, resultedStatus) = ServableStatusComposer.combineStatuses(list);
 
       assert(messages.headOption == notServingServable.message)
       assert(resultedStatus == Servable.Status.NotServing)
@@ -74,7 +74,7 @@ class ServableStatusComposerSpec extends GenericUnitTest {
   describe("with many NotServing servable") {
     it("returns status of that servable") {
       val list: List[Servable] = List(notServingServable, notServingServable);
-      val (messages, resultedStatus) = StatusComposer.combineStatuses(list);
+      val (messages, resultedStatus) = ServableStatusComposer.combineStatuses(list);
 
       assert(messages.length == 2)
       messages.foreach(message => assert(message == notServingServable.message.get))

@@ -5,7 +5,7 @@ import cats.implicits._
 import cats.effect._
 import cats.effect.implicits._
 import io.hydrosphere.serving.manager.domain.servable.Servable.{Status => ServableStatus}
-import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.domain.clouddriver.{Available, CloudDriver, CloudInstanceEvent, NotAvailable, NotServing, Ready, Starting}
 import org.apache.logging.log4j.scala.Logging
 
 

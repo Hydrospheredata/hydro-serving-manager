@@ -1,23 +1,20 @@
 package io.hydrosphere.serving.manager.infrastructure.kubernetes
 
-import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Merge, Source}
 import cats.effect._
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
-import io.hydrosphere.serving.manager.domain.servable.CloudInstanceEvent
-import io.hydrosphere.serving.manager.domain.servable.CloudInstanceEvent._
+import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstanceEvent
+import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstanceEventAdapterInstances._
 import io.hydrosphere.serving.manager.util.AsyncUtil
-import play.api.libs.json.OFormat
 import skuber._
-import skuber.apps.v1.{Deployment, DeploymentList, ReplicaSet, ReplicaSetList}
+import skuber.apps.v1.{Deployment, DeploymentList, ReplicaSet}
 import skuber.autoscaling.HorizontalPodAutoscaler
 import skuber.json.format._
 import streamz.converter._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext}
 
 trait K8SDeployments[F[_]] {
   def get(name: String): F[Option[Deployment]]
@@ -193,17 +190,15 @@ object KubernetesClient {
   def rsImpl[F[_]](
                     underlying: K8SRequestContext
                   )(implicit F: Async[F], ec: ExecutionContext, cs: ContextShift[F], m: Materializer): K8SReplicaSets[F] =
-    new K8SReplicaSets[F] {
-      override def events(): fs2.Stream[F, CloudInstanceEvent] = {
-        val rawStream = underlying.watchAll[ReplicaSet]().map(f => f.map(_.toEvent))
-        for {
-          akkaStream <- fs2.Stream.eval(AsyncUtil.futureAsync(rawStream))
-          evt <-
-            akkaStream
-              .filter(_.isRight)
-              .map { case Right(value) => value }
-              .toStream[F]()
-        } yield evt
-      }
+    () => {
+      val rawStream = underlying.watchAll[ReplicaSet]().map(f => f.map(_.toEvent))
+      for {
+        akkaStream <- fs2.Stream.eval(AsyncUtil.futureAsync(rawStream))
+        evt <-
+          akkaStream
+            .filter(_.isRight)
+            .map { case Right(value) => value }
+            .toStream[F]()
+      } yield evt
     }
 }
