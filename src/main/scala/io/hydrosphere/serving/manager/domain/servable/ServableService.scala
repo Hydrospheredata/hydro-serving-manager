@@ -71,7 +71,7 @@ object ServableService extends Logging {
     _.filter(s => s.metadata.toSet.subsetOf(metadata.toSet))
 
   def apply[F[_]](
-      defaultDC: Option[DeploymentConfiguration] = None
+      defaultDC: DeploymentConfiguration
   )(implicit
       F: Concurrent[F],
       timer: Timer[F],
@@ -132,8 +132,7 @@ object ServableService extends Logging {
             metadata = metadata,
             host = None,
             port = None,
-            deploymentConfiguration = deployConfig
-              .orElse(defaultDC)
+            deploymentConfiguration = deployConfig.getOrElse(defaultDC)
           )
           _ <- servableRepository.upsert(initServable)
           _ <- awaitServable(initServable)

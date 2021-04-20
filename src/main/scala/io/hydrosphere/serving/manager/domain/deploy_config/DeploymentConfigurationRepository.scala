@@ -18,16 +18,13 @@ trait DeploymentConfigurationRepository[F[_]] {
 }
 
 object DeploymentConfigurationRepository {
-  def make[F[_]](defaultDC: Option[DeploymentConfiguration])(implicit
+  def make[F[_]](defaultDC: DeploymentConfiguration)(implicit
       F: Bracket[F, Throwable],
       tx: Transactor[F],
       pub: DeploymentConfigurationEvents.Publisher[F]
   ): DeploymentConfigurationRepository[F] = {
     val dbRepo = new DBDeploymentConfigurationRepository[F]()
-    defaultDC match {
-      case Some(value) => withDefaultDepConfig(dbRepo, value)
-      case None        => dbRepo
-    }
+    withDefaultDepConfig(dbRepo, defaultDC)
   }
 
   def withDefaultDepConfig[F[_]](

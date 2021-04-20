@@ -16,7 +16,7 @@ case class ManagerConfiguration(
     database: HikariConfiguration,
     cloudDriver: CloudDriverConfiguration,
     dockerRepository: DockerRepositoryConfiguration,
-    defaultDeploymentConfiguration: Option[DeploymentConfiguration]
+    defaultDeploymentConfiguration: DeploymentConfiguration = DeploymentConfiguration.empty
 )
 
 object ManagerConfiguration {

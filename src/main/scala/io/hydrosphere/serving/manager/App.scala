@@ -99,11 +99,12 @@ object App {
           DeploymentConfigurationRepository.make(config.defaultDeploymentConfiguration)
         implicit val modelRepo        = DBModelRepository.make()
         implicit val modelVersionRepo = DBModelVersionRepository.make()
-        implicit val servableRepo     = ServableRepository.make(config.defaultDeploymentConfiguration)
-        implicit val appRepo          = DBApplicationRepository.make()
+        implicit val servableRepo     = DBServableRepository.make(config.defaultDeploymentConfiguration)
+        implicit val appRepo          = DBApplicationRepository.make(config.defaultDeploymentConfiguration)
         implicit val buildLogRepo     = DBBuildLogRepository.make()
-        implicit val monitoringRepo   = DBMonitoringRepository.make()
-        implicit val imageRepo        = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
+        implicit val monitoringRepo =
+          DBMonitoringRepository.make(config.defaultDeploymentConfiguration)
+        implicit val imageRepo = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
 
         Resource.liftF(Core.make[F](config))
       }

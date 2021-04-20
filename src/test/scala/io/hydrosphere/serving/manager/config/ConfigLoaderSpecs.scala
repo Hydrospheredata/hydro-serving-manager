@@ -14,8 +14,7 @@ class ConfigLoaderSpecs extends GenericUnitTest {
         .load[IO](source)
         .unsafeRunSync()
       print(config.show)
-      assert(config.defaultDeploymentConfiguration.isDefined)
-      assert(config.defaultDeploymentConfiguration.get.name == DEFAULT_DEPLOYMENT_CONFIG_NAME)
+      assert(config.defaultDeploymentConfiguration.name == DEFAULT_DEPLOYMENT_CONFIG_NAME)
     }
   }
 }
