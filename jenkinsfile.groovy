@@ -15,7 +15,11 @@ SERVICEIMAGENAME = 'serving-manager'
 GITHUBREPO  = "github.com/Hydrospheredata/hydro-serving-manager.git"
 
 def checkoutRepo(String repo){
-      git changelog: false, credentialsId: 'HydroRobot_AccessToken', poll: false, url: repo
+  if (env.CHANGE_ID != null ){
+    git changelog: false, credentialsId: 'HydroRobot_AccessToken', poll: false, url: repo, branch: env.CHANGE_BRANCH
+  } else {
+    git changelog: false, credentialsId: 'HydroRobot_AccessToken', poll: false, url: repo, branch: env.BRANCH_NAME
+  }
 }
 
 def getVersion(){
@@ -113,7 +117,7 @@ def bumpGrpc(String newVersion, String search, String patch, String path){
     sh script: "rm -rf tmp", label: "Remove temp file"
 }
 
-//Команды для запуска тестов (каждой репе своя?)
+//Run test command
 def runTest(){
     sh script: "sbt --batch test", label: "Run test task"
 }
@@ -122,6 +126,7 @@ def buildDocker(){
     //run build command and store build tag
     tagVersion = getVersion()
     sh script: "sbt --batch -DappVersion=$tagVersion docker", label: "Run build docker task";
+    sh script: "sbt --batch -DappVersion=latest docker", label: "Run build docker task";
 }
 
 
@@ -137,17 +142,17 @@ def pushDocker(String registryUrl, String dockerImage){
 def updateDockerCompose(String newVersion){
   dir('docker-compose'){
     //Change template
-    sh script: "sed \"s/.*image:.*/    image: hydrosphere\\/serving-manager:$newVersion/g\" hydro-serving-manager.service.template > hydro-serving-manager.compose", label: "sed hydro-manager version"
+    sh script: "sed -i \"s/.*image:.*/    image: hydrosphere\\/serving-manager:$newVersion/g\" hydro-serving-manager.service.template", label: "sed hydro-manager version"
     //Merge compose into 1 file
     composeMerge = "docker-compose"
-    composeService = sh label: "Get all template", returnStdout: true, script: "ls *.compose"
+    composeService = sh label: "Get all template", returnStdout: true, script: "ls *.template"
     list = composeService.split( "\\r?\\n" )
     for(l in list){
         composeMerge = composeMerge + " -f $l"
     }
-    composeMerge = composeMerge + " config > docker-compose.yaml"
+    composeMerge = composeMerge + " config > ../docker-compose.yaml"
     sh script: "$composeMerge", label:"Merge compose file"
-    sh script: "cp docker-compose.yaml ../docker-compose.yaml"
+    //sh script: "cp docker-compose.yaml ../docker-compose.yaml"
   }
 }
 
@@ -202,7 +207,6 @@ node('hydrocentral') {
             //Set commit author
             sh script: "git config --global user.name \"HydroRobot\"", label: "Set username"
             sh script: "git config --global user.email \"robot@hydrosphere.io\"", label: "Set user email"
-            // git changelog: false, credentialsId: 'HydroRobot_AccessToken', poll: false, url: 'https://github.com/Hydrospheredata/hydro-serving-manager.git' 
             checkoutRepo("https://github.com/Hydrospheredata/$SERVICENAME" + '.git')
             AUTHOR = sh(script:"git log -1 --pretty=format:'%an'", returnStdout: true, label: "get last commit author").trim()
             if (params.grpcVersion == ''){
@@ -230,6 +234,8 @@ node('hydrocentral') {
  
                 buildDocker()
                 pushDocker(REGISTRYURL, SERVICEIMAGENAME+":$newVersion")
+                //Update latest tag
+                pushDocker(REGISTRYURL, SERVICEIMAGENAME+":latest")
                 //Update helm and docker-compose if release 
                 if (params.releaseType == 'global'){
                     releaseService(oldVersion, newVersion)
