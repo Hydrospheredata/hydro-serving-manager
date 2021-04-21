@@ -7,19 +7,14 @@ import cats.data.NonEmptyList
 import cats.effect.{Clock, IO}
 import cats.effect.concurrent.Deferred
 import cats.syntax.option._
+
 import io.hydrosphere.serving.manager.domain.contract.DataProfileType.IMAGE
 import io.hydrosphere.serving.manager.domain.contract.DataType.DT_INT32
 import io.hydrosphere.serving.manager.domain.contract.Signature.{defaultSignature, validate}
 import io.hydrosphere.serving.manager.domain.contract.TensorShape
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
-import io.hydrosphere.serving.manager.domain.application.{
-  Application,
-  ApplicationGraph,
-  ApplicationRepository,
-  ApplicationServable,
-  ApplicationStage
-}
+import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.contract.{Field, Signature}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model._
@@ -29,8 +24,6 @@ import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableReposit
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{FetcherResult, ModelFetcher}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, ModelUnpacker}
 import io.hydrosphere.serving.manager.util.DeferredResult
-
-import org.mockito.Matchers
 
 class ModelServiceSpec extends GenericUnitTest {
   val dummyImage     = DockerImage("a", "b")
@@ -178,7 +171,7 @@ class ModelServiceSpec extends GenericUnitTest {
         )
 
         val modelRepo = mock[ModelRepository[IO]]
-        when(modelRepo.get(Matchers.anyLong())).thenReturn(IO(None))
+        when(modelRepo.get(anyLong)).thenReturn(IO(None))
 
         val storageMock = mock[ModelUnpacker[IO]]
         when(storageMock.unpack(uploadFile)).thenReturn(IO(ModelFileStructure.forRoot(uploadFile)))
@@ -186,7 +179,7 @@ class ModelServiceSpec extends GenericUnitTest {
         when(modelRepo.create(Model(0, modelName))).thenReturn(IO(model))
 
         val versionBuilder = mock[ModelVersionBuilder[IO]]
-        when(versionBuilder.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
+        when(versionBuilder.build(any, any, any)).thenReturn(
           IO(
             DeferredResult(
               modelVersion,
@@ -270,7 +263,7 @@ class ModelServiceSpec extends GenericUnitTest {
         println(upload)
 
         val modelRepo = mock[ModelRepository[IO]]
-        when(modelRepo.update(Matchers.any(classOf[Model]))).thenReturn(IO(1))
+        when(modelRepo.update(any[Model])).thenReturn(IO(1))
         when(modelRepo.get(modelName)).thenReturn(IO(model.some))
         when(modelRepo.get(1)).thenReturn(IO(model.some))
 
@@ -279,7 +272,7 @@ class ModelServiceSpec extends GenericUnitTest {
           .thenReturn(IO(ModelFileStructure.forRoot(Paths.get(".AAAAAAAAA"))))
 
         val versionService = mock[ModelVersionBuilder[IO]]
-        when(versionService.build(Matchers.any(), Matchers.any(), Matchers.any())).thenReturn(
+        when(versionService.build(any, any, any)).thenReturn(
           IO(
             DeferredResult(
               modelVersion,
@@ -462,70 +455,54 @@ class ModelServiceSpec extends GenericUnitTest {
           installCommand = None,
           metadata = Map.empty
         )
-        val modelRepo = new ModelRepository[IO] {
-          override def create(entity: Model): IO[Model] = ???
-          override def get(id: Long): IO[Option[Model]] =
-            id match {
-              case appFailedModel.id      => IO.pure(Some(appFailedModel))
-              case servableFailedModel.id => IO.pure(Some(servableFailedModel))
-              case okModel.id             => IO.pure(Some(okModel))
-              case _                      => IO(None)
-            }
-          override def all(): IO[Seq[Model]]                = ???
-          override def get(name: String): IO[Option[Model]] = ???
-          override def update(value: Model): IO[Int]        = ???
-          override def delete(id: Long): IO[Int]            = IO.pure(1)
+
+        val modelRepo = mock[ModelRepository[IO]]
+        when(modelRepo.get(anyLong)) thenAnswer { (id: Long) =>
+          id match {
+            case appFailedModel.id      => IO.pure(Some(appFailedModel))
+            case servableFailedModel.id => IO.pure(Some(servableFailedModel))
+            case okModel.id             => IO.pure(Some(okModel))
+            case _                      => IO(None)
+          }
         }
-        val appRepo = new ApplicationRepository[IO] {
-          override def create(entity: Application): IO[Application] = ???
-          override def get(id: Long): IO[Option[Application]]       = ???
-          override def get(name: String): IO[Option[Application]]   = ???
-          override def update(value: Application): IO[Int]          = ???
-          override def delete(id: Long): IO[Int]                    = ???
-          override def all(): IO[List[Application]]                 = ???
-          override def findVersionUsage(versionIdx: Long): IO[List[Application]] =
-            versionIdx match {
-              case appFailedModel.id => IO(app :: Nil)
-              case _                 => IO.pure(Nil)
-            }
-          override def findServableUsage(servableName: String): IO[List[Application]] = ???
+        when(modelRepo.delete(anyLong)).thenReturn(IO.pure(1))
+
+        val appRepo = mock[ApplicationRepository[IO]]
+        when(appRepo.findVersionUsage(anyLong)) thenAnswer { (id: Long) =>
+          id match {
+            case appFailedModel.id => IO(app :: Nil)
+            case _                 => IO.pure(Nil)
+          }
         }
-        val servableRepo = new ServableRepository[IO] {
-          override def all(): IO[List[Servable]]                   = ???
-          override def upsert(servable: Servable): IO[Servable]    = ???
-          override def delete(name: String): IO[Int]               = ???
-          override def get(name: String): IO[Option[Servable]]     = ???
-          override def get(names: Seq[String]): IO[List[Servable]] = ???
-          override def findForModelVersion(versionId: Long): IO[List[Servable]] =
-            versionId match {
-              case servableFailedVersion.id =>
-                println("Here")
-                IO.pure(servable :: Nil)
-              case _ =>
-                println(s"Ok ${versionId}")
-                IO.pure(Nil)
-            }
+
+        val servableRepo = mock[ServableRepository[IO]]
+        when(servableRepo.findForModelVersion(anyLong)) thenAnswer { (id: Long) =>
+          id match {
+            case servableFailedVersion.id =>
+              IO.pure(servable :: Nil)
+            case _ =>
+              IO.pure(Nil)
+          }
         }
-        val modelVersionService = new ModelVersionService[IO] {
-          override def all(): IO[List[ModelVersion.Internal]]                 = ???
-          override def get(id: Long): IO[ModelVersion.Internal]               = ???
-          override def get(name: String, version: Long): IO[ModelVersionView] = ???
-          override def getNextModelVersion(modelId: Long): IO[Long]           = ???
-          override def list: IO[List[ModelVersionView]]                       = ???
-          override def listForModel(modelId: Long): IO[List[ModelVersion.Internal]] =
-            modelId match {
-              case appFailedModel.id      => IO.pure(appFailedVersion :: Nil)
-              case servableFailedModel.id => IO.pure(servableFailedVersion :: Nil)
-              case okModel.id             => IO.pure(okVersion1 :: okVersion2 :: Nil)
-              case _                      => IO.raiseError(new RuntimeException(s"Shouldn't delete model $modelId"))
-            }
-          override def delete(versionId: Long): IO[Option[ModelVersion.Internal]] =
-            versionId match {
-              case okVersion1.id => IO.pure(Some(okVersion1))
-              case okVersion2.id => IO.pure(Some(okVersion2))
-              case _             => IO.raiseError(new RuntimeException(s"Shouldn't delete version $versionId"))
-            }
+
+        val modelVersionService = mock[ModelVersionService[IO]]
+        when(modelVersionService.listForModel(anyLong)) thenAnswer { (id: Long) =>
+          id match {
+            case appFailedModel.id      => IO.pure(appFailedVersion :: Nil)
+            case servableFailedModel.id => IO.pure(servableFailedVersion :: Nil)
+            case okModel.id             => IO.pure(okVersion1 :: okVersion2 :: Nil)
+            case _                      => IO.raiseError(new RuntimeException(s"Shouldn't delete model $id"))
+          }
         }
+        when(modelVersionService.delete(anyLong)) thenAnswer { (versionId: Long) =>
+          versionId match {
+            case okVersion1.id => IO.pure(Some(okVersion1))
+            case okVersion2.id => IO.pure(Some(okVersion2))
+            case _             => IO.raiseError(new RuntimeException(s"Shouldn't delete version $versionId"))
+          }
+
+        }
+
         val modelService = ModelService.apply[IO]()(
           MonadError[IO, Throwable],
           clock,

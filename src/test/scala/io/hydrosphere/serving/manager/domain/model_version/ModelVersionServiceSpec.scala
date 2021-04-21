@@ -7,9 +7,6 @@ import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
-import io.hydrosphere.serving.proto.contract.signature.ModelSignature
-
-import scala.collection.mutable.ListBuffer
 
 class ModelVersionServiceSpec extends GenericUnitTest {
   describe("ModelVersionService") {

@@ -1,7 +1,6 @@
 package io.hydrosphere.serving.manager.util
 
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.proto.contract.tensor.TensorShape
 import io.hydrosphere.serving.proto.contract.tensor.definitions.{DoubleTensor, Shape, TensorUtil}
 
 class TensorUtilSpec extends GenericUnitTest {

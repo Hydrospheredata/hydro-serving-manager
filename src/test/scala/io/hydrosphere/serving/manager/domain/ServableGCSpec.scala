@@ -22,7 +22,6 @@ import io.hydrosphere.serving.manager.domain.servable.{
   ServableRepository,
   ServableService
 }
-import io.hydrosphere.serving.proto.contract.signature.ModelSignature
 import org.mockito.Mockito
 
 class ServableGCSpec extends GenericUnitTest {
@@ -42,7 +41,7 @@ class ServableGCSpec extends GenericUnitTest {
         metadata = Map.empty
       )
 
-      implicit val appRepo = mock[ApplicationRepository[IO]]
+      implicit val appRepo: ApplicationRepository[IO] = mock[ApplicationRepository[IO]]
       when(appRepo.findVersionUsage(mv.id)).thenReturn(Nil.pure[IO])
 
       val servable = Servable(
@@ -64,10 +63,10 @@ class ServableGCSpec extends GenericUnitTest {
         message = "ok".some
       )
 
-      implicit val servableRepo = mock[ServableRepository[IO]]
+      implicit val servableRepo: ServableRepository[IO] = mock[ServableRepository[IO]]
       when(servableRepo.findForModelVersion(mv.id)).thenReturn(List(servable).pure[IO])
 
-      implicit val servableService = mock[ServableService[IO]]
+      implicit val servableService: ServableService[IO] = mock[ServableService[IO]]
       when(servableService.stop(servable.name)).thenReturn(servable.pure[IO])
       when(servableService.stop(metricServable.name)).thenReturn(metricServable.pure[IO])
 
@@ -97,9 +96,10 @@ class ServableGCSpec extends GenericUnitTest {
           )
         )
 
-      implicit val monRepo = mock[MonitoringRepository[IO]]
+      implicit val monRepo: MonitoringRepository[IO] = mock[MonitoringRepository[IO]]
       when(monRepo.forModelVersion(mv.id)).thenReturn(List(metric1, metric2).pure[IO])
-      implicit val monService = mock[Monitoring[IO]]
+
+      implicit val monService: Monitoring[IO] = mock[Monitoring[IO]]
       when(monService.update(metric1Cleaned)).thenReturn(metric1.pure[IO])
       when(monService.update(metric2)).thenReturn(metric2.pure[IO])
 

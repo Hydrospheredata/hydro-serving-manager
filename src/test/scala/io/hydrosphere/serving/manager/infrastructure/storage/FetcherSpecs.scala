@@ -14,9 +14,9 @@ import org.scalatest.enablers.Definition.definitionOfOption
 import java.nio.file.Path
 
 class FetcherSpecs extends GenericUnitTest {
-  implicit val ops = StorageOps.default[IO]
+  implicit val ops: LocalStorageOps[IO] = StorageOps.default[IO]
 
-  def getModel(modelName: String) = {
+  def getModel(modelName: String): Path = {
     val path = getTestResourcePath("test_models")
     val res  = path.resolve(modelName)
     res

@@ -13,7 +13,7 @@ object Dependencies {
   val envoyDataPlaneApi = "v1.6.0_1"
   val fs2               = "2.4.4"
   val enumeratumV       = "1.6.0"
-  val mockitoScalaV     = "1.16.3"
+  val mockitoScalaV     = "1.16.37"
 
   lazy val awsDependencies = Seq(
     "com.amazonaws" % "aws-java-sdk-ecs"     % awsSdkVersion,
@@ -47,16 +47,16 @@ object Dependencies {
   ).map(_ exclude ("com.google.api.grpc", "proto-google-common-protos"))
 
   lazy val testDependencies = Seq(
-//    "org.mockito"       %% "mockito-scala"           % mockitoScalaV    % "test,it",
-//    "org.mockito"       %% "mockito-scala-scalatest" % mockitoScalaV    % "test,it",
-//    "org.mockito"       %% "mockito-scala-cats"      % mockitoScalaV    % "test,it",
-    "org.mockito"        % "mockito-all"             % "1.10.19"        % "test,it",
+    "org.mockito" %% "mockito-scala"           % mockitoScalaV % "test,it",
+    "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaV % "test,it",
+    "org.mockito" %% "mockito-scala-cats"      % mockitoScalaV % "test,it",
+//    "org.mockito"        % "mockito-all"             % "1.10.19"        % "test,it",
     "com.typesafe.akka" %% "akka-http-testkit"       % akkaHttpVersion  % "test,it",
     "org.scalactic"     %% "scalactic"               % scalaTestVersion % "test,it",
     "org.scalatest"     %% "scalatest"               % scalaTestVersion % "test,it",
     "com.typesafe.akka" %% "akka-testkit"            % akkaVersion      % "test,it",
-    "com.amazonaws"      % "aws-java-sdk-test-utils" % "1.11.174"       % "test,it",
-    "org.scalatestplus" %% "mockito-3-4"             % "3.2.2.0"        % "test"
+    "com.amazonaws"      % "aws-java-sdk-test-utils" % "1.11.174"       % "test,it"
+//    "org.scalatestplus" %% "mockito-3-4"             % "3.2.2.0"        % "test"
   )
 
   lazy val logDependencies = Seq(

@@ -51,8 +51,8 @@ class ServableServableStatusComposerSpec extends GenericUnitTest {
 
   describe("with one servable") {
     it("returns status of that servable") {
-      val servable = servingServable;
-      val list: List[Servable] = List(servingServable);
+      val servable                   = servingServable
+      val list: List[Servable]       = List(servingServable)
       val (messages, resultedStatus) = ServableStatusComposer.combineStatuses(list);
 
       assert(messages.isEmpty)
@@ -60,11 +60,10 @@ class ServableServableStatusComposerSpec extends GenericUnitTest {
     }
   }
 
-
   describe("with one NotServing servable") {
     it("returns status of that servable") {
-      val list: List[Servable] = List(notServingServable, servingServable);
-      val (messages, resultedStatus) = ServableStatusComposer.combineStatuses(list);
+      val list: List[Servable]       = List(notServingServable, servingServable)
+      val (messages, resultedStatus) = ServableStatusComposer.combineStatuses(list)
 
       assert(messages.headOption == notServingServable.message)
       assert(resultedStatus == Servable.Status.NotServing)
@@ -73,8 +72,8 @@ class ServableServableStatusComposerSpec extends GenericUnitTest {
 
   describe("with many NotServing servable") {
     it("returns status of that servable") {
-      val list: List[Servable] = List(notServingServable, notServingServable);
-      val (messages, resultedStatus) = ServableStatusComposer.combineStatuses(list);
+      val list: List[Servable]       = List(notServingServable, notServingServable)
+      val (messages, resultedStatus) = ServableStatusComposer.combineStatuses(list)
 
       assert(messages.length == 2)
       messages.foreach(message => assert(message == notServingServable.message.get))

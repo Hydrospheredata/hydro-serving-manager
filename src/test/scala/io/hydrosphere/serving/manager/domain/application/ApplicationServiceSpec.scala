@@ -28,15 +28,7 @@ import org.mockito.{Matchers, Mockito}
 import scala.collection.mutable.ListBuffer
 
 class ApplicationServiceSpec extends GenericUnitTest {
-  val signature = Signature(
-    "claim",
-    NonEmptyList.of(
-      Field.Tensor("in", DT_DOUBLE, TensorShape.Dynamic, None)
-    ),
-    NonEmptyList.of(
-      Field.Tensor("out", DT_DOUBLE, TensorShape.Dynamic, None)
-    )
-  )
+  val signature = Signature.defaultSignature
 
   val modelVersion = ModelVersion.Internal(
     id = 1,
@@ -79,33 +71,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
       val versionRepo = mock[ModelVersionRepository[IO]]
       when(versionRepo.get(1)).thenReturn(IO(Some(externalMv)))
-      val servableService = new ServableService[IO] {
-        def all(): IO[List[Servable]] = ???
-        def getFiltered(
-            name: Option[String],
-            versionId: Option[Long],
-            metadata: Map[String, String]
-        ): IO[List[Servable]]                = ???
-        def stop(name: String): IO[Servable] = ???
-        def get(name: String): IO[Servable]  = ???
-        def findAndDeploy(
-            name: String,
-            version: Long,
-            deployConfigName: Option[String],
-            metadata: Map[String, String]
-        ): IO[Servable] = ???
-        def findAndDeploy(
-            modelId: Long,
-            deployConfigName: Option[String],
-            metadata: Map[String, String]
-        ): IO[Servable] = ???
-        def deploy(
-            modelVersion: ModelVersion.Internal,
-            deployConfig: Option[deploy_config.DeploymentConfiguration],
-            metadata: Map[String, String]
-        ): IO[Servable] = ???
-      }
-      val monitoringRepo = mock[MonitoringRepository[IO]]
+
+      val servableService = mock[ServableService[IO]]
+      val monitoringRepo  = mock[MonitoringRepository[IO]]
       val appDeployer = ApplicationDeployer.default[IO]()(
         Concurrent[IO],
         applicationRepository = appRepo,
@@ -152,7 +120,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
         )
 
         when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(
+        when(appRepo.create(any)).thenReturn(
           IO(
             Application(
               id = 1,
@@ -166,42 +134,20 @@ class ApplicationServiceSpec extends GenericUnitTest {
         )
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
-        val servableService = new ServableService[IO] {
-          def all(): IO[List[Servable]] = ???
-          def getFiltered(
-              name: Option[String],
-              versionId: Option[Long],
-              metadata: Map[String, String]
-          ): IO[List[Servable]]                = ???
-          def stop(name: String): IO[Servable] = ???
-          def get(name: String): IO[Servable]  = ???
-          override def findAndDeploy(
-              name: String,
-              version: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[Servable] = ???
-          override def findAndDeploy(
-              modelId: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[Servable] = ???
-          override def deploy(
-              modelVersion: ModelVersion.Internal,
-              deployConfig: Option[deploy_config.DeploymentConfiguration],
-              metadata: Map[String, String]
-          ): IO[Servable] =
-            IO.pure {
-              val s = Servable(
-                modelVersion,
-                "hi",
-                Servable.Status.Serving,
-                message = "ok".some,
-                host = Some("hoat"),
-                port = Some(9090)
-              )
-              s
-            }
+
+        val servableService = mock[ServableService[IO]]
+        when(servableService.deploy(any[ModelVersion.Internal], any, anyMap)).thenReturn {
+          IO.pure {
+            val s = Servable(
+              modelVersion,
+              "hi",
+              Servable.Status.Serving,
+              message = "ok".some,
+              host = Some("hoat"),
+              port = Some(9090)
+            )
+            s
+          }
         }
 
         val monitoringRepo = mock[MonitoringRepository[IO]]
@@ -238,9 +184,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
 //    it("should handle failed application builds") {
 //      ioAssert {
 //        val appRepo = mock[ApplicationRepository[IO]]
-//        when(appRepo.update(Matchers.any())).thenReturn(IO.pure(1))
+//        when(appRepo.update(any())).thenReturn(IO.pure(1))
 //        when(appRepo.get("test")).thenReturn(IO(None))
-//        when(appRepo.create(Matchers.any())).thenReturn(
+//        when(appRepo.create(any())).thenReturn(
 //          IO(
 //            Application(
 //              id = 1,
@@ -326,9 +272,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
 //    it("should handle finished builds") {
 //      ioAssert {
 //        val appRepo = mock[ApplicationRepository[IO]]
-//        when(appRepo.update(Matchers.any())).thenReturn(IO(1))
+//        when(appRepo.update(any())).thenReturn(IO(1))
 //        when(appRepo.get("test")).thenReturn(IO(None))
-//        when(appRepo.create(Matchers.any())).thenReturn(
+//        when(appRepo.create(any())).thenReturn(
 //          IO(
 //            Application(
 //              id = 1,
@@ -415,9 +361,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
 //    it("should recreate missing MetricSpec Servables") {
 //      ioAssert {
 //        val appRepo = mock[ApplicationRepository[IO]]
-//        when(appRepo.update(Matchers.any())).thenReturn(IO(1))
+//        when(appRepo.update(any())).thenReturn(IO(1))
 //        when(appRepo.get("test")).thenReturn(IO(None))
-//        when(appRepo.create(Matchers.any())).thenReturn(
+//        when(appRepo.create(any())).thenReturn(
 //          IO(
 //            Application(
 //              id = 1,
@@ -433,7 +379,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
 //        val versionRepo = mock[ModelVersionRepository[IO]]
 //        when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
 //        val servableService = mock[ServableService[IO]]
-//        when(servableService.deploy(Matchers.eq(modelVersion), Matchers.eq(None), Matchers.any()))
+//        when(servableService.deploy(Matchers.eq(modelVersion), Matchers.eq(None), any()))
 //          .thenReturn {
 //             IO {
 //               Servable(

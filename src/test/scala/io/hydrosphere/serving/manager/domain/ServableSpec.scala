@@ -74,8 +74,8 @@ class ServableSpec extends GenericUnitTest {
     )
     it("should use it if no DC specified for servable") {
       implicit val servableRepo = mock[ServableRepository[IO]]
-      when(servableRepo.get(Matchers.anyString())).thenReturn(None.pure[IO])
-      when(servableRepo.upsert(Matchers.any())).thenReturn(servable.pure[IO])
+      when(servableRepo.get(any[String])).thenReturn(None.pure[IO])
+      when(servableRepo.upsert(any)).thenReturn(servable.pure[IO])
       implicit val appRepo     = mock[ApplicationRepository[IO]]
       implicit val versionRepo = mock[ModelVersionRepository[IO]]
       implicit val monRepo     = mock[MonitoringRepository[IO]]
@@ -85,10 +85,10 @@ class ServableSpec extends GenericUnitTest {
       val cloudInstance        = CloudInstance(1, "kek", CloudInstance.Status.Starting)
       when(
         cloudDriver.run(
-          name = Matchers.anyString(),
-          modelVersionId = Matchers.anyLong(),
-          image = Matchers.any(),
-          config = Matchers.eq(defaultDC.some)
+          name = any[String],
+          modelVersionId = anyLong,
+          image = any,
+          config = eqTo(defaultDC.some)
         )
       ).thenReturn(IO(cloudInstance))
 
@@ -114,8 +114,8 @@ class ServableSpec extends GenericUnitTest {
       )
 
       implicit val servableRepo = mock[ServableRepository[IO]]
-      when(servableRepo.get(Matchers.anyString())).thenReturn(None.pure[IO])
-      when(servableRepo.upsert(Matchers.any())).thenReturn(servable.pure[IO])
+      when(servableRepo.get(any[String])).thenReturn(None.pure[IO])
+      when(servableRepo.upsert(any)).thenReturn(servable.pure[IO])
       implicit val appRepo     = mock[ApplicationRepository[IO]]
       implicit val versionRepo = mock[ModelVersionRepository[IO]]
       implicit val monRepo     = mock[MonitoringRepository[IO]]
@@ -125,10 +125,10 @@ class ServableSpec extends GenericUnitTest {
       val cloudInstance        = CloudInstance(1, "kek", CloudInstance.Status.Starting)
       when(
         cloudDriver.run(
-          name = Matchers.anyString(),
-          modelVersionId = Matchers.anyLong(),
-          image = Matchers.any(),
-          config = Matchers.eq(customDC.some)
+          name = any[String],
+          modelVersionId = anyLong,
+          image = any,
+          config = eqTo(customDC.some)
         )
       ).thenReturn(IO(cloudInstance))
 
@@ -192,7 +192,7 @@ class ServableSpec extends GenericUnitTest {
 //      val depConfService = mock[DeploymentConfigurationService[IO]]
 //
 //      val cloudDriver = mock[CloudDriver[IO]]
-//      when(cloudDriver.run(Matchers.any(), Matchers.any(), Matchers.any(), Matchers.any()))
+//      when(cloudDriver.run(any, any, any, any))
 //        .thenReturn(IO.raiseError(new IllegalStateException("Shouldn't reach this")))
 //
 //      val servableRepo = mock[ServableRepository[IO]]
@@ -228,7 +228,7 @@ class ServableSpec extends GenericUnitTest {
 //      val depConfService = mock[DeploymentConfigurationService[IO]]
 //      val driverState    = ListBuffer.empty[CloudInstance]
 //      val cloudDriver    = mock[CloudDriver[IO]]
-//      when(cloudDriver.run(Matchers.any(), Matchers.any(), Matchers.any(), Matchers.any()))
+//      when(cloudDriver.run(any, any, any, any()))
 //        .thenAnswer {
 //          (name: String, id: Long, _: DockerImage, _: Option[DeploymentConfiguration]) =>
 //            val instance = CloudInstance(id, name, CloudInstance.Status.Starting)
