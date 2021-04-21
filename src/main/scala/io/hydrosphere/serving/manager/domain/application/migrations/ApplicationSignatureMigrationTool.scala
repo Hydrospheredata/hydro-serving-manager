@@ -138,10 +138,6 @@ object ApplicationSignatureMigrationTool extends Logging {
           name = ar.application_name,
           signature = signature,
           namespace = ar.namespace,
-          status = Application.Status
-            .withNameInsensitiveOption(ar.status)
-            .getOrElse(Application.Status.Failed),
-          statusMessage = ar.status_message,
           kafkaStreaming = kafkaStreams,
           graph = graph
         )

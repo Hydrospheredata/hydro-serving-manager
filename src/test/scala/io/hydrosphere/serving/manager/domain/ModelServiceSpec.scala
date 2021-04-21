@@ -8,16 +8,11 @@ import cats.effect.{Clock, IO}
 import cats.effect.concurrent.Deferred
 import cats.syntax.option._
 import io.hydrosphere.serving.manager.domain.contract.DataProfileType.IMAGE
-import io.hydrosphere.serving.manager.domain.contract.DataType.{DT_FLOAT, DT_INT32}
+import io.hydrosphere.serving.manager.domain.contract.DataType.DT_INT32
 import io.hydrosphere.serving.manager.domain.contract.Signature.{defaultSignature, validate}
 import io.hydrosphere.serving.manager.domain.contract.TensorShape
-import io.hydrosphere.serving.proto.contract.signature.ModelSignature
-//import io.hydrosphere.serving.contract.model_contract.ModelContract
-//import io.hydrosphere.serving.contract.model_field.ModelField
-//import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
-//import io.hydrosphere.serving.manager.data_profile_types.DataProfileType
 import io.hydrosphere.serving.manager.domain.application.{
   Application,
   ApplicationGraph,
@@ -25,18 +20,16 @@ import io.hydrosphere.serving.manager.domain.application.{
   ApplicationServable,
   ApplicationStage
 }
-import io.hydrosphere.serving.manager.domain.contract.{DataProfileType, DataType, Field, Signature}
+import io.hydrosphere.serving.manager.domain.contract.{Field, Signature}
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model._
 import io.hydrosphere.serving.manager.domain.model_build.ModelVersionBuilder
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableRepository}
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.{FetcherResult, ModelFetcher}
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, ModelUnpacker}
 import io.hydrosphere.serving.manager.util.DeferredResult
-import io.hydrosphere.serving.proto.contract.field.ModelField
-import io.hydrosphere.serving.proto.contract.types.{DataProfileType, DataType}
+
 import org.mockito.Matchers
 
 class ModelServiceSpec extends GenericUnitTest {
@@ -390,18 +383,28 @@ class ModelServiceSpec extends GenericUnitTest {
           installCommand = None,
           metadata = Map.empty
         )
+
+        val failServable = Servable(
+          modelVersion = appFailedVersion,
+          name = "",
+          status = Servable.Status.NotServing,
+          message = None,
+          host = None,
+          port = None
+        )
+
         val app = Application(
           id = 1,
           name = "app",
           namespace = None,
-          status = Application.Status.Failed,
-          statusMessage = None,
           signature = Signature.defaultSignature,
           kafkaStreaming = Nil,
           graph = ApplicationGraph(
             NonEmptyList.of(
               ApplicationStage(
-                NonEmptyList.of(ApplicationServable(appFailedVersion, 100)),
+                NonEmptyList.of(
+                  ApplicationServable(appFailedVersion, 100, servable = failServable.some)
+                ),
                 Signature.defaultSignature
               )
             )

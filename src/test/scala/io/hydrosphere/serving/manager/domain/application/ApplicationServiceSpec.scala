@@ -134,6 +134,23 @@ class ApplicationServiceSpec extends GenericUnitTest {
     it("should start application build") {
       ioAssert {
         val appRepo = mock[ApplicationRepository[IO]]
+        val startingServable = Servable(
+          modelVersion = modelVersion,
+          name = "",
+          status = Servable.Status.Starting,
+          message = None,
+          host = None,
+          port = None
+        )
+        val graphWithStartingServable = ApplicationGraph(
+          NonEmptyList.of(
+            ApplicationStage(
+              NonEmptyList.of(ApplicationServable(modelVersion, 100, startingServable.some)),
+              modelVersion.modelSignature
+            )
+          )
+        )
+
         when(appRepo.get("test")).thenReturn(IO(None))
         when(appRepo.create(Matchers.any())).thenReturn(
           IO(
@@ -141,10 +158,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
               id = 1,
               name = "test",
               namespace = None,
-              status = Application.Status.Assembling,
               signature = signature.copy(signatureName = "test"),
               kafkaStreaming = List.empty,
-              graph = appGraph
+              graphWithStartingServable
             )
           )
         )

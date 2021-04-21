@@ -3,7 +3,11 @@ package io.hydrosphere.serving.manager.api.http.controller.application
 import cats.data.NonEmptyList
 import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationGraphView.StageView
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationGraph, ApplicationKafkaStream}
+import io.hydrosphere.serving.manager.domain.application.{
+  Application,
+  ApplicationGraph,
+  ApplicationKafkaStream
+}
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
@@ -57,8 +61,6 @@ object ApplicationView {
     val status  = app.status.entryName
     val message = app.statusMessage
     val graph   = ApplicationGraphView.fromGraph(app.graph)
-
-
 
     ApplicationView(
       id = app.id,

@@ -29,8 +29,6 @@ trait ApplicationDeployer[F[_]] {
 }
 
 object ApplicationDeployer extends Logging {
-  case class IncompleteAppDeployment(app: Application, msg: String) extends Throwable
-
   def default[F[_]]()(implicit
       F: Concurrent[F],
       servableService: ServableService[F],
@@ -51,25 +49,7 @@ object ApplicationDeployer extends Logging {
           composedApp <- composeApp(name, None, executionGraph, kafkaStreaming, metadata)
           repoApp     <- applicationRepository.create(composedApp)
           app = composedApp.copy(id = repoApp.id)
-          _ <-
-            startServices(app).void
-              .handleErrorWith { ex =>
-                val failedApp = ex match {
-                  case IncompleteAppDeployment(incompleteApp, message) =>
-                    incompleteApp.copy(
-                      status = Application.Status.Failed,
-                      statusMessage = Option(message)
-                    )
-                  case x =>
-                    app.copy(
-                      status = Application.Status.Failed,
-                      statusMessage = Option(x.getMessage)
-                    )
-                }
-                F.delay(logger.error(s"Error while building application $failedApp", ex)) >>
-                  applicationRepository.update(failedApp).void
-              }
-              .start
+          _ <- startServices(app).void.start
         } yield app
 
       def composeApp(
@@ -122,8 +102,6 @@ object ApplicationDeployer extends Logging {
           namespace = namespace,
           signature = contract,
           kafkaStreaming = kafkaStreaming,
-          status = Application.Status.Assembling,
-          statusMessage = None,
           graph = graph,
           metadata = metadata
         )
@@ -162,9 +140,7 @@ object ApplicationDeployer extends Logging {
                   newMetricServables <-
                     mvMetrics
                       .filter(_.config.servable.isEmpty)
-                      .traverse { x =>
-                        monitoringService.deployServable(x)
-                      }
+                      .traverse(x => monitoringService.deployServable(x))
                   _ <- F.delay(logger.debug(s"Deployed MetricServables: ${newMetricServables}"))
                   servable <- servableService.deploy(
                     i.modelVersion,
@@ -175,8 +151,7 @@ object ApplicationDeployer extends Logging {
               }
             } yield ApplicationStage(variants, stage.signature)
           }
-          finishedApp =
-            app.copy(status = Application.Status.Ready, graph = ApplicationGraph(deployedStages))
+          finishedApp = app.copy(graph = ApplicationGraph(deployedStages))
           _ <- applicationRepository.update(finishedApp)
         } yield finishedApp
       }
