@@ -48,7 +48,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
 
   // TODO: implicit
   describe("Methods") {
-    val o    = MetricSpecEvents.Publisher
+    val o    = MetricSpecEvents
     val repo = DBMonitoringRepository.make[IO]()
     it("should insert a MetricSpec") {
       val msRow = CustomModelMetricSpec(
@@ -138,8 +138,7 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
         mvNew,
         "test-servable",
         Servable.Status.Serving,
-        Nil,
-        "ok",
+        "ok".some,
         "here".some,
         90.some
       )

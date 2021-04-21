@@ -2,6 +2,7 @@ package io.hydrosphere.serving.manager.it.infrastructure.db
 
 import java.time.Instant
 import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.implicits._
 import doobie.scalatest.IOChecker
 import io.hydrosphere.serving.manager.domain.contract.Signature
@@ -19,7 +20,7 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRep
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 
 class DBServableRepoSpec extends FullIntegrationSpec with IOChecker {
-  val transactor = app.transactor
+  val transactor: doobie.Transactor[IO] = app.transactor
 
   var mv1: ModelVersion.Internal       = _
   var depConf: DeploymentConfiguration = _

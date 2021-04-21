@@ -12,7 +12,7 @@ import io.hydrosphere.serving.manager.config.{DockerClientConfig, ManagerConfigu
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
-import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
+import io.hydrosphere.serving.manager.infrastructure.grpc.GrpcChannel
 import io.hydrosphere.serving.manager.util.TarGzUtils
 import io.hydrosphere.serving.manager.util.random.RNG
 import org.scalatest._

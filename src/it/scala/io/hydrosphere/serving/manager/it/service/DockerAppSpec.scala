@@ -43,12 +43,12 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
   private val upload1 = ModelUploadMetadata(
     name = "m1",
     runtime = dummyImage,
-    signature = signature.some
+    modelSignature = signature.some
   )
   private val upload2 = ModelUploadMetadata(
     name = "m2",
     runtime = dummyImage,
-    signature = signature.some
+    modelSignature = signature.some
   )
 
   var mv1: ModelVersion.Internal = _
@@ -78,12 +78,11 @@ class DockerAppSpec extends FullIntegrationSpec with BeforeAndAfterAll {
         for {
           appResult <- app.core.appService.create(create)
           _ = println("Sent creation request")
-          _ <- appResult.completed.get
           _ = println("Creation completed")
           preCont <- IO(dockerClient.listContainers())
           _ = println("sleep")
           _ <- timer.sleep(5.seconds)
-          _ <- app.core.appService.delete(appResult.started.name)
+          _ <- app.core.appService.delete(appResult.name)
           _ = println("deleted app")
           cont <- IO(dockerClient.listContainers())
         } yield {
