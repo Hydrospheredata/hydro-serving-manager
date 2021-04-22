@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager
 
-import java.nio.charset.StandardCharsets
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
@@ -37,15 +36,14 @@ import io.hydrosphere.serving.manager.domain.deploy_config.{
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
-import io.hydrosphere.serving.manager.domain.servable.ServableEvents
+import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.Database
 import io.hydrosphere.serving.manager.infrastructure.db.repository._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
-import io.hydrosphere.serving.manager.infrastructure.grpc.{GrpcChannel, PredictionClient}
+import io.hydrosphere.serving.manager.infrastructure.grpc.GrpcChannel
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.util.random.RNG
-import io.hydrosphere.serving.manager.util.{FileUtils, UUIDGenerator}
-import org.apache.commons.io.IOUtils
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -69,10 +67,9 @@ object App {
     implicit val timeout                 = Timeout(5.minute)
     implicit val serviceExecutionContext = ExecutionContext.global
     implicit val grpcCtor                = GrpcChannel.plaintextFactory[F]
-//    implicit val predictionCtor          = PredictionClient.clientCtor[F](grpcCtor)
-    implicit val storageOps = StorageOps.default[F]
-    implicit val uuidGen    = UUIDGenerator.default[F]()
-    implicit val dc         = dockerClient
+    implicit val storageOps              = StorageOps.default[F]
+    implicit val uuidGen                 = UUIDGenerator.default[F]()
+    implicit val dc                      = dockerClient
     for {
       rngF <- Resource.liftF(RNG.default[F])
       cloudDriver =
@@ -98,14 +95,16 @@ object App {
         implicit val (servablePub, servableSub) = servablePubSub
         implicit val (metricPub, metricSub)     = monitoringPubSub
         implicit val (depPub, depSUb)           = depPubSub
-        implicit val hsRepo                     = new DBDeploymentConfigurationRepository()
-        implicit val modelRepo                  = DBModelRepository.make()
-        implicit val modelVersionRepo           = DBModelVersionRepository.make()
-        implicit val servableRepo               = DBServableRepository.make()
-        implicit val appRepo                    = DBApplicationRepository.make()
-        implicit val buildLogRepo               = DBBuildLogRepository.make()
-        implicit val monitoringRepo             = DBMonitoringRepository.make()
-        implicit val imageRepo                  = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
+        implicit val hsRepo =
+          DeploymentConfigurationRepository.make(config.defaultDeploymentConfiguration)
+        implicit val modelRepo        = DBModelRepository.make()
+        implicit val modelVersionRepo = DBModelVersionRepository.make()
+        implicit val servableRepo     = DBServableRepository.make(config.defaultDeploymentConfiguration)
+        implicit val appRepo          = DBApplicationRepository.make(config.defaultDeploymentConfiguration)
+        implicit val buildLogRepo     = DBBuildLogRepository.make()
+        implicit val monitoringRepo =
+          DBMonitoringRepository.make(config.defaultDeploymentConfiguration)
+        implicit val imageRepo = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
 
         Resource.liftF(Core.make[F](config))
       }

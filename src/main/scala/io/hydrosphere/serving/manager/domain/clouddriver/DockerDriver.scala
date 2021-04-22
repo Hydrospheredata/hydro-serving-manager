@@ -15,22 +15,19 @@ import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-
 class DockerDriver[F[_]](
-  client: DockerdClient[F],
-  config: CloudDriverConfiguration.Docker
-)(
-  implicit
-  F: MonadError[F, Throwable],
+    client: DockerdClient[F],
+    config: CloudDriverConfiguration.Docker
+)(implicit
+    F: MonadError[F, Throwable]
 ) extends CloudDriver[F] {
 
   import DockerDriver._
 
-  override def instances: F[List[CloudInstance]] = {
-    client.listAllContainers.map(all => {
+  override def instances: F[List[CloudInstance]] =
+    client.listAllContainers.map { all =>
       all.map(containerToInstance).collect({ case Some(v) => v })
-    })
-  }
+    }
 
   private def containerOf(name: String): F[Option[Container]] = {
     val query = List(
@@ -44,43 +41,49 @@ class DockerDriver[F[_]](
     containerOf(name).map(_.flatMap(containerToInstance))
 
   override def run(
-    name: String,
-    modelVersionId: Long,
-    image: DockerImage,
-    deploymentConfig: Option[DeploymentConfiguration] = None
+      name: String,
+      modelVersionId: Long,
+      image: DockerImage,
+      deploymentConfig: DeploymentConfiguration
   ): F[CloudInstance] = {
-    val container = Internals.mkContainerConfig(name, modelVersionId, image, config, deploymentConfig.flatMap(_.container))
+    val container = Internals.mkContainerConfig(
+      name,
+      modelVersionId,
+      image,
+      config,
+      deploymentConfig.container
+    )
     for {
       creation <- client.createContainer(container, Some(name))
-      _ <- client.runContainer(creation.id())
+      _        <- client.runContainer(creation.id())
       maybeOut <- instance(name)
       out <- maybeOut match {
         case Some(v) => F.pure(v)
         case None =>
           val warnings = Option(creation.warnings()) match {
             case Some(l) => l.asScala.mkString("\n")
-            case None => ""
+            case None    => ""
           }
-          val msg = s"Running docker container for $name (${creation.id()}) failed. Warnings: \n $warnings"
+          val msg =
+            s"Running docker container for $name (${creation.id()}) failed. Warnings: \n $warnings"
           F.raiseError[CloudInstance](new RuntimeException(msg))
       }
     } yield out
   }
 
-  override def remove(name: String): F[Unit] = {
+  override def remove(name: String): F[Unit] =
     for {
       maybeC <- containerOf(name)
       _ <- maybeC match {
         case Some(c) =>
           val params = List(
             RemoveContainerParam.forceKill(true),
-            RemoveContainerParam.removeVolumes(true),
+            RemoveContainerParam.removeVolumes(true)
           )
           client.removeContainer(c.id, params)
         case None => F.raiseError[Unit](new Exception(s"Could not find container for $name"))
       }
     } yield ()
-  }
 
   private def containerToInstance(c: Container): Option[CloudInstance] = {
     val labels = c.labels().asScala
@@ -90,12 +93,13 @@ class DockerDriver[F[_]](
     val maybeName = Option(c.names())
       .map(_.asScala)
       .flatMap(_.headOption)
-      .map(_.tail)  // NB: name is '/container-name'. We need to remove the slash.
+      .map(_.tail) // NB: name is '/container-name'. We need to remove the slash.
       .map(n => s"dns:///$n")
     (mName, mMvId).mapN { (name, mvId) =>
       c.state() match {
         case ContainerState.Running(_) =>
-          val host = maybeName.getOrElse(Internals.extractIpAddress(c.networkSettings(), config.networkName))
+          val host =
+            maybeName.getOrElse(Internals.extractIpAddress(c.networkSettings(), config.networkName))
           val status = CloudInstance.Status.Running(host, DefaultConstants.DEFAULT_APP_PORT)
           CloudInstance(mvId, name, status)
         case ContainerState.Created(_) =>
@@ -114,7 +118,7 @@ class DockerDriver[F[_]](
       ListContainersParam.withLabel(CloudDriver.Labels.ModelVersionId, modelVersionId.toString)
     )
     val r = for {
-      cont <- OptionT(client.listContainers(query).map(_.headOption))
+      cont   <- OptionT(client.listContainers(query).map(_.headOption))
       parsed <- OptionT.fromOption[F](containerToInstance(cont))
     } yield parsed
     r.value
@@ -129,7 +133,9 @@ class DockerDriver[F[_]](
       list <- fs2.Stream.eval(client.listContainers(query))
       container <- list match {
         case head :: _ => fs2.Stream[F, Container](head)
-        case Nil => fs2.Stream.raiseError[F](DomainError.notFound(s"There is no running containers for $name"))
+        case Nil =>
+          fs2.Stream
+            .raiseError[F](DomainError.notFound(s"There is no running containers for $name"))
       }
       logMessage <- client.logs(container.id(), follow)
     } yield logMessage
@@ -145,97 +151,86 @@ object DockerDriver {
     object ContainerState {
 
       final case object Created extends ContainerState {
-        def unapply(arg: String): Option[Created.type] = {
-          if (arg == "created") {
+        def unapply(arg: String): Option[Created.type] =
+          if (arg == "created")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Restarting extends ContainerState {
-        def unapply(arg: String): Option[Restarting.type] = {
-          if (arg == "restarting") {
+        def unapply(arg: String): Option[Restarting.type] =
+          if (arg == "restarting")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Running extends ContainerState {
-        def unapply(arg: String): Option[Running.type] = {
-          if (arg == "running") {
+        def unapply(arg: String): Option[Running.type] =
+          if (arg == "running")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Paused extends ContainerState {
-        def unapply(arg: String): Option[Paused.type] = {
-          if (arg == "paused") {
+        def unapply(arg: String): Option[Paused.type] =
+          if (arg == "paused")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Exited extends ContainerState {
-        def unapply(arg: String): Option[Exited.type] = {
-          if (arg == "exited") {
+        def unapply(arg: String): Option[Exited.type] =
+          if (arg == "exited")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
       final case object Dead extends ContainerState {
-        def unapply(arg: String): Option[Dead.type] = {
-          if (arg == "dead") {
+        def unapply(arg: String): Option[Dead.type] =
+          if (arg == "dead")
             Some(this)
-          } else {
+          else
             None
-          }
-        }
       }
 
     }
 
     def mkContainerConfig(
-      name: String,
-      modelVersionId: Long,
-      image: DockerImage,
-      dockerConf: CloudDriverConfiguration.Docker,
-      config: Option[K8sContainerConfig]
+        name: String,
+        modelVersionId: Long,
+        image: DockerImage,
+        dockerConf: CloudDriverConfiguration.Docker,
+        config: Option[K8sContainerConfig]
     ): ContainerConfig = {
       val hostConfig = {
         val builder = HostConfig.builder().networkMode(dockerConf.networkName)
         val withLogs = dockerConf.loggingConfiguration match {
           case Some(c) => builder.logConfig(LogConfig.create(c.driver, c.params.asJava))
-          case None => builder
+          case None    => builder
         }
         withLogs.build()
       }
 
       val labels = Map(
-        CloudDriver.Labels.ServiceName -> name,
+        CloudDriver.Labels.ServiceName    -> name,
         CloudDriver.Labels.ModelVersionId -> modelVersionId.toString
       )
 
       val userEnvs = config.flatMap(_.env).getOrElse(Map.empty)
       val envMap = userEnvs ++ Map(
         DefaultConstants.ENV_MODEL_DIR -> DefaultConstants.DEFAULT_MODEL_DIR,
-        DefaultConstants.ENV_APP_PORT -> DefaultConstants.DEFAULT_APP_PORT.toString
+        DefaultConstants.ENV_APP_PORT  -> DefaultConstants.DEFAULT_APP_PORT.toString
       )
 
       val envs = envMap.map({ case (k, v) => s"$k=$v" }).toList.asJava
 
-      ContainerConfig.builder()
+      ContainerConfig
+        .builder()
         .image(image.fullName)
         .exposedPorts(DefaultConstants.DEFAULT_APP_PORT.toString)
         .labels(labels.asJava)

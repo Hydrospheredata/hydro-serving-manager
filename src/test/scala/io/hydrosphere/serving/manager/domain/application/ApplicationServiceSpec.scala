@@ -10,6 +10,7 @@ import io.hydrosphere.serving.manager.domain.{deploy_config, DomainError}
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.contract.DataType.DT_DOUBLE
 import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
@@ -181,7 +182,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
                 Servable.Status.Serving,
                 message = "ok",
                 host = Some("hoat"),
-                port = Some(9090)
+                port = Some(9090),
+                deploymentConfiguration = DeploymentConfiguration.empty
               )
               val d = Deferred[IO, Servable].unsafeRunSync()
               d.complete(s).unsafeRunSync()
@@ -272,7 +274,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
                 Servable.Status.NotServing,
                 message = "error",
                 host = None,
-                port = None
+                port = None,
+                deploymentConfiguration = DeploymentConfiguration.empty
               )
             )
         }
@@ -363,7 +366,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
               usedApps = Nil,
               message = "Ok",
               host = Some("host"),
-              port = Some(9090)
+              port = Some(9090),
+              deploymentConfiguration = DeploymentConfiguration.empty
             )
             DeferredResult.completed(s)
           }
@@ -431,7 +435,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
               usedApps = Nil,
               message = "Ok",
               host = Some("host"),
-              port = Some(9090)
+              port = Some(9090),
+              deploymentConfiguration = DeploymentConfiguration.empty
             )
             DeferredResult.completed[IO, Servable](s)
           }
@@ -545,7 +550,8 @@ class ApplicationServiceSpec extends GenericUnitTest {
                 Servable.Status.Serving,
                 message = "Ok",
                 host = Some("host"),
-                port = Some(9090)
+                port = Some(9090),
+                deploymentConfiguration = DeploymentConfiguration.empty
               )
             )
         }

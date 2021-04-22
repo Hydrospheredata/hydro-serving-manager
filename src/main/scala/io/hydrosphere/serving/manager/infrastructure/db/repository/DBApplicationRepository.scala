@@ -227,7 +227,7 @@ object DBApplicationRepository {
          | WHERE id = $id
       """.stripMargin.update
 
-  def make[F[_]]()(implicit
+  def make[F[_]](defaultDC: DeploymentConfiguration)(implicit
       F: Bracket[F, Throwable],
       tx: Transactor[F],
       appPublisher: ApplicationEvents.Publisher[F]
@@ -351,9 +351,13 @@ object DBApplicationRepository {
                   .getManyQ(value)
                   .to[List]
                   .map(list =>
-                    list.map(x => DBServableRepository.toServableT(x)).collect {
-                      case Right(x) => x
-                    }
+                    list
+                      .map(x =>
+                        DBServableRepository.toServable(x._1, x._2, x._3, x._4, x._5, defaultDC)
+                      )
+                      .collect {
+                        case Right(x) => x
+                      }
                   )
                   .transact(tx)
               case None => F.pure(List.empty)
@@ -362,7 +366,7 @@ object DBApplicationRepository {
           servableMap     = servables.map(x => x.fullName -> x).toMap
           deploymentNames = nodesOrError.toList.flatMap(s => s.requiredDeployConfig)
           deployments <- {
-            NonEmptyList.fromList(deploymentNames) match {
+            val deps = NonEmptyList.fromList(deploymentNames) match {
               case Some(value) =>
                 DBDeploymentConfigurationRepository
                   .getManyQ(value)
@@ -370,6 +374,7 @@ object DBApplicationRepository {
                   .transact(tx)
               case None => F.pure(List.empty)
             }
+            deps.map(defaultDC +: _)
           }
 
           deploymentMap = deployments.map(x => x.name -> x).toMap

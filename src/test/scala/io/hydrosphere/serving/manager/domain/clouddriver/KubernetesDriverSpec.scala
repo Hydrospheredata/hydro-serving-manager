@@ -45,7 +45,7 @@ class KubernetesDriverSpec extends GenericUnitTest {
     val image          = DockerImage("yep/image", "tag")
 
     it("should create a Deployment and a Service with no DepConf for a Servable") {
-      val config = None
+      val config = DeploymentConfiguration.empty
 
       // TODO set specific arguments
       val deployments = mock[K8SDeployments[IO]]
@@ -55,7 +55,7 @@ class KubernetesDriverSpec extends GenericUnitTest {
         dockerImage = image,
         dockerRepoHost = "host",
         kubeRegistrySecretName = "secret",
-        crc = None
+        crc = config
       )
 
       when(deployments.create(dep1)).thenReturn(dep1.pure[IO])
@@ -116,7 +116,7 @@ class KubernetesDriverSpec extends GenericUnitTest {
         container = None,
         pod = None,
         deployment = None
-      ).some
+      )
 
       val deps = mock[K8SDeployments[IO]]
       when(deps.create(Matchers.any())).thenReturn(

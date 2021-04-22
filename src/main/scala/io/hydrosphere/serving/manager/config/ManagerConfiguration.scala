@@ -1,31 +1,37 @@
 package io.hydrosphere.serving.manager.config
 
-import java.nio.file.Path
+import cats.Show
 import cats.effect.Sync
 import cats.syntax.either._
 import com.amazonaws.regions.Regions
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
-import pureconfig.{ConfigReader, ConfigSource}
-import pureconfig.error.CannotConvert
-import pureconfig.generic.auto._
 import io.circe.parser._
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
+import pureconfig.error.CannotConvert
+import pureconfig.{ConfigReader, ConfigSource}
+import pureconfig.generic.auto._
+import cats.derived.semiauto
 
 case class ManagerConfiguration(
     application: ApplicationConfig,
-    localStorage: Option[Path],
     database: HikariConfiguration,
     cloudDriver: CloudDriverConfiguration,
     dockerRepository: DockerRepositoryConfiguration,
-    defaultDeploymentConfiguration: Option[DeploymentConfiguration]
+    defaultDeploymentConfiguration: DeploymentConfiguration = DeploymentConfiguration.empty
 )
 
 object ManagerConfiguration {
-  implicit val depConfigReader: ConfigReader[DeploymentConfiguration] = ConfigReader.fromString {
-    str =>
-      decode[DeploymentConfiguration](str).leftMap { err =>
-        CannotConvert(str, classOf[DeploymentConfiguration].getSimpleName, err.getMessage)
-      }
+  implicit val show: Show[ManagerConfiguration] = {
+    implicit val depConfShow: Show[DeploymentConfiguration] = Show.fromToString
+    semiauto.show
   }
+  implicit val depConfigReader: ConfigReader[DeploymentConfiguration] =
+    ConfigReader
+      .fromString { str =>
+        decode[DefaultDeploymentConfiguration](str).leftMap { err =>
+          CannotConvert(str, classOf[DefaultDeploymentConfiguration].getSimpleName, err.getMessage)
+        }
+      }
+      .map(_.toDC)
 
   implicit val regionsConfigReader: ConfigReader[Regions] = ConfigReader.fromString { str =>
     Either
