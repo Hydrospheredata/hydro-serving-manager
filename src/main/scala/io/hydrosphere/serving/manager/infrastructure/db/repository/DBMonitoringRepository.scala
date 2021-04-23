@@ -13,6 +13,7 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRep
 import scala.util.Try
 import io.circe.parser._
 import io.circe.syntax._
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 
 object DBMonitoringRepository {
 
@@ -104,7 +105,7 @@ object DBMonitoringRepository {
            DELETE FROM hydro_serving.metric_specs WHERE id = $specId
          """.update
 
-  def make[F[_]]()(implicit
+  def make[F[_]](defaultDC: DeploymentConfiguration)(implicit
       F: Bracket[F, Throwable],
       tx: Transactor[F],
       pub: MetricSpecEvents.Publisher[F]
@@ -150,7 +151,9 @@ object DBMonitoringRepository {
           servableRow <- parsedConfig.servableName.flatTraverse[F, JoinedServableRow] {
             servableName => DBServableRepository.getQ(servableName).option.transact(tx)
           }
-          servable <- servableRow.traverse(x => F.fromEither(DBServableRepository.toServableT(x)))
+          servable <- servableRow.traverse(x =>
+            F.fromEither(DBServableRepository.toServable(x._1, x._2, x._3, x._4, x._5, defaultDC))
+          )
         } yield {
           val config = CustomModelMetricSpecConfiguration(
             modelVersionId = parsedConfig.modelVersionId,

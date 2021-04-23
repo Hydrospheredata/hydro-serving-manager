@@ -3,9 +3,11 @@ package io.hydrosphere.serving.manager.domain
 import java.time.Instant
 import cats.effect.IO
 import cats.implicits._
+import com.amazonaws.services.ecs.model.transform.DeploymentConfigurationJsonUnmarshaller
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
@@ -22,6 +24,7 @@ import io.hydrosphere.serving.manager.domain.servable.{
   ServableRepository,
   ServableService
 }
+import io.hydrosphere.serving.proto.contract.signature.ModelSignature
 import org.mockito.Mockito
 
 class ServableGCSpec extends GenericUnitTest {
@@ -51,7 +54,8 @@ class ServableGCSpec extends GenericUnitTest {
         usedApps = List.empty,
         port = Some(9090),
         host = Some("localhost"),
-        message = "ok".some
+        message = "ok".some,
+        deploymentConfiguration = DeploymentConfiguration.empty
       )
       val metricServable = Servable(
         modelVersion = mv,
@@ -60,7 +64,8 @@ class ServableGCSpec extends GenericUnitTest {
         usedApps = List.empty,
         port = Some(9090),
         host = Some("localhost"),
-        message = "ok".some
+        message = "ok".some,
+        deploymentConfiguration = DeploymentConfiguration.empty
       )
 
       implicit val servableRepo: ServableRepository[IO] = mock[ServableRepository[IO]]

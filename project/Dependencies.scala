@@ -14,6 +14,7 @@ object Dependencies {
   val fs2               = "2.4.4"
   val enumeratumV       = "1.6.0"
   val mockitoScalaV     = "1.16.37"
+  val monocleV          = "3.0.0-M4"
 
   lazy val awsDependencies = Seq(
     "com.amazonaws" % "aws-java-sdk-ecs"     % awsSdkVersion,
@@ -55,8 +56,8 @@ object Dependencies {
     "org.scalactic"     %% "scalactic"               % scalaTestVersion % "test,it",
     "org.scalatest"     %% "scalatest"               % scalaTestVersion % "test,it",
     "com.typesafe.akka" %% "akka-testkit"            % akkaVersion      % "test,it",
-    "com.amazonaws"      % "aws-java-sdk-test-utils" % "1.11.174"       % "test,it"
-//    "org.scalatestplus" %% "mockito-3-4"             % "3.2.2.0"        % "test"
+    "com.amazonaws"      % "aws-java-sdk-test-utils" % "1.11.174"       % "test,it",
+    "org.scalatestplus" %% "mockito-3-4"             % "3.2.2.0"        % "test"
   )
 
   lazy val logDependencies = Seq(
@@ -95,6 +96,9 @@ object Dependencies {
     akkaCirceDependencies ++
     enumeratumDependencies ++
     Seq(
+//      "com.github.julien-truffaut" %% "monocle-core"      % monocleV,
+//      "com.github.julien-truffaut" %% "monocle-macro"     % monocleV, // only for Scala 2.13
+      "org.typelevel"         %% "kittens"           % "2.2.1",
       "org.typelevel"         %% "cats-effect"       % catsV,
       "org.tpolecat"          %% "doobie-core"       % "0.9.0",
       "org.tpolecat"          %% "doobie-postgres"   % "0.9.0",

@@ -12,6 +12,14 @@ import io.hydrosphere.serving.manager.domain.contract.DataProfileType.IMAGE
 import io.hydrosphere.serving.manager.domain.contract.DataType.DT_INT32
 import io.hydrosphere.serving.manager.domain.contract.Signature.{defaultSignature, validate}
 import io.hydrosphere.serving.manager.domain.contract.TensorShape
+import io.hydrosphere.serving.manager.domain.deploy_config.{
+  DeploymentConfiguration,
+  DeploymentConfigurationRepository
+}
+import io.hydrosphere.serving.proto.contract.signature.ModelSignature
+//import io.hydrosphere.serving.contract.model_contract.ModelContract
+//import io.hydrosphere.serving.contract.model_field.ModelField
+//import io.hydrosphere.serving.contract.model_signature.ModelSignature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.domain.application._
@@ -383,7 +391,8 @@ class ModelServiceSpec extends GenericUnitTest {
           status = Servable.Status.NotServing,
           message = None,
           host = None,
-          port = None
+          port = None,
+          deploymentConfiguration = DeploymentConfiguration.empty
         )
 
         val app = Application(
@@ -426,7 +435,8 @@ class ModelServiceSpec extends GenericUnitTest {
           metadata = Map.empty,
           host = None,
           port = None,
-          message = "asd".some
+          message = "asd".some,
+          deploymentConfiguration = DeploymentConfiguration.empty
         )
         val okModel = Model(3, "ok")
         val okVersion1 = ModelVersion.Internal(

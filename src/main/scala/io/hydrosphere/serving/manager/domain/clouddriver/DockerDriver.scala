@@ -44,14 +44,14 @@ class DockerDriver[F[_]](
       name: String,
       modelVersionId: Long,
       image: DockerImage,
-      deploymentConfig: Option[DeploymentConfiguration] = None
+      deploymentConfig: DeploymentConfiguration
   ): F[CloudInstance] = {
     val container = Internals.mkContainerConfig(
       name,
       modelVersionId,
       image,
       config,
-      deploymentConfig.flatMap(_.container)
+      deploymentConfig.container
     )
     for {
       creation <- client.createContainer(container, Some(name))

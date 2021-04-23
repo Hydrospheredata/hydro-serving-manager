@@ -6,6 +6,7 @@ import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurati
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable.Status
 
+// TODO: port/host
 @JsonCodec
 case class Servable(
     modelVersion: ModelVersion.Internal,
@@ -16,8 +17,11 @@ case class Servable(
     port: Option[Int],
     usedApps: List[String] = Nil,
     metadata: Map[String, String] = Map.empty,
-    deploymentConfiguration: Option[DeploymentConfiguration] = None
-)
+    deploymentConfiguration: DeploymentConfiguration
+) {
+  def fullName: String =
+    Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, name)
+}
 
 object Servable {
 
@@ -36,8 +40,5 @@ object Servable {
 
   def extractSuffix(modelName: String, modelVersion: Long, name: String): String =
     name.replaceFirst(s"${modelName.replace("_", "-")}-$modelVersion-", "")
-
-
-
 
 }

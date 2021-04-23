@@ -40,7 +40,11 @@ object DBServableRepository {
   type JoinedServableRow =
     (ServableRow, ModelVersionRow, ModelRow, Option[DeploymentConfiguration], Option[List[String]])
 
-  def fromServable(s: Servable): ServableRow =
+  def fromServable(s: Servable, defaultDCName: String): ServableRow = {
+    val depConf =
+      if (s.deploymentConfiguration.name == defaultDCName)
+        None
+      else s.deploymentConfiguration.name.some
     ServableRow(
       service_name = s.name,
       model_version_id = s.modelVersion.id,
@@ -49,16 +53,20 @@ object DBServableRepository {
       port = s.port,
       status = s.status.entryName,
       metadata = s.metadata.maybeEmpty.map(_.asJson.noSpaces),
-      deployment_configuration = s.deploymentConfiguration.map(_.name)
+      deployment_configuration = depConf
     )
+  }
 
   def toServable(
       sr: ServableRow,
       mvr: ModelVersionRow,
       mr: ModelRow,
       deploymentConfig: Option[DeploymentConfiguration],
-      apps: Option[List[String]]
-  ): Either[Throwable, Servable] = {
+      apps: Option[List[String]],
+      defaultDC: DeploymentConfiguration
+  ) = {
+
+    val suffix = Servable.extractSuffix(mr.name, mvr.model_version, sr.service_name)
     val status =
       Servable.Status.withNameInsensitiveOption(sr.status).getOrElse(Servable.Status.NotAvailable)
 
@@ -70,7 +78,7 @@ object DBServableRepository {
             Right(
               Servable(
                 modelVersion = imv,
-                name =  sr.service_name,
+                name = sr.service_name,
                 status = status,
                 usedApps = apps.getOrElse(Nil),
                 metadata = sr.metadata
@@ -79,7 +87,7 @@ object DBServableRepository {
                 message = sr.status_text,
                 host = sr.host,
                 port = sr.port,
-                deploymentConfiguration = deploymentConfig
+                deploymentConfiguration = deploymentConfig.getOrElse(defaultDC)
               )
             )
           case emv: ModelVersion.External =>
@@ -91,8 +99,6 @@ object DBServableRepository {
         }
       )
   }
-
-  def toServableT = (toServable _).tupled
 
   def allQ =
     sql"""
@@ -153,7 +159,7 @@ object DBServableRepository {
          |   WHERE hydro_serving.servable.model_version_id = $versionId
       """.stripMargin.query[JoinedServableRow]
 
-  def make[F[_]]()(implicit
+  def make[F[_]](defaultDC: DeploymentConfiguration)(implicit
       F: Bracket[F, Throwable],
       tx: Transactor[F],
       servablePub: ServableEvents.Publisher[F]
@@ -162,19 +168,23 @@ object DBServableRepository {
       override def findForModelVersion(versionId: Long): F[List[Servable]] =
         for {
           rows <- findForModelVersionQ(versionId).to[List].transact(tx)
-        } yield rows.map(x => toServableT(x).toOption).collect {
-          case Some(x) => x
-        }
+        } yield rows
+          .map(x => toServable(x._1, x._2, x._3, x._4, x._5, defaultDC).toOption)
+          .collect {
+            case Some(x) => x
+          }
 
       override def all(): F[List[Servable]] =
         for {
           rows <- allQ.to[List].transact(tx)
-        } yield rows.map(x => toServableT(x).toOption).collect {
-          case Some(x) => x
-        }
+        } yield rows
+          .map(x => toServable(x._1, x._2, x._3, x._4, x._5, defaultDC).toOption)
+          .collect {
+            case Some(x) => x
+          }
 
       override def upsert(servable: Servable): F[Servable] = {
-        val row = fromServable(servable)
+        val row = fromServable(servable, defaultDC.name)
         upsertQ(row).run
           .transact(tx)
           .as(servable)
@@ -189,15 +199,17 @@ object DBServableRepository {
       override def get(name: String): F[Option[Servable]] =
         for {
           row <- getQ(name).option.transact(tx)
-        } yield row.flatMap(x => toServableT(x).toOption)
+        } yield row.flatMap(x => toServable(x._1, x._2, x._3, x._4, x._5, defaultDC).toOption)
 
       override def get(names: Seq[String]): F[List[Servable]] = {
         val okCase = for {
           nonEmptyNames <- OptionT.fromOption[F](NonEmptyList.fromList(names.toList))
           rows          <- OptionT.liftF(getManyQ(nonEmptyNames).to[List].transact(tx))
-        } yield rows.map(x => toServableT(x).toOption).collect {
-          case Some(x) => x
-        }
+        } yield rows
+          .map(x => toServable(x._1, x._2, x._3, x._4, x._5, defaultDC).toOption)
+          .collect {
+            case Some(x) => x
+          }
         okCase.getOrElse(Nil)
       }
     }

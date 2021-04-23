@@ -4,7 +4,10 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.implicits._
-import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
+import io.hydrosphere.serving.manager.config.{
+  CloudDriverConfiguration,
+  DockerRepositoryConfiguration
+}
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -15,8 +18,7 @@ import skuber.Service.Port
 import skuber.apps.v1.Deployment
 import skuber.autoscaling.HorizontalPodAutoscaler.CrossVersionObjectReference
 import skuber.autoscaling.{CPUTargetUtilization, HorizontalPodAutoscaler}
-import skuber.{Container, EnvVar, LocalObjectReference, ObjectMeta, Pod, Protocol, Service, autoscaling}
-
+import skuber._
 import scala.language.reflectiveCalls
 import scala.util.Try
 
@@ -52,7 +54,7 @@ class KubernetesDriver[F[_]](
       name: String,
       modelVersionId: Long,
       image: DockerImage,
-      config: Option[DeploymentConfiguration] = None
+      config: DeploymentConfiguration
   ): F[CloudInstance] = {
     val depTemplate = KubernetesDriver.prepareDeployment(
       name = name,
@@ -63,7 +65,7 @@ class KubernetesDriver[F[_]](
       crc = config
     )
 
-    val hpaTemplate     = config.flatMap(_.hpa).map(KubernetesDriver.prepareHPA(name, depTemplate, _))
+    val hpaTemplate     = config.hpa.map(KubernetesDriver.prepareHPA(name, depTemplate, _))
     val serviceTemplate = KubernetesDriver.prepareService(name, modelVersionId)
     for {
       _       <- client.deployments.create(depTemplate)
@@ -115,13 +117,13 @@ object KubernetesDriver {
       dockerImage: DockerImage,
       dockerRepoHost: String,
       kubeRegistrySecretName: String,
-      crc: Option[DeploymentConfiguration] = None
+      crc: DeploymentConfiguration
   ): Deployment = {
     import skuber.LabelSelector.dsl._
 
-    val depConf       = crc.flatMap(_.deployment)
-    val podConf       = crc.flatMap(_.pod)
-    val containerConf = crc.flatMap(_.container)
+    val depConf       = crc.deployment
+    val podConf       = crc.pod
+    val containerConf = crc.container
 
     val image = dockerImage.replaceHost(dockerRepoHost).toTry.get
 

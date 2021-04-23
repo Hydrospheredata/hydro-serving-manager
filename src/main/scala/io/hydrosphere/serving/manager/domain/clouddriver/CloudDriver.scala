@@ -3,7 +3,10 @@ package io.hydrosphere.serving.manager.domain.clouddriver
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import cats.effect._
-import io.hydrosphere.serving.manager.config.{CloudDriverConfiguration, DockerRepositoryConfiguration}
+import io.hydrosphere.serving.manager.config.{
+  CloudDriverConfiguration,
+  DockerRepositoryConfiguration
+}
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
@@ -28,9 +31,9 @@ object CloudInstance {
 }
 
 case class CloudInstance(
-  modelVersionId: Long,
-  name: String,
-  status: CloudInstance.Status
+    modelVersionId: Long,
+    name: String,
+    status: CloudInstance.Status
 )
 
 trait CloudDriver[F[_]] {
@@ -39,7 +42,12 @@ trait CloudDriver[F[_]] {
 
   def instance(name: String): F[Option[CloudInstance]]
 
-  def run(name: String, modelVersionId: Long, image: DockerImage, config: Option[DeploymentConfiguration]): F[CloudInstance]
+  def run(
+      name: String,
+      modelVersionId: Long,
+      image: DockerImage,
+      config: DeploymentConfiguration
+  ): F[CloudInstance]
 
   def remove(name: String): F[Unit]
 
@@ -65,10 +73,10 @@ object CloudDriver {
   )(implicit
       F: Async[F],
       cs: ContextShift[F],
+      c: Concurrent[F],
       ex: ExecutionContext,
       actorSystem: ActorSystem,
-      materializer: Materializer,
-      c: Concurrent[F]
+      materializer: Materializer
   ): CloudDriver[F] =
     config match {
       case dockerConf: CloudDriverConfiguration.Docker =>

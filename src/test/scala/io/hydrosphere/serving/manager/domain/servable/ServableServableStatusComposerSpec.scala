@@ -5,7 +5,7 @@ import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
-
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import cats.implicits._
 
 import java.time.Instant
@@ -34,7 +34,7 @@ class ServableServableStatusComposerSpec extends GenericUnitTest {
     port = None,
     usedApps = Nil,
     metadata = Map.empty,
-    deploymentConfiguration = None
+    deploymentConfiguration = DeploymentConfiguration.empty
   )
 
   val notServingServable: Servable = Servable(
@@ -46,7 +46,7 @@ class ServableServableStatusComposerSpec extends GenericUnitTest {
     port = None,
     usedApps = Nil,
     metadata = Map.empty,
-    deploymentConfiguration = None
+    deploymentConfiguration = DeploymentConfiguration.empty
   )
 
   describe("with one servable") {

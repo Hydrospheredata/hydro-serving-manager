@@ -1,45 +1,27 @@
 package io.hydrosphere.serving.manager.config
 
-import com.amazonaws.regions.Regions
+import cats.Show
+import cats.derived.semiauto
 
 sealed trait CloudDriverConfiguration {
   def loggingConfiguration: Option[ModelLoggingConfiguration]
 }
 
 object CloudDriverConfiguration {
-  case class Swarm(
-    networkName: String,
-    loggingConfiguration: Option[ModelLoggingConfiguration]
-  ) extends CloudDriverConfiguration
-
   case class Docker(
-    networkName: String,
-    loggingConfiguration: Option[ModelLoggingConfiguration]
+      networkName: String,
+      loggingConfiguration: Option[ModelLoggingConfiguration]
   ) extends CloudDriverConfiguration
 
-  case class Local(
-    loggingConfiguration: Option[ModelLoggingConfiguration],
-    monitoring: Option[LocalDockerCloudDriverServiceConfiguration],
-    profiler: Option[LocalDockerCloudDriverServiceConfiguration],
-    gateway: Option[LocalDockerCloudDriverServiceConfiguration]
-  ) extends CloudDriverConfiguration
-
-  case class Ecs(
-    region: Regions,
-    cluster: String,
-    accountId: String,
-    loggingConfiguration: Option[ModelLoggingConfiguration],
-    memoryReservation: Int = 200,
-    internalDomainName: String,
-    vpcId: String
-  ) extends CloudDriverConfiguration
-  
   case class Kubernetes(
-    proxyHost: String,
-    proxyPort: Int,
-    kubeNamespace: String,
-    kubeRegistrySecretName: String,
-    loggingConfiguration: Option[ModelLoggingConfiguration]
+      proxyHost: String,
+      proxyPort: Int,
+      kubeNamespace: String,
+      kubeRegistrySecretName: String,
+      loggingConfiguration: Option[ModelLoggingConfiguration]
   ) extends CloudDriverConfiguration
-}
 
+  implicit val dockerShow: Show[Docker]           = semiauto.show
+  implicit val localShow: Show[Kubernetes]        = semiauto.show
+  implicit val cd: Show[CloudDriverConfiguration] = semiauto.show
+}

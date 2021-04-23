@@ -1,7 +1,9 @@
 package io.hydrosphere.serving.manager.config
 
 import cats.effect.IO
+import cats.implicits._
 import io.hydrosphere.serving.manager.GenericUnitTest
+import io.hydrosphere.serving.manager.domain.deploy_config.DEFAULT_DEPLOYMENT_CONFIG_NAME
 import pureconfig.ConfigSource
 
 class ConfigLoaderSpecs extends GenericUnitTest {
@@ -11,9 +13,8 @@ class ConfigLoaderSpecs extends GenericUnitTest {
       val config = ManagerConfiguration
         .load[IO](source)
         .unsafeRunSync()
-      print(config)
-      assert(config.defaultDeploymentConfiguration.isDefined)
-      assert(config.defaultDeploymentConfiguration.get.name == "default")
+      print(config.show)
+      assert(config.defaultDeploymentConfiguration.name == DEFAULT_DEPLOYMENT_CONFIG_NAME)
     }
   }
 }
