@@ -1,37 +1,28 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, IO}
 import cats.syntax.applicative._
 import cats.syntax.option._
-
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.domain.{deploy_config, DomainError}
+import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.requests._
-import io.hydrosphere.serving.manager.domain.contract.DataType.DT_DOUBLE
-import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.monitoring.{
-  CustomModelMetricSpec,
-  CustomModelMetricSpecConfiguration,
-  Monitoring,
-  MonitoringRepository,
-  ThresholdCmpOperator
-}
+import io.hydrosphere.serving.manager.domain.monitoring._
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableGC, ServableService}
-import io.hydrosphere.serving.manager.util.DeferredResult
-import org.mockito.{Matchers, Mockito}
+import org.mockito.Mockito
 
+import java.time.Instant
 import scala.collection.mutable.ListBuffer
 
 class ApplicationServiceSpec extends GenericUnitTest {
-  val signature = Signature.defaultSignature
+  val signature: Signature = Signature.defaultSignature
 
-  val modelVersion = ModelVersion.Internal(
+  val modelVersion: ModelVersion.Internal = ModelVersion.Internal(
     id = 1,
     image = DockerImage("test", "t"),
     created = Instant.now(),
@@ -44,7 +35,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
     installCommand = None,
     metadata = Map.empty
   )
-  val externalMv = ModelVersion.External(
+  val externalMv: ModelVersion.External = ModelVersion.External(
     id = 1,
     created = Instant.now(),
     modelVersion = 1,
@@ -53,7 +44,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
     metadata = Map.empty
   )
 
-  def appGraph =
+  def appGraph: ApplicationGraph =
     ApplicationGraph(
       NonEmptyList.of(
         ApplicationStage(
@@ -180,226 +171,6 @@ class ApplicationServiceSpec extends GenericUnitTest {
           assert(res.name == "test")
           assert(res.status.isInstanceOf[Application.Status.Assembling.type])
         // build will fail nonetheless
-        }
-      }
-    }
-
-    it("should handle failed application builds") {
-      ioAssert {
-        val appRepo = mock[ApplicationRepository[IO]]
-        when(appRepo.update(any)).thenReturn(IO.pure(1))
-        when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(any)).thenReturn(
-          IO(
-            Application(
-              id = 1,
-              name = "test",
-              namespace = None,
-              signature = signature.copy(signatureName = "test"),
-              kafkaStreaming = List.empty,
-              graph = appGraph
-            )
-          )
-        )
-        val versionRepo = mock[ModelVersionRepository[IO]]
-        when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
-
-        val servableService = mock[ServableService[IO]]
-        when(servableService.deploy(any[ModelVersion.Internal], any, anyMap)) thenAnswer {
-          (mv: ModelVersion.Internal, _: DeploymentConfiguration, _: Map[String, String]) =>
-            IO {
-              Servable(
-                modelVersion = mv,
-                "kek",
-                Servable.Status.NotServing,
-                message = "error".some,
-                host = None,
-                port = None,
-                deploymentConfiguration = DeploymentConfiguration.empty
-              )
-            }
-        }
-
-        val monitoringRepo = mock[MonitoringRepository[IO]]
-        when(monitoringRepo.forModelVersion(1)).thenReturn(Nil.pure[IO])
-
-        val appDeployer = ApplicationDeployer.default[IO]()(
-          Concurrent[IO],
-          applicationRepository = appRepo,
-          versionRepository = versionRepo,
-          servableService = servableService,
-          deploymentConfigService = null,
-          monitoringService = null,
-          monitoringRepo = monitoringRepo
-        )
-        val graph = ExecutionGraphRequest(
-          NonEmptyList.of(
-            PipelineStageRequest(
-              NonEmptyList.of(
-                ModelVariantRequest(
-                  modelVersionId = 1,
-                  weight = 100
-                )
-              )
-            )
-          )
-        )
-
-        appDeployer.deploy("test", graph, List.empty, Map.empty).map { res =>
-          println("Waiting for build")
-          assert(res.status == Application.Status.Failed)
-          assert(res.statusMessage.get === "Servable model-1-kek is in invalid state: error")
-        }
-      }
-    }
-
-    it("should handle finished builds") {
-      ioAssert {
-        val appRepo = mock[ApplicationRepository[IO]]
-        when(appRepo.update(any)).thenReturn(IO(1))
-        when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(any)).thenReturn(
-          IO(
-            Application(
-              id = 1,
-              name = "test",
-              namespace = None,
-              signature = signature.copy(signatureName = "test"),
-              kafkaStreaming = List.empty,
-              graph = appGraph
-            )
-          )
-        )
-        val versionRepo = mock[ModelVersionRepository[IO]]
-        when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
-
-        val servableService = mock[ServableService[IO]]
-        when(servableService.deploy(any[ModelVersion.Internal], any, anyMap)) thenAnswer {
-          (mv: ModelVersion.Internal, _: DeploymentConfiguration, _: Map[String, String]) =>
-            IO {
-              Servable(
-                modelVersion = mv,
-                name = "test",
-                status = Servable.Status.Serving,
-                usedApps = Nil,
-                message = "Ok".some,
-                host = Some("host"),
-                port = Some(9090),
-                deploymentConfiguration = DeploymentConfiguration.empty
-              )
-            }
-        }
-
-        val graph = ExecutionGraphRequest(
-          NonEmptyList.of(
-            PipelineStageRequest(
-              NonEmptyList.of(
-                ModelVariantRequest(
-                  modelVersionId = 1,
-                  weight = 100
-                )
-              )
-            )
-          )
-        )
-        val monitoringRepo = mock[MonitoringRepository[IO]]
-        when(monitoringRepo.forModelVersion(1)).thenReturn(Nil.pure[IO])
-        val appDeployer = ApplicationDeployer.default[IO]()(
-          Concurrent[IO],
-          applicationRepository = appRepo,
-          versionRepository = versionRepo,
-          servableService = servableService,
-          deploymentConfigService = null,
-          monitoringService = null,
-          monitoringRepo = monitoringRepo
-        )
-        appDeployer.deploy("test", graph, List.empty, Map.empty).map { res =>
-          assert(res.name === "test")
-          assert(res.status.isInstanceOf[Application.Status.Ready.type])
-        }
-      }
-    }
-
-    it("should recreate missing MetricSpec Servables") {
-      ioAssert {
-        val appRepo = mock[ApplicationRepository[IO]]
-        when(appRepo.update(any)).thenReturn(IO(1))
-        when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(any)).thenReturn(
-          IO(
-            Application(
-              id = 1,
-              name = "test",
-              namespace = None,
-              signature = signature.copy(signatureName = "test"),
-              kafkaStreaming = List.empty,
-              graph = appGraph
-            )
-          )
-        )
-        val versionRepo = mock[ModelVersionRepository[IO]]
-        when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
-
-        val servableService = mock[ServableService[IO]]
-        when(servableService.deploy(eqTo(modelVersion), eqTo(None), any))
-          .thenReturn {
-            IO {
-              Servable(
-                modelVersion = modelVersion,
-                name = "test",
-                status = Servable.Status.Serving,
-                usedApps = Nil,
-                message = "Ok".some,
-                host = Some("host"),
-                port = Some(9090),
-                deploymentConfiguration = DeploymentConfiguration.empty
-              )
-            }
-          }
-
-        val spec = CustomModelMetricSpec(
-          name = "test1",
-          modelVersionId = modelVersion.id,
-          config = CustomModelMetricSpecConfiguration(
-            modelVersionId = 2,
-            threshold = 2,
-            thresholdCmpOperator = ThresholdCmpOperator.Eq,
-            servable = None,
-            deploymentConfigName = None
-          )
-        )
-        val monitoringRepo = mock[MonitoringRepository[IO]]
-        when(monitoringRepo.forModelVersion(1)).thenReturn(List(spec).pure[IO])
-
-        val monitoringService = mock[Monitoring[IO]]
-        when(monitoringService.deployServable(spec)).thenReturn(spec.pure[IO])
-        val appDeployer = ApplicationDeployer.default[IO]()(
-          Concurrent[IO],
-          applicationRepository = appRepo,
-          versionRepository = versionRepo,
-          servableService = servableService,
-          deploymentConfigService = null,
-          monitoringService = monitoringService,
-          monitoringRepo = monitoringRepo
-        )
-        val graph = ExecutionGraphRequest(
-          NonEmptyList.of(
-            PipelineStageRequest(
-              NonEmptyList.of(
-                ModelVariantRequest(
-                  modelVersionId = 1,
-                  weight = 100
-                )
-              )
-            )
-          )
-        )
-        val app = appDeployer.deploy("test", graph, List.empty, Map.empty)
-
-        app.map { res =>
-          Mockito.verify(monitoringService).deployServable(spec)
-          assert(res.name === "test")
-          assert(res.status.isInstanceOf[Application.Status.Ready.type])
         }
       }
     }

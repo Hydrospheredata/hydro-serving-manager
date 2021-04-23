@@ -122,19 +122,31 @@ object ServableService extends Logging {
               )
           }
           randomSuffix <- generateUniqueSuffix(modelVersion)
-          initServable = Servable(
-            modelVersion = modelVersion,
-            name = Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, randomSuffix),
-            status = Servable.Status.Starting,
-            usedApps = Nil,
-            message = "Initialization".some,
-            metadata = metadata,
-            host = None,
-            port = None,
-            deploymentConfiguration = deployConfig.getOrElse(defaultDC)
-          )
+          initServable = {
+            println(deployConfig)
+            println(deployConfig.getOrElse(defaultDC))
+            Servable(
+              modelVersion = modelVersion,
+              name =
+                Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, randomSuffix),
+              status = Servable.Status.Starting,
+              usedApps = Nil,
+              message = "Initialization".some,
+              metadata = metadata,
+              host = None,
+              port = None,
+              deploymentConfiguration = deployConfig.getOrElse(defaultDC)
+            )
+          }
+          _ = println(initServable)
           servable <- servableRepository.upsert(initServable)
-          _ <- cloudDriver.run(servable.name, servable.modelVersion.id, servable.modelVersion.image, servable.deploymentConfiguration)
+          _ = println(servable)
+          _ <- cloudDriver.run(
+            servable.name,
+            servable.modelVersion.id,
+            servable.modelVersion.image,
+            servable.deploymentConfiguration
+          )
         } yield servable
 
       override def stop(name: String): F[Servable] =
