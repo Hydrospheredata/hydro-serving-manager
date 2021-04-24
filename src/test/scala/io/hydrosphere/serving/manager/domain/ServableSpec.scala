@@ -26,8 +26,6 @@ import org.mockito.Matchers
 import java.time.Instant
 import scala.concurrent.ExecutionContext
 
-// TODO
-
 class ServableSpec extends GenericUnitTest {
   implicit val rng: RNG[IO]               = RNG.default[IO].unsafeRunSync()
   implicit val nameGen: NameGenerator[IO] = NameGenerator.haiku[IO]()

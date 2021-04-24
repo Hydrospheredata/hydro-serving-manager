@@ -162,8 +162,9 @@ object App {
         core.repos.servableRepo
       )
       applicationMonitoring = ApplicationMonitoring.make(
-        servablePub = servablePubSub._2,
-        appRepo = core.repos.appRepo
+        servableSub = servablePubSub._2,
+        appRepo = core.repos.appRepo,
+        appPub = appPubSub._1
       )
       http = HttpServer.akkaBased(
         config = config.application,

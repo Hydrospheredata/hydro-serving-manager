@@ -13,35 +13,32 @@ trait ApplicationMonitoring[F[_]] {
 
 object ApplicationMonitoring extends Logging {
   def make[F[_]](
-      servablePub: ServableEvents.Subscriber[F],
-      appRepo: ApplicationRepository[F]
+      servableSub: ServableEvents.Subscriber[F],
+      appRepo: ApplicationRepository[F],
+      appPub: ApplicationEvents.Publisher[F]
   )(implicit F: Concurrent[F]): ApplicationMonitoring[F] =
     new ApplicationMonitoring[F] {
       override def start(): F[Fiber[F, Unit]] = {
         logger.info("Application monitoring has been started")
-        servablePub.subscribe.evalMap(updateApp).compile.drain.start
+        servableSub.subscribe.evalMap(updateApp).compile.drain.start
       }
 
-      // TODO: Redundant update
       def updateApp(event: DiscoveryEvent[Servable, String]): F[Unit] =
         event match {
-          case DiscoveryEvent.Initial => F.unit
-          case DiscoveryEvent.ItemUpdate(items) =>
-            items
-              .traverse { servable =>
-                appRepo.findServableUsage(servable.name).flatMap { apps =>
-                  apps.traverse(app => appRepo.update(app))
-                }
-              }
-              .as(())
-          case DiscoveryEvent.ItemRemove(servables) =>
-            servables
-              .traverse { servable =>
-                appRepo.findServableUsage(servableName = servable).flatMap { apps =>
-                  apps.traverse(app => appRepo.update(app.copy()))
-                }
-              }
-              .as(())
+          case DiscoveryEvent.ItemUpdate(servables) => updateApps(servables)
+          case _                                    => F.unit
         }
+
+      private def getApplications(servableNames: List[String]): F[List[Application]] =
+        servableNames.traverse {
+          appRepo.findServableUsage
+        } map { _.flatten }
+
+      private def updateApps(servables: List[Servable]): F[Unit] =
+        for {
+          names        <- F.pure(servables map { _.name })
+          applications <- getApplications(names)
+          _            <- applications traverse appPub.update
+        } yield ()
     }
 }

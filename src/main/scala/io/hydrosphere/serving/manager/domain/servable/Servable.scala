@@ -6,7 +6,6 @@ import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurati
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.domain.servable.Servable.Status
 
-// TODO: port/host
 @JsonCodec
 case class Servable(
     modelVersion: ModelVersion.Internal,

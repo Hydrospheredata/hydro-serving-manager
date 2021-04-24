@@ -1,25 +1,18 @@
 package io.hydrosphere.serving.manager.domain
 
-import java.nio.file.{Path, Paths}
-import java.time.Instant
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.{Clock, IO}
 import cats.effect.concurrent.Deferred
+import cats.effect.{Clock, IO}
 import cats.syntax.option._
-
 import io.hydrosphere.serving.manager.domain.contract.DataProfileType.IMAGE
 import io.hydrosphere.serving.manager.domain.contract.DataType.DT_INT32
 import io.hydrosphere.serving.manager.domain.contract.Signature.{defaultSignature, validate}
 import io.hydrosphere.serving.manager.domain.contract.TensorShape
-import io.hydrosphere.serving.manager.domain.deploy_config.{
-  DeploymentConfiguration,
-  DeploymentConfigurationRepository
-}
-import io.hydrosphere.serving.proto.contract.signature.ModelSignature
-//import io.hydrosphere.serving.contract.model_contract.ModelContract
-//import io.hydrosphere.serving.contract.model_field.ModelField
-//import io.hydrosphere.serving.contract.model_signature.ModelSignature
+import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
+
+import java.nio.file.{Path, Paths}
+import java.time.Instant
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.domain.application._
@@ -34,8 +27,8 @@ import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure
 import io.hydrosphere.serving.manager.util.DeferredResult
 
 class ModelServiceSpec extends GenericUnitTest {
-  val dummyImage     = DockerImage("a", "b")
-  implicit val clock = Clock.create[IO]
+  val dummyImage: DockerImage   = DockerImage("a", "b")
+  implicit val clock: Clock[IO] = Clock.create[IO]
 
   describe("Model service") {
     describe("name validation") {
@@ -192,9 +185,9 @@ class ModelServiceSpec extends GenericUnitTest {
             DeferredResult(
               modelVersion,
               new Deferred[IO, ModelVersion.Internal] {
-                override def get = IO(modelVersion)
+                override def get: IO[ModelVersion.Internal] = IO(modelVersion)
 
-                override def complete(a: ModelVersion.Internal) = IO.unit
+                override def complete(a: ModelVersion.Internal): IO[Unit] = IO.unit
               }
             )
           )
@@ -204,8 +197,8 @@ class ModelServiceSpec extends GenericUnitTest {
         when(modelVersionService.getNextModelVersion(1)).thenReturn(IO(1L))
         val modelVersionRepository = mock[ModelVersionRepository[IO]]
 
-        val fetcher = new ModelFetcher[IO] {
-          override def fetch(path: Path) = IO(None)
+        val fetcher: ModelFetcher[IO] = new ModelFetcher[IO] {
+          override def fetch(path: Path): IO[Option[FetcherResult]] = IO(None)
         }
 
         val modelManagementService = ModelService[IO]()(
@@ -285,15 +278,15 @@ class ModelServiceSpec extends GenericUnitTest {
             DeferredResult(
               modelVersion,
               new Deferred[IO, ModelVersion.Internal] {
-                override def get = IO(modelVersion)
+                override def get: IO[ModelVersion.Internal] = IO(modelVersion)
 
-                override def complete(a: ModelVersion.Internal) = IO.unit
+                override def complete(a: ModelVersion.Internal): IO[Unit] = IO.unit
               }
             )
           )
         )
-        val fetcher = new ModelFetcher[IO] {
-          override def fetch(path: Path) = IO(None)
+        val fetcher: ModelFetcher[IO] = new ModelFetcher[IO] {
+          override def fetch(path: Path): IO[Option[FetcherResult]] = IO(None)
         }
 
         val modelManagementService = ModelService[IO]()(

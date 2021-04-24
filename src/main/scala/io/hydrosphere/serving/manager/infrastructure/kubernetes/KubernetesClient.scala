@@ -46,8 +46,6 @@ trait K8SPods[F[_]] {
   def selectFirstPod(selector: LabelSelector): F[Option[Pod]]
 
   def logs(name: String, follow: Boolean): fs2.Stream[F, String]
-
-  //  def events(): fs2.Stream[F, CloudInstanceEvent]
 }
 
 trait K8SHorizontalPodAutoscalers[F[_]] {
@@ -59,41 +57,39 @@ trait K8SHorizontalPodAutoscalers[F[_]] {
 }
 
 case class KubernetesClient[F[_]](
-                                   pods: K8SPods[F],
-                                   services: K8SServices[F],
-                                   deployments: K8SDeployments[F],
-                                   hpa: K8SHorizontalPodAutoscalers[F],
-                                   rs: K8SReplicaSets[F]
-                                 )
-{
-  def events()(implicit c: Concurrent[F]): fs2.Stream[F, CloudInstanceEvent] = {
+    pods: K8SPods[F],
+    services: K8SServices[F],
+    deployments: K8SDeployments[F],
+    hpa: K8SHorizontalPodAutoscalers[F],
+    rs: K8SReplicaSets[F]
+) {
+  def events()(implicit c: Concurrent[F]): fs2.Stream[F, CloudInstanceEvent] =
     rs.events().merge(services.events())
-  }
 }
 
 object KubernetesClient {
-  def make[F[_] : Async](
-                          config: CloudDriverConfiguration.Kubernetes
-                        )(implicit
-                          ex: ExecutionContext,
-                          cs: ContextShift[F],
-                          actorSystem: ActorSystem,
-                          materializer: Materializer
-                        ): KubernetesClient[F] = {
-    val k8sConfig = K8SConfiguration.useProxyAt(s"http://${config.proxyHost}:${config.proxyPort}")
+  def make[F[_]: Async](
+      config: CloudDriverConfiguration.Kubernetes
+  )(implicit
+      ex: ExecutionContext,
+      cs: ContextShift[F],
+      actorSystem: ActorSystem,
+      materializer: Materializer
+  ): KubernetesClient[F] = {
+    val k8sConfig  = K8SConfiguration.useProxyAt(s"http://${config.proxyHost}:${config.proxyPort}")
     val underlying = k8sInit(k8sConfig).usingNamespace(config.kubeNamespace)
     fromSkuber[F](underlying)
   }
 
   def fromSkuber[F[_]](
-                        underlying: K8SRequestContext
-                      )(implicit
-                        F: Async[F],
-                        cs: ContextShift[F],
-                        ec: ExecutionContext,
-                        actorSystem: ActorSystem,
-                        materializer: Materializer
-                      ): KubernetesClient[F] =
+      underlying: K8SRequestContext
+  )(implicit
+      F: Async[F],
+      cs: ContextShift[F],
+      ec: ExecutionContext,
+      actorSystem: ActorSystem,
+      materializer: Materializer
+  ): KubernetesClient[F] =
     KubernetesClient(
       pods = podImpl[F](underlying),
       services = servicesImpl[F](underlying),
@@ -103,11 +99,11 @@ object KubernetesClient {
     )
 
   def podImpl[F[_]](underlying: K8SRequestContext)(implicit
-                                                   F: Async[F],
-                                                   cs: ContextShift[F],
-                                                   ec: ExecutionContext,
-                                                   actorSystem: ActorSystem,
-                                                   materializer: Materializer
+      F: Async[F],
+      cs: ContextShift[F],
+      ec: ExecutionContext,
+      actorSystem: ActorSystem,
+      materializer: Materializer
   ): K8SPods[F] =
     new K8SPods[F] {
       override def selectFirstPod(selector: LabelSelector): F[Option[Pod]] =
@@ -124,13 +120,14 @@ object KubernetesClient {
     }
 
   def servicesImpl[F[_]](
-                          underlying: K8SRequestContext,
-                        )(implicit F: Async[F],
-                          cs: ContextShift[F],
-                          ec: ExecutionContext,
-                          actorSystem: ActorSystem,
-                          materializer: Materializer
-                        ): K8SServices[F] =
+      underlying: K8SRequestContext
+  )(implicit
+      F: Async[F],
+      cs: ContextShift[F],
+      ec: ExecutionContext,
+      actorSystem: ActorSystem,
+      materializer: Materializer
+  ): K8SServices[F] =
     new K8SServices[F] {
       override def get(name: String): F[Option[Service]] =
         AsyncUtil.futureAsync(underlying.getOption[Service](name))
@@ -157,8 +154,8 @@ object KubernetesClient {
     }
 
   def deploymentImpl[F[_]](
-                            underlying: K8SRequestContext
-                          )(implicit F: Async[F], ec: ExecutionContext): K8SDeployments[F] =
+      underlying: K8SRequestContext
+  )(implicit F: Async[F], ec: ExecutionContext): K8SDeployments[F] =
     new K8SDeployments[F] {
       override def get(name: String): F[Option[Deployment]] =
         AsyncUtil.futureAsync(underlying.getOption[Deployment](name))
@@ -174,8 +171,8 @@ object KubernetesClient {
     }
 
   def hpaImpl[F[_]](
-                     underlying: K8SRequestContext
-                   )(implicit F: Async[F], ec: ExecutionContext): K8SHorizontalPodAutoscalers[F] =
+      underlying: K8SRequestContext
+  )(implicit F: Async[F], ec: ExecutionContext): K8SHorizontalPodAutoscalers[F] =
     new K8SHorizontalPodAutoscalers[F] {
       override def get(name: String): F[Option[HorizontalPodAutoscaler]] =
         AsyncUtil.futureAsync(underlying.getOption[HorizontalPodAutoscaler](name))
@@ -188,8 +185,13 @@ object KubernetesClient {
     }
 
   def rsImpl[F[_]](
-                    underlying: K8SRequestContext
-                  )(implicit F: Async[F], ec: ExecutionContext, cs: ContextShift[F], m: Materializer): K8SReplicaSets[F] =
+      underlying: K8SRequestContext
+  )(implicit
+      F: Async[F],
+      ec: ExecutionContext,
+      cs: ContextShift[F],
+      m: Materializer
+  ): K8SReplicaSets[F] =
     () => {
       val rawStream = underlying.watchAll[ReplicaSet]().map(f => f.map(_.toEvent))
       for {
