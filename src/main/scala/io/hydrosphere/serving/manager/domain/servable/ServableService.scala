@@ -122,25 +122,19 @@ object ServableService extends Logging {
               )
           }
           randomSuffix <- generateUniqueSuffix(modelVersion)
-          initServable = {
-            println(deployConfig)
-            println(deployConfig.getOrElse(defaultDC))
-            Servable(
-              modelVersion = modelVersion,
-              name =
-                Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, randomSuffix),
-              status = Servable.Status.Starting,
-              usedApps = Nil,
-              message = "Initialization".some,
-              metadata = metadata,
-              host = None,
-              port = None,
-              deploymentConfiguration = deployConfig.getOrElse(defaultDC)
-            )
-          }
-          _ = println(initServable)
+          initServable = Servable(
+            modelVersion = modelVersion,
+            name =
+              Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, randomSuffix),
+            status = Servable.Status.Starting,
+            usedApps = Nil,
+            message = "Initialization".some,
+            metadata = metadata,
+            host = None,
+            port = None,
+            deploymentConfiguration = deployConfig.getOrElse(defaultDC)
+          )
           servable <- servableRepository.upsert(initServable)
-          _ = println(servable)
           _ <- cloudDriver.run(
             servable.name,
             servable.modelVersion.id,

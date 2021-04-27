@@ -26,7 +26,7 @@ class KubernetesDriver[F[_]](
     client: KubernetesClient[F],
     k8sConfig: CloudDriverConfiguration.Kubernetes,
     dockerRepoConf: DockerRepositoryConfiguration.Remote
-)(implicit F: MonadError[F, Throwable], c: Concurrent[F])
+)(implicit F: Concurrent[F])
     extends CloudDriver[F] {
   private def kubeSvc2Servable(svc: skuber.Service) =
     for {

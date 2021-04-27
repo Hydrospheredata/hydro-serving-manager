@@ -20,12 +20,19 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringR
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBMonitoringRepository.MetricSpecRow
 import io.hydrosphere.serving.manager.it.FullIntegrationSpec
 import cats.implicits._
+import io.hydrosphere.serving.manager.config.DefaultDeploymentConfiguration
 
 class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
   implicit val transactor = app.transactor
 
   var version: ModelVersion.Internal = _
   var servable: Servable             = _
+  val defaultDC = DefaultDeploymentConfiguration(
+    container = None,
+    pod = None,
+    deployment = None,
+    hpa = None
+  ).toDC
 
   describe("Queries") {
     val id = UUID.randomUUID().toString
@@ -48,8 +55,9 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
 
   // TODO: implicit
   describe("Methods") {
-    val o    = MetricSpecEvents
-    val repo = DBMonitoringRepository.make[IO]()
+    implicit val (pub, _) = MetricSpecEvents.makeTopic[IO].unsafeRunSync()
+
+    val repo = DBMonitoringRepository.make[IO](defaultDC)
     it("should insert a MetricSpec") {
       val msRow = CustomModelMetricSpec(
         name = "test",
@@ -140,7 +148,8 @@ class DBMonitoringRepoSpec extends FullIntegrationSpec with IOChecker {
         Servable.Status.Serving,
         "ok".some,
         "here".some,
-        90.some
+        90.some,
+        deploymentConfiguration = defaultDC
       )
       res <- app.core.repos.servableRepo.upsert(serv)
     } yield {
