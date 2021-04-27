@@ -14,10 +14,10 @@ import io.circe.syntax._
 import io.hydrosphere.serving.manager.domain.contract.Signature
 
 class DBModelVersionRepoSpec extends FullIntegrationSpec with IOChecker {
-  val transactor                     = app.transactor
-  val time                           = Instant.now()
-  var model: Model                   = _
-  var version: ModelVersion.Internal = _
+  val transactor: doobie.Transactor[IO] = app.transactor
+  val time: Instant                     = Instant.now()
+  var model: Model                      = _
+  var version: ModelVersion.Internal    = _
 
   describe("Queries") {
     val row = ModelVersionRow(

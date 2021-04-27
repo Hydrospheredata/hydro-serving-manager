@@ -24,7 +24,6 @@ import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
 import org.mockito.Matchers
 
 import java.time.Instant
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 
 class ServableSpec extends GenericUnitTest {
@@ -33,7 +32,7 @@ class ServableSpec extends GenericUnitTest {
   implicit val uuidGen: UUIDGenerator[IO] = UUIDGenerator.default[IO]()
   implicit val timer: Timer[IO]           = IO.timer(ExecutionContext.global)
 
-  val signature = Signature(
+  val signature: Signature = Signature(
     signatureName = "test",
     inputs = NonEmptyList.of(
       Field.Tensor("a", DataType.DT_STRING, TensorShape.varVector)
@@ -43,7 +42,7 @@ class ServableSpec extends GenericUnitTest {
     )
   )
 
-  val externalMv = ModelVersion.External(
+  val externalMv: ModelVersion.External = ModelVersion.External(
     id = 1,
     created = Instant.now(),
     modelVersion = 1,
@@ -52,7 +51,7 @@ class ServableSpec extends GenericUnitTest {
     metadata = Map.empty
   )
 
-  val mv = ModelVersion.Internal(
+  val mv: ModelVersion.Internal = ModelVersion.Internal(
     id = 10,
     image = DockerImage("name", "tag"),
     created = Instant.now(),
@@ -65,12 +64,12 @@ class ServableSpec extends GenericUnitTest {
     installCommand = None,
     metadata = Map.empty
   )
-  val servable =
+  val servable: Servable =
     Servable(
       mv,
       "test",
       Servable.Status.Starting,
-      "msg",
+      "msg".some,
       None,
       None,
       deploymentConfiguration = DeploymentConfiguration.empty
@@ -85,23 +84,24 @@ class ServableSpec extends GenericUnitTest {
     ).toDC
 
     it("should use it if no DC specified for servable") {
-      implicit val servableRepo = mock[ServableRepository[IO]]
-      when(servableRepo.get(Matchers.anyString())).thenReturn(None.pure[IO])
-      when(servableRepo.upsert(Matchers.any())).thenReturn(servable.pure[IO])
+      implicit val servableRepo: ServableRepository[IO] = mock[ServableRepository[IO]]
+      when(servableRepo.get(any[String])).thenReturn(None.pure[IO])
+      when(servableRepo.upsert(any)).thenReturn(servable.pure[IO])
 
-      implicit val appRepo     = mock[ApplicationRepository[IO]]
-      implicit val versionRepo = mock[ModelVersionRepository[IO]]
-      implicit val monRepo     = mock[MonitoringRepository[IO]]
-      implicit val depConf     = mock[DeploymentConfigurationService[IO]]
+      implicit val appRepo: ApplicationRepository[IO]      = mock[ApplicationRepository[IO]]
+      implicit val versionRepo: ModelVersionRepository[IO] = mock[ModelVersionRepository[IO]]
+      implicit val monRepo: MonitoringRepository[IO]       = mock[MonitoringRepository[IO]]
+      implicit val depConf: DeploymentConfigurationService[IO] =
+        mock[DeploymentConfigurationService[IO]]
 
-      implicit val cloudDriver = mock[CloudDriver[IO]]
-      val cloudInstance        = CloudInstance(1, "kek", CloudInstance.Status.Starting)
+      implicit val cloudDriver: CloudDriver[IO] = mock[CloudDriver[IO]]
+      val cloudInstance                         = CloudInstance(1, "kek", CloudInstance.Status.Starting)
       when(
         cloudDriver.run(
-          name = Matchers.anyString(),
-          modelVersionId = Matchers.anyLong(),
-          image = Matchers.any(),
-          config = Matchers.eq(defaultDC)
+          name = any[String],
+          modelVersionId = anyLong,
+          image = any,
+          config = eqTo(defaultDC)
         )
       ).thenReturn(IO(cloudInstance))
 
@@ -115,7 +115,7 @@ class ServableSpec extends GenericUnitTest {
           metadata = Map.empty
         )
         .unsafeRunSync()
-      assert(res.started.deploymentConfiguration.name == defaultDC.name)
+      assert(res.deploymentConfiguration.name == defaultDC.name)
     }
 
     it("should not use it if DC specified for servable") {
@@ -127,28 +127,33 @@ class ServableSpec extends GenericUnitTest {
         hpa = None
       )
 
-      implicit val servableRepo = mock[ServableRepository[IO]]
-      when(servableRepo.get(Matchers.anyString())).thenReturn(None.pure[IO])
-      when(servableRepo.upsert(Matchers.any())).thenReturn(servable.pure[IO])
-      implicit val appRepo     = mock[ApplicationRepository[IO]]
-      implicit val versionRepo = mock[ModelVersionRepository[IO]]
-      implicit val monRepo     = mock[MonitoringRepository[IO]]
-      implicit val depConf     = mock[DeploymentConfigurationService[IO]]
+      implicit val servableRepo: ServableRepository[IO] = mock[ServableRepository[IO]]
+      when(servableRepo.get(any[String])).thenReturn(None.pure[IO])
+      when(servableRepo.upsert(any)) thenAnswer ((s: Servable) => {
+        IO(s)
+      })
 
-      implicit val cloudDriver = mock[CloudDriver[IO]]
-      val cloudInstance        = CloudInstance(1, "kek", CloudInstance.Status.Starting)
+      implicit val appRepo: ApplicationRepository[IO]      = mock[ApplicationRepository[IO]]
+      implicit val versionRepo: ModelVersionRepository[IO] = mock[ModelVersionRepository[IO]]
+      implicit val monRepo: MonitoringRepository[IO]       = mock[MonitoringRepository[IO]]
+      implicit val depConf: DeploymentConfigurationService[IO] =
+        mock[DeploymentConfigurationService[IO]]
+
+      implicit val cloudDriver: CloudDriver[IO] = mock[CloudDriver[IO]]
+      val cloudInstance                         = CloudInstance(1, "kek", CloudInstance.Status.Starting)
       when(
         cloudDriver.run(
-          name = Matchers.anyString(),
-          modelVersionId = Matchers.anyLong(),
-          image = Matchers.any(),
-          config = Matchers.eq(customDC)
+          name = any[String],
+          modelVersionId = anyLong,
+          image = any,
+          config = any
         )
       ).thenReturn(IO(cloudInstance))
 
       val servableService = ServableService[IO](
         defaultDC = defaultDC
       )
+
       val res = servableService
         .deploy(
           modelVersion = mv,
@@ -156,7 +161,8 @@ class ServableSpec extends GenericUnitTest {
           metadata = Map.empty
         )
         .unsafeRunSync()
-      assert(res.started.deploymentConfiguration.name == customDC.name)
+
+      assert(res.deploymentConfiguration.name == customDC.name)
     }
   }
 }

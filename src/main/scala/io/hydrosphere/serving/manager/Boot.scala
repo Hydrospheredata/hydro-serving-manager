@@ -16,8 +16,11 @@ object Boot extends IOApp with Logging {
         dockerClient  <- IO(DefaultDockerClient.fromEnv().readTimeoutMillis(60 * 60 * 1000).build())
         wrappedClient <- DockerdClient.create[IO](dockerClient)
         _ <- App.make[IO](configuration, wrappedClient).use { app =>
-          app.migrationTool.getAndRecover() >> app.httpServer.start() >> app.grpcServer
-            .start() >> IO.never
+          app.migrationTool.getAndRecover() >>
+            app.httpServer.start() >>
+            app.grpcServer.start() >>
+            app.applicationMonitoring.start() >>
+            app.servableMonitoring.start() >>  IO.never
         }
       } yield ExitCode.Success
     }

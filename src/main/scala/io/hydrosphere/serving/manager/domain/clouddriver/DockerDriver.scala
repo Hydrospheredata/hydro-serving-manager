@@ -140,6 +140,9 @@ class DockerDriver[F[_]](
       logMessage <- client.logs(container.id(), follow)
     } yield logMessage
   }
+
+  override def getEvents: fs2.Stream[F, CloudInstanceEvent] =
+    client.events()
 }
 
 object DockerDriver {

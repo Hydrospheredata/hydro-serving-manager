@@ -110,7 +110,7 @@ object Converters {
       host = s.host.getOrElse(""),
       port = s.port.getOrElse(0),
       modelVersion = fromModelVersion(s.modelVersion).some,
-      name = s.fullName,
+      name = s.name,
       status = status,
       metadata = s.metadata
     )
@@ -136,7 +136,7 @@ object Converters {
         port = s.port.getOrElse(0),
         weight = mv.weight,
         modelVersion = fromModelVersion(mv.modelVersion).some,
-        name = s.fullName,
+        name = s.name,
         metadata = s.metadata
       )
     }

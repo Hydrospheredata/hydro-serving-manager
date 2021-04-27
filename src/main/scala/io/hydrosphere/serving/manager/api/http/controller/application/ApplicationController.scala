@@ -41,7 +41,7 @@ class ApplicationController[F[_]: Effect](
         completeF{
           for {
             app <- appService.create(r)
-          } yield ApplicationView.fromApplication(app.started)
+          } yield ApplicationView.fromApplication(app)
         }
       }
     }
@@ -54,7 +54,7 @@ class ApplicationController[F[_]: Effect](
         completeF{
           for {
             app <- appService.update(r)
-          } yield ApplicationView.fromApplication(app.started)
+          } yield ApplicationView.fromApplication(app)
         }
       }
     }

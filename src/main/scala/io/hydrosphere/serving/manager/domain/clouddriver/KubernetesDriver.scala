@@ -2,6 +2,7 @@ package io.hydrosphere.serving.manager.domain.clouddriver
 
 import cats.MonadError
 import cats.data.OptionT
+import cats.effect.Concurrent
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.{
   CloudDriverConfiguration,
@@ -19,14 +20,13 @@ import skuber.autoscaling.HorizontalPodAutoscaler.CrossVersionObjectReference
 import skuber.autoscaling.{CPUTargetUtilization, HorizontalPodAutoscaler}
 import skuber._
 import scala.language.reflectiveCalls
-
 import scala.util.Try
 
 class KubernetesDriver[F[_]](
     client: KubernetesClient[F],
     k8sConfig: CloudDriverConfiguration.Kubernetes,
     dockerRepoConf: DockerRepositoryConfiguration.Remote
-)(implicit F: MonadError[F, Throwable])
+)(implicit F: Concurrent[F])
     extends CloudDriver[F] {
   private def kubeSvc2Servable(svc: skuber.Service) =
     for {
@@ -104,6 +104,7 @@ class KubernetesDriver[F[_]](
     fs2.Stream.eval(maybePod).flatMap(pod => client.pods.logs(pod.metadata.name, follow))
   }
 
+  override def getEvents: fs2.Stream[F, CloudInstanceEvent] = client.events()
 }
 
 object KubernetesDriver {

@@ -11,7 +11,8 @@ case class ServableView(
     status: Servable.Status,
     fullName: String,
     metadata: Map[String, String],
-    deploymentConfiguration: DeploymentConfiguration
+    deploymentConfiguration: DeploymentConfiguration,
+    statusMessage: Option[String]
 )
 
 object ServableView {
@@ -19,7 +20,8 @@ object ServableView {
     ServableView(
       modelVersion = s.modelVersion,
       status = s.status,
-      fullName = s.fullName,
+      statusMessage = s.message,
+      fullName = s.name,
       metadata = s.metadata,
       deploymentConfiguration = s.deploymentConfiguration
     )

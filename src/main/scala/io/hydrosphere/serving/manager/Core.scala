@@ -81,12 +81,9 @@ object Core {
       buildLogsRepo: BuildLogRepository[F],
       monitoringRepo: MonitoringRepository[F]
   ): F[Core[F]] = {
-    implicit val servableProbe: ServableProbe[F] = ServableProbe.default[F]
     for {
       buildLoggingService <- BuildLoggingService.make[F]()
-      servableMonitor     <- ServableMonitor.default[F](2.seconds, 1.minute)
       core <- {
-        implicit val sMon                            = servableMonitor.mon
         implicit val bl: BuildLoggingService[F]      = buildLoggingService
         implicit val nameGen: NameGenerator[F]       = NameGenerator.haiku[F]()
         implicit val modelUnpacker: ModelUnpacker[F] = ModelUnpacker.default[F]

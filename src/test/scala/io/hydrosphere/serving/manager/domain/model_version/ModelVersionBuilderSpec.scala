@@ -1,27 +1,20 @@
 package io.hydrosphere.serving.manager.domain.model_version
 
-import cats.data.NonEmptyList
-
-import java.io.File
-import java.lang
 import java.nio.file.{Path, Paths}
-import java.util.Date
 import cats.implicits._
 import cats.effect.{Concurrent, IO}
 import com.spotify.docker.client.messages._
-import com.spotify.docker.client.{DockerClient, LogMessage, LogStream, ProgressHandler}
+import com.spotify.docker.client.ProgressHandler
+
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.discovery.DiscoveryEvent
-import io.hydrosphere.serving.manager.domain.contract.DataType.DT_INT64
-import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
 import io.hydrosphere.serving.manager.domain.model.{Model, ModelVersionMetadata}
 import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, ModelVersionBuilder}
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DockerProgress
-import io.hydrosphere.serving.proto.contract.signature.ModelSignature
-import org.mockito.Matchers
+
 import org.mockito.invocation.InvocationOnMock
 
 import scala.concurrent.duration._
@@ -34,30 +27,22 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
       ioAssert {
         val dc = mock[DockerdClient[IO]]
         when(
-          dc.build(Matchers.any(), Matchers.any(), Matchers.any(), Matchers.any(), Matchers.any())
+          dc.build(any, any, any, any, any)
         ).thenReturn("sha:random-sha".pure[IO])
-        when(dc.push(Matchers.any(), Matchers.any(), Matchers.any()))
+        when(dc.push(any, any, any))
           .thenReturn(IO.raiseError(new RuntimeException with NoStackTrace))
 
         val model = Model(1, "push-me")
 
         val versionRepo = mock[ModelVersionRepository[IO]]
-        when(versionRepo.create(Matchers.any())).thenAnswer { (invocation: InvocationOnMock) =>
+        when(versionRepo.create(any)).thenAnswer { (invocation: InvocationOnMock) =>
           invocation.getArguments.head.asInstanceOf[ModelVersion].pure[IO]
         }
-        when(versionRepo.update(Matchers.any())).thenReturn(1.pure[IO])
+        when(versionRepo.update(any)).thenReturn(1.pure[IO])
 
         val modelVersionMetadata = ModelVersionMetadata(
           modelName = model.name,
-          signature = Signature.fromProto(ModelSignature.defaultInstance) match {
-            case Right(v) => v
-            case Left(value) =>
-              Signature(
-                "name",
-                NonEmptyList.of(Field.Tensor("i", DT_INT64, TensorShape.scalar)),
-                NonEmptyList.of(Field.Tensor("o", DT_INT64, TensorShape.scalar))
-              )
-          },
+          signature = Signature.defaultSignature,
           runtime = DockerImage("run", "time"),
           installCommand = None,
           metadata = Map.empty
@@ -69,15 +54,9 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): IO[Unit] =
             IO.raiseError(new Exception())
         }
-        val versionService = new ModelVersionService[IO] {
-          override def getNextModelVersion(modelId: Long)                  = IO.pure(1)
-          override def get(name: String, version: Long)                    = ???
-          override def list                                                = ???
-          override def delete(versionId: Long)                             = ???
-          override def all(): IO[List[ModelVersion]]                       = ???
-          override def get(id: Long): IO[ModelVersion]                     = ???
-          override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
-        }
+
+        val versionService = mock[ModelVersionService[IO]]
+        when(versionService.getNextModelVersion(anyLong)) thenReturn IO.pure(1)
 
         val mfs = ModelFileStructure(
           Paths.get(""),
@@ -86,23 +65,18 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           Paths.get(""),
           Paths.get("")
         )
-        val ops = new StorageOps[IO] {
-          override def getReadableFile(path: Path): IO[Option[File]]        = ???
-          override def getAllFiles(folder: Path): IO[Option[List[String]]]  = ???
-          override def getSubDirs(path: Path): IO[List[String]]             = ???
-          override def exists(path: Path): IO[Boolean]                      = ???
-          override def copyFile(src: Path, target: Path): IO[Path]          = ???
-          override def moveFolder(src: Path, target: Path): IO[Path]        = ???
-          override def removeFolder(path: Path): IO[Option[Unit]]           = ???
-          override def getTempDir(prefix: String): IO[Path]                 = ???
-          override def readText(path: Path): IO[Option[List[String]]]       = ???
-          override def readBytes(path: Path): IO[Option[Array[Byte]]]       = ???
-          override def writeBytes(path: Path, bytes: Array[Byte]): IO[Path] = IO.pure(path)
+
+        val ops = mock[StorageOps[IO]]
+        when(ops.writeBytes(any[Path], any[Array[Byte]])) thenAnswer { (path: Path) =>
+          IO.pure(path)
         }
+
         val bl = new BuildLoggingService[IO] {
           override def makeLogger(modelVersion: ModelVersion.Internal): IO[ProgressHandler] =
             IO(DockerProgress.makeLogger(println))
+
           override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
+
           override def getLogs(
               modelVersionId: Long,
               sinceLine: Int
@@ -125,20 +99,16 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         } yield assert(completedBuild.status === ModelVersionStatus.Failed)
       }
     }
+
     it("should push the built image") {
       ioAssert {
         val model = Model(1, "push-me")
 
-        val versionRepo = new ModelVersionRepository[IO] {
-          override def create(entity: ModelVersion): IO[ModelVersion]                       = IO.pure(entity)
-          override def get(id: Long): IO[Option[ModelVersion]]                              = ???
-          override def get(modelName: String, modelVersion: Long): IO[Option[ModelVersion]] = ???
-          override def delete(id: Long): IO[Int]                                            = ???
-          override def update(entity: ModelVersion): IO[Int]                                = IO(1)
-          override def all(): IO[List[ModelVersion]]                                        = ???
-          override def listForModel(modelId: Long): IO[List[ModelVersion]]                  = ???
-          override def lastModelVersionByModel(modelId: Long): IO[Option[ModelVersion]]     = ???
+        val versionRepo: ModelVersionRepository[IO] = mock[ModelVersionRepository[IO]]
+        when(versionRepo.create(any[ModelVersion])) thenAnswer { (entity: ModelVersion) =>
+          IO.pure(entity)
         }
+        when(versionRepo.update(any[ModelVersion])) thenAnswer IO.pure(1)
 
         val modelVersionMetadata = ModelVersionMetadata(
           modelName = model.name,
@@ -148,51 +118,15 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           metadata = Map.empty
         )
 
-        val dc = new DockerdClient[IO] {
-          override def createContainer(
-              container: ContainerConfig,
-              name: Option[String]
-          ): IO[ContainerCreation]                        = ???
-          override def runContainer(id: String): IO[Unit] = ???
-          override def removeContainer(
-              id: String,
-              params: List[DockerClient.RemoveContainerParam]
-          ): IO[Unit] = ???
-          override def listContainers(
-              params: List[DockerClient.ListContainersParam]
-          ): IO[List[Container]]                                                 = ???
-          override def logs(id: String, follow: Boolean): fs2.Stream[IO, String] = ???
-          override def build(
-              directory: Path,
-              name: String,
-              dockerfile: String,
-              handler: ProgressHandler,
-              params: List[DockerClient.BuildParam]
-          ): IO[String] = IO("random-sha")
-          override def push(
-              image: String,
-              progressHandler: ProgressHandler,
-              registryAuth: RegistryAuth
-          ): IO[Unit] = IO.unit
-          override def inspectImage(image: String): IO[ImageInfo] =
-            IO(new ImageInfo {
-              override def id(): String                       = image
-              override def parent(): String                   = ???
-              override def comment(): String                  = ???
-              override def created(): Date                    = ???
-              override def container(): String                = ???
-              override def containerConfig(): ContainerConfig = ???
-              override def dockerVersion(): String            = ???
-              override def author(): String                   = ???
-              override def config(): ContainerConfig          = ???
-              override def architecture(): String             = ???
-              override def os(): String                       = ???
-              override def size(): lang.Long                  = ???
-              override def virtualSize(): lang.Long           = ???
-              override def rootFs(): RootFs                   = ???
-            })
-          override def getHost: IO[String] = ???
+        val dc = mock[DockerdClient[IO]]
+        when(dc.build(any, any, any, any, any)) thenReturn IO("random-sha")
+        when(dc.push(any, any, any)) thenReturn IO.unit
+        when(dc.inspectImage(any)) thenAnswer { (id: String) =>
+          val imgInfo: ImageInfo = mock[ImageInfo]
+          when(imgInfo.id) thenReturn id
+          IO(imgInfo)
         }
+
         val p = Promise[DockerImage]
         val imageRepo = new ImageRepository[IO] {
           override def getImage(name: String, tag: String): DockerImage = DockerImage(name, tag)
@@ -200,15 +134,9 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           override def push(dockerImage: DockerImage, progressHandler: ProgressHandler): IO[Unit] =
             IO(p.success(dockerImage))
         }
-        val versionService = new ModelVersionService[IO] {
-          override def getNextModelVersion(modelId: Long)                  = IO.pure(1)
-          override def get(name: String, version: Long)                    = ???
-          override def list                                                = ???
-          override def delete(versionId: Long)                             = ???
-          override def all(): IO[List[ModelVersion]]                       = ???
-          override def get(id: Long): IO[ModelVersion]                     = ???
-          override def listForModel(modelId: Long): IO[List[ModelVersion]] = ???
-        }
+
+        val versionService = mock[ModelVersionService[IO]]
+        when(versionService.getNextModelVersion(anyLong)) thenReturn IO(1)
 
         val mfs = ModelFileStructure(
           Paths.get(""),
@@ -217,23 +145,18 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
           Paths.get(""),
           Paths.get("")
         )
-        val ops = new StorageOps[IO] {
-          override def getReadableFile(path: Path): IO[Option[File]]        = ???
-          override def getAllFiles(folder: Path): IO[Option[List[String]]]  = ???
-          override def getSubDirs(path: Path): IO[List[String]]             = ???
-          override def exists(path: Path): IO[Boolean]                      = ???
-          override def copyFile(src: Path, target: Path): IO[Path]          = ???
-          override def moveFolder(src: Path, target: Path): IO[Path]        = ???
-          override def removeFolder(path: Path): IO[Option[Unit]]           = ???
-          override def getTempDir(prefix: String): IO[Path]                 = ???
-          override def readText(path: Path): IO[Option[List[String]]]       = ???
-          override def readBytes(path: Path): IO[Option[Array[Byte]]]       = ???
-          override def writeBytes(path: Path, bytes: Array[Byte]): IO[Path] = IO.pure(path)
-        }
+
+        val ops = mock[StorageOps[IO]]
+        when(ops.writeBytes(any, any)).thenAnswer[Path, Array[Byte]]((path: Path, _: Array[Byte]) =>
+          IO(path)
+        )
+
         val bl = new BuildLoggingService[IO] {
           override def makeLogger(modelVersion: ModelVersion.Internal): IO[ProgressHandler] =
             IO(DockerProgress.makeLogger(println))
+
           override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
+
           override def getLogs(
               modelVersionId: Long,
               sinceLine: Int

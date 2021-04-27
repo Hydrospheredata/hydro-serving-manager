@@ -2,21 +2,26 @@ package io.hydrosphere.serving.manager
 
 import java.nio.file.{Path, Paths}
 import cats.data.EitherT
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import io.hydrosphere.serving.manager.domain.DomainError
-import org.mockito.Mockito
+
+import org.mockito.ArgumentMatchersSugar
+import org.mockito.MockitoSugar
+
 import org.scalatest.funspec.AsyncFunSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{Assertion, EitherValues}
-import org.scalatestplus.mockito.MockitoSugar
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
-trait GenericUnitTest extends AsyncFunSpecLike with Matchers with EitherValues with MockitoSugar {
-  implicit val ec = ExecutionContext.global
-  implicit val cs = IO.contextShift(ec)
-
-  def when[T](methodCall: T) = Mockito.when(methodCall)
+trait GenericUnitTest
+    extends AsyncFunSpecLike
+    with Matchers
+    with EitherValues
+    with MockitoSugar
+    with ArgumentMatchersSugar {
+  implicit val ec: ExecutionContextExecutor = ExecutionContext.global
+  implicit val cs: ContextShift[IO]         = IO.contextShift(ec)
 
   protected def ioAssert(body: => IO[Assertion]): Future[Assertion] =
     body.unsafeToFuture()

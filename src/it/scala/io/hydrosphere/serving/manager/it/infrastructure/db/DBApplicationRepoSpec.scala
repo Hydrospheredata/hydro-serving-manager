@@ -1,6 +1,7 @@
 package io.hydrosphere.serving.manager.it.infrastructure.db
 
 import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.syntax.option._
 import doobie.scalatest.IOChecker
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
@@ -20,8 +21,8 @@ import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplication
 import io.hydrosphere.serving.proto.contract.signature.ModelSignature
 
 class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
-  val transactor         = app.transactor
-  private val uploadFile = packModel("/models/dummy_model")
+  val transactor: doobie.Transactor[IO] = app.transactor
+  private val uploadFile                = packModel("/models/dummy_model")
   private val signature = Signature(
     signatureName = "not-default-spark",
     inputs = NonEmptyList.of(
@@ -41,10 +42,11 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
       )
     )
   )
+
   private val upload1 = ModelUploadMetadata(
     name = "m1",
     runtime = dummyImage,
-    signature = signature.some
+    modelSignature = signature.some
   )
   var mv1: ModelVersion.Internal = _
   var servable: Servable         = _
@@ -115,7 +117,7 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
     }
     it("should find app usages") {
       val oldApp = app.core.repos.appRepo.get("repo-spec-app").unsafeRunSync().get
-      val result = app.core.repos.appRepo.findServableUsage(servable.fullName).unsafeRunSync()
+      val result = app.core.repos.appRepo.findServableUsage(servable.name).unsafeRunSync()
       assert(result.head.name == oldApp.name)
 
       val failResult = app.core.repos.appRepo.findServableUsage("hackermans").unsafeRunSync()
@@ -132,8 +134,7 @@ class DBApplicationRepoSpec extends FullIntegrationSpec with IOChecker {
         completed1,
         "test-suffix",
         Servable.Status.Serving,
-        Nil,
-        message = "ok",
+        message = "ok".some,
         host = "localhost".some,
         port = 9090.some
       )

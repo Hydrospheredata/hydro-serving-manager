@@ -8,7 +8,6 @@ import io.hydrosphere.serving.manager.domain.DomainError.NotFound
 import io.hydrosphere.serving.manager.domain.application.requests._
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.servable.{ServableGC, ServableService}
-import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.proto.contract.tensor.conversions.json.TensorJsonLens
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import org.apache.logging.log4j.scala.Logging
@@ -20,11 +19,11 @@ trait ApplicationService[F[_]] {
 
   def generateInputs(name: String): F[Json]
 
-  def create(appRequest: CreateApplicationRequest): F[DeferredResult[F, Application]]
+  def create(appRequest: CreateApplicationRequest): F[Application]
 
   def delete(name: String): F[Application]
 
-  def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, Application]]
+  def update(appRequest: UpdateApplicationRequest): F[Application]
 
   def get(name: String): F[Application]
 }
@@ -48,7 +47,7 @@ object ApplicationService extends Logging {
           jsonData   <- F.delay(TensorJsonLens.mapToJson(tensorData))
         } yield jsonData
 
-      def create(req: CreateApplicationRequest): F[DeferredResult[F, Application]] =
+      def create(req: CreateApplicationRequest): F[Application] =
         applicationDeployer.deploy(
           req.name,
           req.executionGraph,
@@ -63,12 +62,12 @@ object ApplicationService extends Logging {
           _ <- app.graph.stages.traverse { stage =>
             stage.variants.traverse { variant =>
               servableGC.mark(variant.modelVersion).void >>
-                variant.servable.fold(F.unit)(s => servableService.stop(s.fullName).void)
+                variant.servable.fold(F.unit)(s => servableService.stop(s.name).void)
             }
           }
         } yield app
 
-      def update(appRequest: UpdateApplicationRequest): F[DeferredResult[F, Application]] =
+      def update(appRequest: UpdateApplicationRequest): F[Application] =
         for {
           oldApplication <- OptionT(applicationRepository.get(appRequest.id))
             .getOrElseF(

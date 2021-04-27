@@ -29,7 +29,7 @@ object DBServableRepository {
   case class ServableRow(
       service_name: String,
       model_version_id: Long,
-      status_text: String,
+      status_text: Option[String],
       host: Option[String],
       port: Option[Int],
       status: String,
@@ -46,12 +46,12 @@ object DBServableRepository {
         None
       else s.deploymentConfiguration.name.some
     ServableRow(
-      service_name = s.fullName,
+      service_name = s.name,
       model_version_id = s.modelVersion.id,
-      status_text = s.status.entryName,
+      status_text = s.message,
       host = s.host,
       port = s.port,
-      status = s.message,
+      status = s.status.entryName,
       metadata = s.metadata.maybeEmpty.map(_.asJson.noSpaces),
       deployment_configuration = depConf
     )
@@ -78,7 +78,7 @@ object DBServableRepository {
             Right(
               Servable(
                 modelVersion = imv,
-                nameSuffix = suffix,
+                name = sr.service_name,
                 status = status,
                 usedApps = apps.getOrElse(Nil),
                 metadata = sr.metadata

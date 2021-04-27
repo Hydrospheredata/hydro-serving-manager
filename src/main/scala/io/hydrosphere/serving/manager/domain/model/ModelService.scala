@@ -143,7 +143,7 @@ object ModelService {
                 DomainError
                   .invalidRequest(
                     s"Can't delete the model. ${version.fullName} is used in ${x
-                      .map(_.fullName)}"
+                      .map(_.name)}"
                   )
                   .raiseError[F, Unit]
             }

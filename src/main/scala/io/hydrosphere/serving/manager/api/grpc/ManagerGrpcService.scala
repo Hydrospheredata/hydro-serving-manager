@@ -9,7 +9,6 @@ import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionService
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.ServableService
-import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.manager.util.grpc.Converters
 
 import scala.concurrent.Future
@@ -66,7 +65,7 @@ class ManagerGrpcService[F[_]](
     val flow = for {
       res <- request.modelVersion match {
         case ModelVersion.Empty =>
-          F.raiseError[DeferredResult[F, Servable]](
+          F.raiseError[Servable](
             DomainError.invalidRequest("model version is not specified")
           )
         case ModelVersion.VersionId(value) =>
@@ -80,9 +79,7 @@ class ManagerGrpcService[F[_]](
             request.metadata
           )
       }
-      _         <- F.delay(responseObserver.onNext(Converters.fromServable(res.started)))
-      completed <- res.completed.get
-      _         <- F.delay(responseObserver.onNext(Converters.fromServable(completed)))
+      _         <- F.delay(responseObserver.onNext(Converters.fromServable(res)))
       _         <- F.delay(responseObserver.onCompleted())
     } yield ()
 

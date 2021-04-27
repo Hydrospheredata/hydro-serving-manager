@@ -61,17 +61,17 @@ class GrpcSpec extends GenericUnitTest {
             version: Long,
             deployConfigName: Option[String],
             metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
+        ): IO[Servable] = ???
         def findAndDeploy(
             modelId: Long,
             deployConfigName: Option[String],
             metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
+        ): IO[Servable] = ???
         def deploy(
             modelVersion: ModelVersion.Internal,
             deployConfig: Option[deploy_config.DeploymentConfiguration],
             metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
+        ): IO[Servable] = ???
       }
       val grpcApi = new ManagerGrpcService(versionService, s)
 
@@ -139,17 +139,17 @@ class GrpcSpec extends GenericUnitTest {
             version: Long,
             deployConfigName: Option[String],
             metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
+        ): IO[Servable] = ???
         def findAndDeploy(
             modelId: Long,
             deployConfigName: Option[String],
             metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
+        ): IO[Servable] = ???
         def deploy(
             modelVersion: ModelVersion.Internal,
             deployConfig: Option[deploy_config.DeploymentConfiguration],
             metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
+        ): IO[Servable] = ???
       }
       val grpcApi = new ManagerGrpcService(versionService, s)
       grpcApi.getAllVersions(Empty(), observer)
@@ -183,17 +183,17 @@ class GrpcSpec extends GenericUnitTest {
             version: Long,
             deployConfigName: Option[String],
             metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
+        ): IO[Servable] = ???
         def findAndDeploy(
             modelId: Long,
             deployConfigName: Option[String],
             metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
+        ): IO[Servable] = ???
         def deploy(
             modelVersion: ModelVersion.Internal,
             deployConfig: Option[deploy_config.DeploymentConfiguration],
             metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
+        ): IO[Servable] = ???
       }
       val grpcApi = new ManagerGrpcService(versionRepo, s)
       grpcApi.getAllVersions(Empty(), observer)

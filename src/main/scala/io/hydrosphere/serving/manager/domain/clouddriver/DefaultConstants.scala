@@ -97,7 +97,7 @@ object DefaultConstants {
 
   def getModelLabels(service: Servable): Map[String, String] = {
     Map[String, String](
-      LABEL_SERVICE_NAME -> service.nameSuffix,
+      LABEL_SERVICE_NAME -> service.name,
       LABEL_HS_SERVICE_MARKER -> LABEL_HS_SERVICE_MARKER,
       DefaultConstants.LABEL_DEPLOYMENT_TYPE -> DefaultConstants.DEPLOYMENT_TYPE_MODEL
     )

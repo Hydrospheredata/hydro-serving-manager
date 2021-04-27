@@ -1,7 +1,8 @@
 package io.hydrosphere.serving.manager
 
-import java.nio.file.Paths
+import java.nio.file.{Path, Paths}
 
 object TestConstants {
-  val localModelsPath = Paths.get(this.getClass.getClassLoader.getResource("test_models").toURI)
+  val localModelsPath: Path =
+    Paths.get(this.getClass.getClassLoader.getResource("test_models").toURI)
 }

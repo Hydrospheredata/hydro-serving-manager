@@ -10,7 +10,7 @@ import io.hydrosphere.serving.manager.config.{
 import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.kubernetes._
-import org.mockito.{Matchers, Mockito}
+import org.mockito.Mockito
 import skuber.apps.v1.Deployment
 import skuber.autoscaling.HorizontalPodAutoscaler
 import skuber.autoscaling.HorizontalPodAutoscaler.CrossVersionObjectReference
@@ -26,17 +26,19 @@ class KubernetesDriverSpec extends GenericUnitTest {
   def getOrMock[T](opt: Option[T])(implicit ct: ClassTag[T]) =
     opt.getOrElse(Mockito.mock(ct.runtimeClass.asInstanceOf[Class[T]]))
 
-  def mockClient[F[_]](
+  protected def mockClient[F[_]](
       pod: Option[K8SPods[F]] = None,
       deployments: Option[K8SDeployments[F]] = None,
       services: Option[K8SServices[F]] = None,
-      hpa: Option[K8SHorizontalPodAutoscalers[F]] = None
+      hpa: Option[K8SHorizontalPodAutoscalers[F]] = None,
+      rs: Option[K8SReplicaSets[F]] = None
   ) =
     KubernetesClient[F](
       pods = getOrMock(pod),
       services = getOrMock(services),
       deployments = getOrMock(deployments),
-      hpa = getOrMock(hpa)
+      hpa = getOrMock(hpa),
+      rs = getOrMock(rs)
     )
 
   describe("KubernetesDriver") {
@@ -119,12 +121,12 @@ class KubernetesDriverSpec extends GenericUnitTest {
       )
 
       val deps = mock[K8SDeployments[IO]]
-      when(deps.create(Matchers.any())).thenReturn(
+      when(deps.create(any)).thenReturn(
         Deployment(name)
           .pure[IO]
       )
       val svc = mock[K8SServices[IO]]
-      when(svc.create(Matchers.any())).thenReturn(
+      when(svc.create(any)).thenReturn(
         Service(name)
           .addLabel(CloudDriver.Labels.ModelVersionId -> modelVersionId.toString)
           .addLabel(CloudDriver.Labels.ServiceName -> name)

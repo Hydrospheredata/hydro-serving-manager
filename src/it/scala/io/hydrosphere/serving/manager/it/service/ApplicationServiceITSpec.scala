@@ -38,17 +38,17 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
   private val upload1 = ModelUploadMetadata(
     name = "m1",
     runtime = dummyImage,
-    signature = signature.some
+    modelSignature = signature.some
   )
   private val upload2 = ModelUploadMetadata(
     name = "m2",
     runtime = dummyImage,
-    signature = signature.some
+    modelSignature = signature.some
   )
   private val upload3 = ModelUploadMetadata(
     name = "m3",
     runtime = dummyImage,
-    signature = signature.some
+    modelSignature = signature.some
   )
 
   var mv1: ModelVersion.Internal = _
@@ -79,15 +79,13 @@ class ApplicationServiceITSpec extends FullIntegrationSpec with BeforeAndAfterAl
         )
         for {
           appResult <- app.core.appService.create(create)
-          started = appResult.started
-          finished  <- appResult.completed.get
           servables <- app.core.repos.servableRepo.all()
         } yield {
-          assert(started.name === "simple-app")
+          assert(appResult.name === "simple-app")
           assert(finished.status.isInstanceOf[Application.Status.Ready.type], finished.status)
-          assert(started.signature.inputs === mv1.modelSignature.inputs)
-          assert(started.signature.outputs === mv1.modelSignature.outputs)
-          val models = finished.graph.stages.flatMap(_.variants)
+          assert(appResult.signature.inputs === mv1.modelSignature.inputs)
+          assert(appResult.signature.outputs === mv1.modelSignature.outputs)
+          val models = appResult.graph.stages.flatMap(_.variants)
           assert(models.head.weight === 100)
           assert(models.head.modelVersion.id === mv1.id)
           logger.debug(s"Servables: $servables")

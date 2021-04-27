@@ -13,7 +13,7 @@ object Dependencies {
   val envoyDataPlaneApi = "v1.6.0_1"
   val fs2               = "2.4.4"
   val enumeratumV       = "1.6.0"
-  val mockitoScalaV     = "1.16.3"
+  val mockitoScalaV     = "1.16.37"
   val monocleV          = "3.0.0-M4"
 
   lazy val awsDependencies = Seq(
@@ -48,10 +48,9 @@ object Dependencies {
   ).map(_ exclude ("com.google.api.grpc", "proto-google-common-protos"))
 
   lazy val testDependencies = Seq(
-//    "org.mockito"       %% "mockito-scala"           % mockitoScalaV    % "test,it",
-//    "org.mockito"       %% "mockito-scala-scalatest" % mockitoScalaV    % "test,it",
-//    "org.mockito"       %% "mockito-scala-cats"      % mockitoScalaV    % "test,it",
-    "org.mockito"        % "mockito-all"             % "1.10.19"        % "test,it",
+    "org.mockito"       %% "mockito-scala"           % mockitoScalaV    % "test,it",
+    "org.mockito"       %% "mockito-scala-scalatest" % mockitoScalaV    % "test,it",
+    "org.mockito"       %% "mockito-scala-cats"      % mockitoScalaV    % "test,it",
     "com.typesafe.akka" %% "akka-http-testkit"       % akkaHttpVersion  % "test,it",
     "org.scalactic"     %% "scalactic"               % scalaTestVersion % "test,it",
     "org.scalatest"     %% "scalatest"               % scalaTestVersion % "test,it",

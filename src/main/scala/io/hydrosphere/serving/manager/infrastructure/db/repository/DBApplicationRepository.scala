@@ -2,7 +2,6 @@ package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import cats.data.{NonEmptyList, OptionT}
 import cats.effect.Bracket
-import cats.free.Free
 import cats.implicits._
 import doobie._
 import doobie.free.connection
@@ -11,15 +10,17 @@ import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
 import io.circe
 import io.circe.generic.JsonCodec
+import io.circe.parser._
+import io.circe.syntax._
+
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import io.hydrosphere.serving.manager.domain.servable.Servable
+import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableStatusComposer}
+import io.hydrosphere.serving.manager.domain.servable.Servable.{Status => ServableStatus}
 import io.hydrosphere.serving.manager.util.CollectionOps._
-import io.circe.parser._
-import io.circe.syntax._
 import io.hydrosphere.serving.manager.infrastructure.db.Metas._
 
 @JsonCodec
@@ -29,8 +30,10 @@ final case class DBGraphServable(
     servableName: Option[String],
     requiredDeployConfig: Option[String]
 )
+
 @JsonCodec
 final case class DBGraphStage(variants: NonEmptyList[DBGraphServable], signature: Signature)
+
 @JsonCodec
 final case class DBGraph(stages: NonEmptyList[DBGraphStage])
 
@@ -52,7 +55,9 @@ object DBGraph {
                 DomainError.InternalError(s"Model version (${variant.modelVersionId}) is not found")
               )
           servable <- variant.servableName.traverse(x =>
-            servables.get(x).toRight(DomainError.InternalError(s"Servable (${x}) is not found"))
+            servables
+              .get(x)
+              .toRight(DomainError.InternalError(s"Servable (${x}) is not found"))
           )
           depConf <- variant.requiredDeployConfig.traverse(x =>
             deploymentConfigs
@@ -61,8 +66,10 @@ object DBGraph {
           )
         } yield ApplicationServable(mv, variant.weight, servable, depConf)
       }
+
       variants.map(ApplicationStage(_, stage.signature))
     }
+
     stages.map(ApplicationGraph.apply)
   }
 
@@ -74,7 +81,7 @@ object DBGraph {
             DBGraphServable(
               modelVersionId = variant.modelVersion.id,
               weight = variant.weight,
-              servableName = variant.servable.map(_.fullName),
+              servableName = variant.servable.map(_.name),
               requiredDeployConfig = variant.requiredDeploymentConfig.map(_.name)
             )
           },
@@ -121,20 +128,19 @@ object DBApplicationRepository {
       signature <- decode[Signature](ar.application_contract)
       metadata =
         ar.metadata.flatMap(m => decode[Map[String, String]](m).toOption).getOrElse(Map.empty)
-      message = ar.status_message
-      status =
-        Application.Status.withNameInsensitiveOption(ar.status).getOrElse(Application.Status.Failed)
-    } yield Application(
-      id = ar.id,
-      name = ar.application_name,
-      signature = signature,
-      kafkaStreaming = kafkaStreaming,
-      namespace = ar.namespace,
-      status = status,
-      statusMessage = message,
-      graph = graph,
-      metadata = metadata
-    )
+    } yield {
+
+      val app = Application(
+        id = ar.id,
+        name = ar.application_name,
+        signature = signature,
+        kafkaStreaming = kafkaStreaming,
+        namespace = ar.namespace,
+        graph = graph,
+        metadata = metadata
+      )
+      app
+    }
 
   def fromApplication(app: Application): ApplicationRow = {
     val graph     = DBGraph.disassembleGraph(app.graph)
@@ -266,6 +272,7 @@ object DBApplicationRepository {
           case (app, versions, servables, deploymentMap) =>
             OptionT.liftF(F.fromEither(toApplication(app, versions, servables, deploymentMap)))
         }
+
         result.value
       }
 
@@ -323,7 +330,6 @@ object DBApplicationRepository {
           .fromList(app)
           .fold(F.pure[AppInfo](Map.empty, Map.empty, Map.empty))(fetchAppsInfo)
 
-      // TODO: Servable name
       def fetchAppsInfo(apps: NonEmptyList[ApplicationRow]): F[AppInfo] = {
         val graphsOrError: Either[circe.Error, NonEmptyList[DBGraph]] =
           apps.traverse(ar => decode[DBGraph](ar.execution_graph))
@@ -363,7 +369,7 @@ object DBApplicationRepository {
               case None => F.pure(List.empty)
             }
           }
-          servableMap     = servables.map(x => x.fullName -> x).toMap
+          servableMap     = servables.map(x => x.name -> x).toMap
           deploymentNames = nodesOrError.toList.flatMap(s => s.requiredDeployConfig)
           deployments <- {
             val deps = NonEmptyList.fromList(deploymentNames) match {

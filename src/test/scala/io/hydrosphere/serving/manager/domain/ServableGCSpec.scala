@@ -44,36 +44,36 @@ class ServableGCSpec extends GenericUnitTest {
         metadata = Map.empty
       )
 
-      implicit val appRepo = mock[ApplicationRepository[IO]]
+      implicit val appRepo: ApplicationRepository[IO] = mock[ApplicationRepository[IO]]
       when(appRepo.findVersionUsage(mv.id)).thenReturn(Nil.pure[IO])
 
       val servable = Servable(
         modelVersion = mv,
-        nameSuffix = "asdasd",
+        name = "asdasd",
         status = Servable.Status.Serving,
         usedApps = List.empty,
         port = Some(9090),
         host = Some("localhost"),
-        message = "ok",
+        message = "ok".some,
         deploymentConfiguration = DeploymentConfiguration.empty
       )
       val metricServable = Servable(
         modelVersion = mv,
-        nameSuffix = "monitoring",
+        name = "monitoring",
         status = Servable.Status.Serving,
         usedApps = List.empty,
         port = Some(9090),
         host = Some("localhost"),
-        message = "ok",
+        message = "ok".some,
         deploymentConfiguration = DeploymentConfiguration.empty
       )
 
-      implicit val servableRepo = mock[ServableRepository[IO]]
+      implicit val servableRepo: ServableRepository[IO] = mock[ServableRepository[IO]]
       when(servableRepo.findForModelVersion(mv.id)).thenReturn(List(servable).pure[IO])
 
-      implicit val servableService = mock[ServableService[IO]]
-      when(servableService.stop(servable.fullName)).thenReturn(servable.pure[IO])
-      when(servableService.stop(metricServable.fullName)).thenReturn(metricServable.pure[IO])
+      implicit val servableService: ServableService[IO] = mock[ServableService[IO]]
+      when(servableService.stop(servable.name)).thenReturn(servable.pure[IO])
+      when(servableService.stop(metricServable.name)).thenReturn(metricServable.pure[IO])
 
       val metric1 =
         CustomModelMetricSpec(
@@ -101,17 +101,18 @@ class ServableGCSpec extends GenericUnitTest {
           )
         )
 
-      implicit val monRepo = mock[MonitoringRepository[IO]]
+      implicit val monRepo: MonitoringRepository[IO] = mock[MonitoringRepository[IO]]
       when(monRepo.forModelVersion(mv.id)).thenReturn(List(metric1, metric2).pure[IO])
-      implicit val monService = mock[Monitoring[IO]]
+
+      implicit val monService: Monitoring[IO] = mock[Monitoring[IO]]
       when(monService.update(metric1Cleaned)).thenReturn(metric1.pure[IO])
       when(monService.update(metric2)).thenReturn(metric2.pure[IO])
 
       ServableGC.gcModelVersion[IO](mv.id).unsafeRunSync()
 
       Mockito.verify(appRepo).findVersionUsage(mv.id)
-      Mockito.verify(servableService).stop(servable.fullName)
-      Mockito.verify(servableService).stop(metricServable.fullName)
+      Mockito.verify(servableService).stop(servable.name)
+      Mockito.verify(servableService).stop(metricServable.name)
       succeed
     }
   }

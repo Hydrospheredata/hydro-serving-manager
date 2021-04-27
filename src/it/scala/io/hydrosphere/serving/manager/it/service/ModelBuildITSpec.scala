@@ -23,7 +23,7 @@ class ModelBuildITSpec extends FullIntegrationSpec {
     )
   )
 
-  describe("Model serivce") {
+  describe("Model service") {
     it("should create an image with correct name and content") {
       ioAssert {
         for {

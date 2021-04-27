@@ -8,6 +8,9 @@ import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import cats.effect.{ConcurrentEffect, ContextShift}
+import streamz.converter._
+import io.circe.syntax._
+
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
@@ -19,8 +22,6 @@ import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.ServableEvents
 
-import streamz.converter._
-import io.circe.syntax._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -30,7 +31,7 @@ class SSEController[F[_]](
     modelSubscriber: ModelVersionEvents.Subscriber[F],
     servableSubscriber: ServableEvents.Subscriber[F],
     metricSpecSubscriber: MetricSpecEvents.Subscriber[F],
-    depSubscriber: DeploymentConfigurationEvents.Subscriber[F]
+    depSubscriber: DeploymentConfigurationEvents.Subscriber[F],
 )(implicit
     F: ConcurrentEffect[F],
     cs: ContextShift[F],

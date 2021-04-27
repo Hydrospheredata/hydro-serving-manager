@@ -7,6 +7,8 @@ import cats.effect._
 import cats.implicits._
 import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
+import org.apache.commons.io.IOUtils
+
 import io.hydrosphere.serving.manager.api.grpc.{
   GrpcServer,
   GrpcServingDiscovery,
@@ -26,7 +28,7 @@ import io.hydrosphere.serving.manager.api.http.controller.{
   MonitoringController
 }
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
-import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
+import io.hydrosphere.serving.manager.domain.application.{ApplicationEvents, ApplicationMonitoring}
 import io.hydrosphere.serving.manager.domain.application.migrations.ApplicationSignatureMigrationTool
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.deploy_config.{
@@ -36,7 +38,11 @@ import io.hydrosphere.serving.manager.domain.deploy_config.{
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
-import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableRepository}
+import io.hydrosphere.serving.manager.domain.servable.{
+  ServableEvents,
+  ServableMonitoring,
+  ServableRepository
+}
 import io.hydrosphere.serving.manager.infrastructure.db.Database
 import io.hydrosphere.serving.manager.infrastructure.db.repository._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
@@ -54,7 +60,9 @@ case class App[F[_]](
     grpcServer: GrpcServer[F],
     httpServer: HttpServer[F],
     transactor: Transactor[F],
-    migrationTool: ApplicationSignatureMigrationTool[F]
+    migrationTool: ApplicationSignatureMigrationTool[F],
+    servableMonitoring: ServableMonitoring[F],
+    applicationMonitoring: ApplicationMonitoring[F]
 )
 
 object App {
@@ -149,7 +157,15 @@ object App {
       monitoringController =
         new MonitoringController[F](core.monitoringService, core.repos.monitoringRepository)
       depConfController = new DeploymentConfigController[F](core.deploymentConfigService)
-
+      servableMonitoring = ServableMonitoring.make(
+        cloudDriver,
+        core.repos.servableRepo
+      )
+      applicationMonitoring = ApplicationMonitoring.make(
+        servableSub = servablePubSub._2,
+        appRepo = core.repos.appRepo,
+        appPub = appPubSub._1
+      )
       http = HttpServer.akkaBased(
         config = config.application,
         modelRoutes = modelController.routes,
@@ -161,6 +177,6 @@ object App {
         externalModelRoutes = externalModelController.routes,
         deploymentConfRoutes = depConfController.routes
       )
-    } yield App(config, core, grpc, http, tx, migrator)
+    } yield App(config, core, grpc, http, tx, migrator, servableMonitoring, applicationMonitoring)
   }
 }

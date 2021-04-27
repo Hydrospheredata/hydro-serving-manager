@@ -125,12 +125,12 @@ object ServableGC {
     for {
       // delete model servables
       servables <- servRepo.findForModelVersion(modelVersionId)
-      _ <- servables.traverse(x => servService.stop(x.fullName))
+      _ <- servables.traverse(x => servService.stop(x.name))
 
       // delete monitoring servables
       specs <- monitoringRepository.forModelVersion(modelVersionId)
       monitoringServables = specs.flatMap(_.config.servable)
-      _ <- monitoringServables.traverse(x => servService.stop(x.fullName))
+      _ <- monitoringServables.traverse(x => servService.stop(x.name))
 
       // remove servables from monitoring specs
       emptySpecs = specs.map { spec =>

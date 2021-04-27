@@ -41,13 +41,13 @@ trait ServableService[F[_]] {
       version: Long,
       deployConfigName: Option[String],
       metadata: Map[String, String]
-  ): F[DeferredResult[F, Servable]]
+  ): F[Servable]
 
   def findAndDeploy(
       modelId: Long,
       deployConfigName: Option[String],
       metadata: Map[String, String]
-  ): F[DeferredResult[F, Servable]]
+  ): F[Servable]
 
   def stop(name: String): F[Servable]
 
@@ -55,14 +55,14 @@ trait ServableService[F[_]] {
       modelVersion: ModelVersion.Internal,
       deployConfig: Option[DeploymentConfiguration],
       metadata: Map[String, String]
-  ): F[DeferredResult[F, Servable]]
+  ): F[Servable]
 }
 
 object ServableService extends Logging {
   type ServableFiler = List[Servable] => List[Servable]
 
   def filterByName(name: String): ServableFiler =
-    _.filter(_.fullName == name)
+    _.filter(_.name == name)
 
   def filterByVersionId(versionId: Long): ServableFiler =
     _.filter(_.modelVersion.id == versionId)
@@ -110,7 +110,7 @@ object ServableService extends Logging {
           modelVersion: ModelVersion.Internal,
           deployConfig: Option[DeploymentConfiguration],
           metadata: Map[String, String]
-      ): F[DeferredResult[F, Servable]] =
+      ): F[Servable] =
         for {
           _ <- modelVersion.status match {
             case ModelVersionStatus.Released => F.unit
@@ -122,46 +122,26 @@ object ServableService extends Logging {
               )
           }
           randomSuffix <- generateUniqueSuffix(modelVersion)
-          d            <- Deferred[F, Servable]
           initServable = Servable(
             modelVersion = modelVersion,
-            nameSuffix = randomSuffix,
+            name =
+              Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, randomSuffix),
             status = Servable.Status.Starting,
             usedApps = Nil,
-            message = "Initialization",
+            message = "Initialization".some,
             metadata = metadata,
             host = None,
             port = None,
             deploymentConfiguration = deployConfig.getOrElse(defaultDC)
           )
-          _ <- servableRepository.upsert(initServable)
-          _ <- awaitServable(initServable)
-            .flatMap(d.complete)
-            .onError {
-              case NonFatal(ex) =>
-                cloudDriver.remove(initServable.fullName).attempt >>
-                  d.complete(initServable.copy(status = Servable.Status.NotServing)).attempt >>
-                  F.delay(logger.error(ex))
-            }
-            .start
-        } yield DeferredResult(initServable, d)
-
-      def awaitServable(servable: Servable): F[Servable] =
-        for {
-          ci <- cloudDriver.run(
-            servable.fullName,
+          servable <- servableRepository.upsert(initServable)
+          _ <- cloudDriver.run(
+            servable.name,
             servable.modelVersion.id,
             servable.modelVersion.image,
             servable.deploymentConfiguration
           )
-          serv = ci.status match {
-            case Status.Starting => servable.copy(status = Servable.Status.Starting)
-            case Status.Running(host, port) =>
-              servable.copy(status = Servable.Status.Serving, host = host.some, port = port.some)
-            case Status.Stopped => servable.copy(status = Servable.Status.NotServing)
-          }
-          _ <- servableRepository.upsert(serv)
-        } yield serv
+        } yield servable
 
       override def stop(name: String): F[Servable] =
         for {
@@ -203,7 +183,7 @@ object ServableService extends Logging {
           version: Long,
           configName: Option[String],
           metadata: Map[String, String]
-      ): F[DeferredResult[F, Servable]] =
+      ): F[Servable] =
         for {
           abstractVersion <- OptionT(versionRepository.get(name, version))
             .getOrElseF(F.raiseError(DomainError.notFound(s"Model $name:$version doesn't exist")))
@@ -225,7 +205,7 @@ object ServableService extends Logging {
           modelId: Long,
           configName: Option[String],
           metadata: Map[String, String]
-      ): F[DeferredResult[F, Servable]] =
+      ): F[Servable] =
         for {
           abstractVersion <- OptionT(versionRepository.get(modelId))
             .getOrElseF(F.raiseError(DomainError.notFound(s"Model id=$modelId doesn't exist")))

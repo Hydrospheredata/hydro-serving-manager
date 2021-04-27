@@ -5,14 +5,16 @@ import akka.stream.Materializer
 import cats.effect._
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.CloudDriverConfiguration
+import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstanceEvent
+import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstanceEventAdapterInstances._
 import io.hydrosphere.serving.manager.util.AsyncUtil
 import skuber._
-import skuber.apps.v1.{Deployment, DeploymentList}
+import skuber.apps.v1.{Deployment, DeploymentList, ReplicaSet}
 import skuber.autoscaling.HorizontalPodAutoscaler
 import skuber.json.format._
 import streamz.converter._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext}
 
 trait K8SDeployments[F[_]] {
   def get(name: String): F[Option[Deployment]]
@@ -24,6 +26,10 @@ trait K8SDeployments[F[_]] {
   def list: F[List[Deployment]]
 }
 
+trait K8SReplicaSets[F[_]] {
+  def events(): fs2.Stream[F, CloudInstanceEvent]
+}
+
 trait K8SServices[F[_]] {
   def get(name: String): F[Option[Service]]
 
@@ -32,6 +38,8 @@ trait K8SServices[F[_]] {
   def delete(name: String, gracePeriodSeconds: Int = -1): F[Unit]
 
   def list: F[List[Service]]
+
+  def events(): fs2.Stream[F, CloudInstanceEvent]
 }
 
 trait K8SPods[F[_]] {
@@ -52,8 +60,12 @@ case class KubernetesClient[F[_]](
     pods: K8SPods[F],
     services: K8SServices[F],
     deployments: K8SDeployments[F],
-    hpa: K8SHorizontalPodAutoscalers[F]
-)
+    hpa: K8SHorizontalPodAutoscalers[F],
+    rs: K8SReplicaSets[F]
+) {
+  def events()(implicit c: Concurrent[F]): fs2.Stream[F, CloudInstanceEvent] =
+    rs.events().merge(services.events())
+}
 
 object KubernetesClient {
   def make[F[_]: Async](
@@ -82,7 +94,8 @@ object KubernetesClient {
       pods = podImpl[F](underlying),
       services = servicesImpl[F](underlying),
       deployments = deploymentImpl[F](underlying),
-      hpa = hpaImpl[F](underlying)
+      hpa = hpaImpl[F](underlying),
+      rs = rsImpl[F](underlying)
     )
 
   def podImpl[F[_]](underlying: K8SRequestContext)(implicit
@@ -108,7 +121,13 @@ object KubernetesClient {
 
   def servicesImpl[F[_]](
       underlying: K8SRequestContext
-  )(implicit F: Async[F], ec: ExecutionContext): K8SServices[F] =
+  )(implicit
+      F: Async[F],
+      cs: ContextShift[F],
+      ec: ExecutionContext,
+      actorSystem: ActorSystem,
+      materializer: Materializer
+  ): K8SServices[F] =
     new K8SServices[F] {
       override def get(name: String): F[Option[Service]] =
         AsyncUtil.futureAsync(underlying.getOption[Service](name))
@@ -120,6 +139,18 @@ object KubernetesClient {
 
       override def list: F[List[Service]] =
         AsyncUtil.futureAsync(underlying.list[ServiceList]).map(_.toList)
+
+      override def events(): fs2.Stream[F, CloudInstanceEvent] = {
+        val rawStream = underlying.watchAll[Service]().map(f => f.map(_.toEvent))
+        for {
+          akkaStream <- fs2.Stream.eval(AsyncUtil.futureAsync(rawStream))
+          evt <-
+            akkaStream
+              .filter(_.isRight)
+              .map { case Right(value) => value }
+              .toStream[F]()
+        } yield evt
+      }
     }
 
   def deploymentImpl[F[_]](
@@ -151,5 +182,25 @@ object KubernetesClient {
 
       override def delete(name: String, gracePeriodSeconds: Int): F[Unit] =
         AsyncUtil.futureAsync(underlying.delete[HorizontalPodAutoscaler](name, gracePeriodSeconds))
+    }
+
+  def rsImpl[F[_]](
+      underlying: K8SRequestContext
+  )(implicit
+      F: Async[F],
+      ec: ExecutionContext,
+      cs: ContextShift[F],
+      m: Materializer
+  ): K8SReplicaSets[F] =
+    () => {
+      val rawStream = underlying.watchAll[ReplicaSet]().map(f => f.map(_.toEvent))
+      for {
+        akkaStream <- fs2.Stream.eval(AsyncUtil.futureAsync(rawStream))
+        evt <-
+          akkaStream
+            .filter(_.isRight)
+            .map { case Right(value) => value }
+            .toStream[F]()
+      } yield evt
     }
 }

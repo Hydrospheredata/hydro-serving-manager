@@ -1,44 +1,28 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import java.time.Instant
 import cats.data.NonEmptyList
-import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, IO}
 import cats.syntax.applicative._
+import cats.syntax.option._
 import io.hydrosphere.serving.manager.GenericUnitTest
-import io.hydrosphere.serving.manager.domain.{deploy_config, DomainError}
+import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.requests._
-import io.hydrosphere.serving.manager.domain.contract.DataType.DT_DOUBLE
-import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
-import io.hydrosphere.serving.manager.domain.monitoring.{
-  CustomModelMetricSpec,
-  CustomModelMetricSpecConfiguration,
-  Monitoring,
-  MonitoringRepository,
-  ThresholdCmpOperator
-}
+import io.hydrosphere.serving.manager.domain.monitoring._
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableGC, ServableService}
-import io.hydrosphere.serving.manager.util.DeferredResult
-import org.mockito.{Matchers, Mockito}
+import org.mockito.Mockito
 
+import java.time.Instant
 import scala.collection.mutable.ListBuffer
 
 class ApplicationServiceSpec extends GenericUnitTest {
-  val signature = Signature(
-    "claim",
-    NonEmptyList.of(
-      Field.Tensor("in", DT_DOUBLE, TensorShape.Dynamic, None)
-    ),
-    NonEmptyList.of(
-      Field.Tensor("out", DT_DOUBLE, TensorShape.Dynamic, None)
-    )
-  )
+  val signature: Signature = Signature.defaultSignature
 
-  val modelVersion = ModelVersion.Internal(
+  val modelVersion: ModelVersion.Internal = ModelVersion.Internal(
     id = 1,
     image = DockerImage("test", "t"),
     created = Instant.now(),
@@ -51,7 +35,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
     installCommand = None,
     metadata = Map.empty
   )
-  val externalMv = ModelVersion.External(
+  val externalMv: ModelVersion.External = ModelVersion.External(
     id = 1,
     created = Instant.now(),
     modelVersion = 1,
@@ -60,7 +44,7 @@ class ApplicationServiceSpec extends GenericUnitTest {
     metadata = Map.empty
   )
 
-  def appGraph =
+  def appGraph: ApplicationGraph =
     ApplicationGraph(
       NonEmptyList.of(
         ApplicationStage(
@@ -79,33 +63,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
 
       val versionRepo = mock[ModelVersionRepository[IO]]
       when(versionRepo.get(1)).thenReturn(IO(Some(externalMv)))
-      val servableService = new ServableService[IO] {
-        def all(): IO[List[Servable]] = ???
-        def getFiltered(
-            name: Option[String],
-            versionId: Option[Long],
-            metadata: Map[String, String]
-        ): IO[List[Servable]]                = ???
-        def stop(name: String): IO[Servable] = ???
-        def get(name: String): IO[Servable]  = ???
-        def findAndDeploy(
-            name: String,
-            version: Long,
-            deployConfigName: Option[String],
-            metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
-        def findAndDeploy(
-            modelId: Long,
-            deployConfigName: Option[String],
-            metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
-        def deploy(
-            modelVersion: ModelVersion.Internal,
-            deployConfig: Option[deploy_config.DeploymentConfiguration],
-            metadata: Map[String, String]
-        ): IO[DeferredResult[IO, Servable]] = ???
-      }
-      val monitoringRepo = mock[MonitoringRepository[IO]]
+
+      val servableService = mock[ServableService[IO]]
+      val monitoringRepo  = mock[MonitoringRepository[IO]]
       val appDeployer = ApplicationDeployer.default[IO]()(
         Concurrent[IO],
         applicationRepository = appRepo,
@@ -134,61 +94,54 @@ class ApplicationServiceSpec extends GenericUnitTest {
     it("should start application build") {
       ioAssert {
         val appRepo = mock[ApplicationRepository[IO]]
+        val startingServable = Servable(
+          modelVersion = modelVersion,
+          name = "",
+          status = Servable.Status.Starting,
+          message = None,
+          host = None,
+          port = None,
+          deploymentConfiguration = DeploymentConfiguration.empty
+        )
+        val graphWithStartingServable = ApplicationGraph(
+          NonEmptyList.of(
+            ApplicationStage(
+              NonEmptyList.of(ApplicationServable(modelVersion, 100, startingServable.some)),
+              modelVersion.modelSignature
+            )
+          )
+        )
+
         when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(
+        when(appRepo.create(any)).thenReturn(
           IO(
             Application(
               id = 1,
               name = "test",
               namespace = None,
-              status = Application.Status.Assembling,
               signature = signature.copy(signatureName = "test"),
               kafkaStreaming = List.empty,
-              graph = appGraph
+              graphWithStartingServable
             )
           )
         )
         val versionRepo = mock[ModelVersionRepository[IO]]
         when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
-        val servableService = new ServableService[IO] {
-          def all(): IO[List[Servable]] = ???
-          def getFiltered(
-              name: Option[String],
-              versionId: Option[Long],
-              metadata: Map[String, String]
-          ): IO[List[Servable]]                = ???
-          def stop(name: String): IO[Servable] = ???
-          def get(name: String): IO[Servable]  = ???
-          override def findAndDeploy(
-              name: String,
-              version: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] = ???
-          override def findAndDeploy(
-              modelId: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] = ???
-          override def deploy(
-              modelVersion: ModelVersion.Internal,
-              deployConfig: Option[deploy_config.DeploymentConfiguration],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] =
-            IO.pure {
-              val s = Servable(
-                modelVersion,
-                "hi",
-                Servable.Status.Serving,
-                message = "ok",
-                host = Some("hoat"),
-                port = Some(9090),
-                deploymentConfiguration = DeploymentConfiguration.empty
-              )
-              val d = Deferred[IO, Servable].unsafeRunSync()
-              d.complete(s).unsafeRunSync()
-              DeferredResult(s, d)
-            }
+
+        val servableService = mock[ServableService[IO]]
+        when(servableService.deploy(any[ModelVersion.Internal], any, anyMap)).thenReturn {
+          IO.pure {
+            val s = Servable(
+              modelVersion,
+              "hi",
+              Servable.Status.Serving,
+              message = "ok".some,
+              host = Some("hoat"),
+              port = Some(9090),
+              deploymentConfiguration = DeploymentConfiguration.empty
+            )
+            s
+          }
         }
 
         val monitoringRepo = mock[MonitoringRepository[IO]]
@@ -215,277 +168,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
           )
         )
         appDeployer.deploy("test", graph, List.empty, Map.empty).map { res =>
-          assert(res.started.name === "test")
-          assert(res.started.status.isInstanceOf[Application.Status.Assembling.type])
+          assert(res.name == "test")
+          assert(res.status.isInstanceOf[Application.Status.Assembling.type])
         // build will fail nonetheless
-        }
-      }
-    }
-
-    it("should handle failed application builds") {
-      ioAssert {
-        val appRepo = mock[ApplicationRepository[IO]]
-        when(appRepo.update(Matchers.any())).thenReturn(IO.pure(1))
-        when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(
-          IO(
-            Application(
-              id = 1,
-              name = "test",
-              namespace = None,
-              status = Application.Status.Assembling,
-              signature = signature.copy(signatureName = "test"),
-              kafkaStreaming = List.empty,
-              graph = appGraph
-            )
-          )
-        )
-        val versionRepo = mock[ModelVersionRepository[IO]]
-        when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
-        val servableService = new ServableService[IO] {
-          def all(): IO[List[Servable]] = ???
-          def getFiltered(
-              name: Option[String],
-              versionId: Option[Long],
-              metadata: Map[String, String]
-          ): IO[List[Servable]]                = ???
-          def stop(name: String): IO[Servable] = ???
-          def get(name: String): IO[Servable]  = ???
-          override def findAndDeploy(
-              name: String,
-              version: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] = ???
-          override def findAndDeploy(
-              modelId: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] = ???
-          override def deploy(
-              modelVersion: ModelVersion.Internal,
-              deployConfig: Option[deploy_config.DeploymentConfiguration],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] =
-            DeferredResult.completed[IO, Servable](
-              Servable(
-                modelVersion,
-                "kek",
-                Servable.Status.NotServing,
-                message = "error",
-                host = None,
-                port = None,
-                deploymentConfiguration = DeploymentConfiguration.empty
-              )
-            )
-        }
-        val monitoringRepo = mock[MonitoringRepository[IO]]
-        when(monitoringRepo.forModelVersion(1)).thenReturn(Nil.pure[IO])
-        val appDeployer = ApplicationDeployer.default[IO]()(
-          Concurrent[IO],
-          applicationRepository = appRepo,
-          versionRepository = versionRepo,
-          servableService = servableService,
-          deploymentConfigService = null,
-          monitoringService = null,
-          monitoringRepo = monitoringRepo
-        )
-        val graph = ExecutionGraphRequest(
-          NonEmptyList.of(
-            PipelineStageRequest(
-              NonEmptyList.of(
-                ModelVariantRequest(
-                  modelVersionId = 1,
-                  weight = 100
-                )
-              )
-            )
-          )
-        )
-
-        appDeployer.deploy("test", graph, List.empty, Map.empty).flatMap { res =>
-          println("Waiting for build")
-          res.completed.get.map { x =>
-            assert(x.status == Application.Status.Failed)
-            assert(x.statusMessage.get === "Servable model-1-kek is in invalid state: error")
-
-          }
-        }
-      }
-    }
-
-    it("should handle finished builds") {
-      ioAssert {
-        val appRepo = mock[ApplicationRepository[IO]]
-        when(appRepo.update(Matchers.any())).thenReturn(IO(1))
-        when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(
-          IO(
-            Application(
-              id = 1,
-              name = "test",
-              namespace = None,
-              status = Application.Status.Assembling,
-              signature = signature.copy(signatureName = "test"),
-              kafkaStreaming = List.empty,
-              graph = appGraph
-            )
-          )
-        )
-        val versionRepo = mock[ModelVersionRepository[IO]]
-        when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
-        val servableService = new ServableService[IO] {
-          def all(): IO[List[Servable]] = ???
-          def getFiltered(
-              name: Option[String],
-              versionId: Option[Long],
-              metadata: Map[String, String]
-          ): IO[List[Servable]]                = ???
-          def stop(name: String): IO[Servable] = ???
-          def get(name: String): IO[Servable]  = ???
-          def findAndDeploy(
-              name: String,
-              version: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] = ???
-          def findAndDeploy(
-              modelId: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] = ???
-          def deploy(
-              mv: ModelVersion.Internal,
-              deployConfig: Option[deploy_config.DeploymentConfiguration],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] = {
-            val s = Servable(
-              modelVersion = mv,
-              nameSuffix = "test",
-              status = Servable.Status.Serving,
-              usedApps = Nil,
-              message = "Ok",
-              host = Some("host"),
-              port = Some(9090),
-              deploymentConfiguration = DeploymentConfiguration.empty
-            )
-            DeferredResult.completed(s)
-          }
-        }
-
-        val graph = ExecutionGraphRequest(
-          NonEmptyList.of(
-            PipelineStageRequest(
-              NonEmptyList.of(
-                ModelVariantRequest(
-                  modelVersionId = 1,
-                  weight = 100
-                )
-              )
-            )
-          )
-        )
-        val monitoringRepo = mock[MonitoringRepository[IO]]
-        when(monitoringRepo.forModelVersion(1)).thenReturn(Nil.pure[IO])
-        val appDeployer = ApplicationDeployer.default[IO]()(
-          Concurrent[IO],
-          applicationRepository = appRepo,
-          versionRepository = versionRepo,
-          servableService = servableService,
-          deploymentConfigService = null,
-          monitoringService = null,
-          monitoringRepo = monitoringRepo
-        )
-        appDeployer.deploy("test", graph, List.empty, Map.empty).flatMap { res =>
-          res.completed.get.map { finished =>
-            assert(finished.name === "test")
-            assert(finished.status.isInstanceOf[Application.Status.Ready.type])
-          }
-        }
-      }
-    }
-
-    it("should recreate missing MetricSpec Servables") {
-      ioAssert {
-        val appRepo = mock[ApplicationRepository[IO]]
-        when(appRepo.update(Matchers.any())).thenReturn(IO(1))
-        when(appRepo.get("test")).thenReturn(IO(None))
-        when(appRepo.create(Matchers.any())).thenReturn(
-          IO(
-            Application(
-              id = 1,
-              name = "test",
-              namespace = None,
-              status = Application.Status.Assembling,
-              signature = signature.copy(signatureName = "test"),
-              kafkaStreaming = List.empty,
-              graph = appGraph
-            )
-          )
-        )
-        val versionRepo = mock[ModelVersionRepository[IO]]
-        when(versionRepo.get(1)).thenReturn(IO(Some(modelVersion)))
-        val servableService = mock[ServableService[IO]]
-        when(servableService.deploy(Matchers.eq(modelVersion), Matchers.eq(None), Matchers.any()))
-          .thenReturn {
-            val s = Servable(
-              modelVersion = modelVersion,
-              nameSuffix = "test",
-              status = Servable.Status.Serving,
-              usedApps = Nil,
-              message = "Ok",
-              host = Some("host"),
-              port = Some(9090),
-              deploymentConfiguration = DeploymentConfiguration.empty
-            )
-            DeferredResult.completed[IO, Servable](s)
-          }
-
-        val spec = CustomModelMetricSpec(
-          name = "test1",
-          modelVersionId = modelVersion.id,
-          config = CustomModelMetricSpecConfiguration(
-            modelVersionId = 2,
-            threshold = 2,
-            thresholdCmpOperator = ThresholdCmpOperator.Eq,
-            servable = None,
-            deploymentConfigName = None
-          )
-        )
-        val monitoringRepo = mock[MonitoringRepository[IO]]
-        when(monitoringRepo.forModelVersion(1)).thenReturn(List(spec).pure[IO])
-
-        val monitoringService = mock[Monitoring[IO]]
-        when(monitoringService.deployServable(spec)).thenReturn(spec.pure[IO])
-        val appDeployer = ApplicationDeployer.default[IO]()(
-          Concurrent[IO],
-          applicationRepository = appRepo,
-          versionRepository = versionRepo,
-          servableService = servableService,
-          deploymentConfigService = null,
-          monitoringService = monitoringService,
-          monitoringRepo = monitoringRepo
-        )
-        val graph = ExecutionGraphRequest(
-          NonEmptyList.of(
-            PipelineStageRequest(
-              NonEmptyList.of(
-                ModelVariantRequest(
-                  modelVersionId = 1,
-                  weight = 100
-                )
-              )
-            )
-          )
-        )
-        val app = appDeployer.deploy("test", graph, List.empty, Map.empty)
-
-        app.flatMap { res =>
-          res.completed.get.map { finished =>
-            Mockito.verify(monitoringService).deployServable(spec)
-            assert(finished.name === "test")
-            assert(finished.status.isInstanceOf[Application.Status.Ready.type])
-          }
         }
       }
     }
@@ -500,61 +185,43 @@ class ApplicationServiceSpec extends GenericUnitTest {
           name = "test",
           namespace = None,
           signature = signature.copy(signatureName = "test"),
-          status = Application.Status.Assembling,
           kafkaStreaming = List.empty,
           graph = appGraph
         )
         var app     = Option(ogApp)
         val appRepo = mock[ApplicationRepository[IO]]
-        when(appRepo.get(Matchers.anyLong())).thenReturn(IO(app))
-        when(appRepo.get(Matchers.anyString())).thenReturn(IO(app))
-        when(appRepo.create(Matchers.any())).thenReturn(IO(ogApp))
-        when(appRepo.update(Matchers.any())).thenReturn(IO(1))
-        when(appRepo.delete(Matchers.any())).thenReturn(IO {
+        when(appRepo.get(anyLong)).thenReturn(IO(app))
+        when(appRepo.get(any[String])).thenReturn(IO(app))
+        when(appRepo.create(any)).thenReturn(IO(ogApp))
+        when(appRepo.update(any)).thenReturn(IO(1))
+        when(appRepo.delete(any)).thenReturn(IO {
           app = None
           1
         })
 
         val versionRepo = mock[ModelVersionRepository[IO]]
-        when(versionRepo.get(Matchers.any[Long]())).thenReturn(IO(Some(modelVersion)))
+        when(versionRepo.get(anyLong)).thenReturn(IO(Some(modelVersion)))
 
-        val servableService = new ServableService[IO] {
-          def all(): IO[List[Servable]] = ???
-          def getFiltered(
-              name: Option[String],
-              versionId: Option[Long],
-              metadata: Map[String, String]
-          ): IO[List[Servable]]                = ???
-          def stop(name: String): IO[Servable] = ???
-          def get(name: String): IO[Servable]  = ???
-          def findAndDeploy(
-              name: String,
-              version: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] = ???
-          def findAndDeploy(
-              modelId: Long,
-              deployConfigName: Option[String],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] = ???
-          def deploy(
-              mv: ModelVersion.Internal,
-              deployConfig: Option[deploy_config.DeploymentConfiguration],
-              metadata: Map[String, String]
-          ): IO[DeferredResult[IO, Servable]] =
-            DeferredResult.completed(
-              Servable(
-                mv,
-                "test",
-                Servable.Status.Serving,
-                message = "Ok",
-                host = Some("host"),
-                port = Some(9090),
-                deploymentConfiguration = DeploymentConfiguration.empty
-              )
-            )
-        }
+        val servableService = mock[ServableService[IO]]
+        when(servableService.deploy(eqTo(modelVersion), eqTo(None), any))
+          .thenAnswer {
+            (
+                mv: ModelVersion.Internal,
+                _: Option[DeploymentConfiguration],
+                _: Map[String, String]
+            ) =>
+              IO {
+                Servable(
+                  mv,
+                  "test",
+                  Servable.Status.Serving,
+                  message = "Ok".some,
+                  host = Some("host"),
+                  port = Some(9090),
+                  deploymentConfiguration = DeploymentConfiguration.empty
+                )
+              }
+          }
 
         val apps = ListBuffer.empty[Application]
         val graph = ExecutionGraphRequest(
@@ -575,9 +242,9 @@ class ApplicationServiceSpec extends GenericUnitTest {
               executionGraph: ExecutionGraphRequest,
               kafkaStreaming: List[ApplicationKafkaStream],
               meta: Map[String, String]
-          ): IO[DeferredResult[IO, Application]] =
-            DeferredResult.completed[IO, Application](ogApp)
+          ): IO[Application] = IO(ogApp)
         }
+
         val gc = ServableGC.noop[IO]()
         val applicationService = ApplicationService[IO]()(
           Concurrent[IO],
@@ -588,9 +255,10 @@ class ApplicationServiceSpec extends GenericUnitTest {
           gc
         )
         val updateReq = UpdateApplicationRequest(1, "test", None, graph, Option.empty, Option.empty)
+
         applicationService.update(updateReq).map { res =>
-          assert(res.started.name === "test")
-          assert(res.started.status.isInstanceOf[Application.Status.Assembling.type])
+          assert(res.name === "test")
+          assert(res.status.isInstanceOf[Application.Status.Assembling.type])
         }
       }
     }

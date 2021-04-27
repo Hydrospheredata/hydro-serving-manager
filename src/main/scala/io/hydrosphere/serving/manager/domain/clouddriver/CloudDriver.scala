@@ -54,6 +54,8 @@ trait CloudDriver[F[_]] {
   def getByVersionId(modelVersionId: Long): F[Option[CloudInstance]]
 
   def getLogs(name: String, follow: Boolean): fs2.Stream[F, String]
+
+  def getEvents: fs2.Stream[F, CloudInstanceEvent]
 }
 
 object CloudDriver {
@@ -71,6 +73,7 @@ object CloudDriver {
   )(implicit
       F: Async[F],
       cs: ContextShift[F],
+      c: Concurrent[F],
       ex: ExecutionContext,
       actorSystem: ActorSystem,
       materializer: Materializer

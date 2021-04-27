@@ -61,7 +61,7 @@ object ApplicationSignatureMigrationTool extends Logging {
                   .traverse(servableRepo.get)
                   .map(list =>
                     list.collect {
-                      case Some(servable) => servable.fullName -> servable
+                      case Some(servable) => servable.name -> servable
                     }.toMap
                   )
               depNames = graph.stages.flatMap(_.variants).toList.flatMap(_.requiredDeployConfig)
@@ -138,10 +138,6 @@ object ApplicationSignatureMigrationTool extends Logging {
           name = ar.application_name,
           signature = signature,
           namespace = ar.namespace,
-          status = Application.Status
-            .withNameInsensitiveOption(ar.status)
-            .getOrElse(Application.Status.Failed),
-          statusMessage = ar.status_message,
           kafkaStreaming = kafkaStreams,
           graph = graph
         )

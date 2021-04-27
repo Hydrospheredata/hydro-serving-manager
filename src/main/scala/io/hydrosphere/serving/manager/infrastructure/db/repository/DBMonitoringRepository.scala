@@ -55,7 +55,7 @@ object DBMonitoringRepository {
       modelVersionId = spec.config.modelVersionId,
       thresholdValue = spec.config.threshold,
       thresholdOp = spec.config.thresholdCmpOperator,
-      servableName = spec.config.servable.map(_.fullName),
+      servableName = spec.config.servable.map(_.name),
       deploymentConfigName = spec.config.deploymentConfigName
     )
     Try(config.asJson.noSpaces).toEither.map { json =>

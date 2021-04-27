@@ -270,11 +270,7 @@ object DBModelVersionRepository {
       override def all(): F[List[ModelVersion]] =
         for {
           rows <- allQ.to[List].transact(tx)
-        } yield rows.map(x =>
-          toModelVersion(x._1, x._2).toOption match {
-            case Some(value) => value
-          }
-        )
+        } yield rows.flatMap(x => toModelVersion(x._1, x._2).toOption)
 
       override def create(entity: ModelVersion): F[ModelVersion] =
         insertQ(fromModelVersion(entity))

@@ -9,9 +9,9 @@ import io.hydrosphere.serving.manager.domain.servable.Servable.Status
 @JsonCodec
 case class Servable(
     modelVersion: ModelVersion.Internal,
-    nameSuffix: String,
+    name: String,
     status: Status,
-    message: String,
+    message: Option[String],
     host: Option[String],
     port: Option[Int],
     usedApps: List[String] = Nil,
@@ -19,7 +19,7 @@ case class Servable(
     deploymentConfiguration: DeploymentConfiguration
 ) {
   def fullName: String =
-    Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, nameSuffix)
+    Servable.fullName(modelVersion.model.name, modelVersion.modelVersion, name)
 }
 
 object Servable {

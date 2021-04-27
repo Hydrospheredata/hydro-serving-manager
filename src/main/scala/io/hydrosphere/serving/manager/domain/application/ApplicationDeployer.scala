@@ -25,12 +25,10 @@ trait ApplicationDeployer[F[_]] {
       executionGraph: ExecutionGraphRequest,
       kafkaStreaming: List[ApplicationKafkaStream],
       metadata: Map[String, String]
-  ): F[DeferredResult[F, Application]]
+  ): F[Application]
 }
 
 object ApplicationDeployer extends Logging {
-  case class IncompleteAppDeployment(app: Application, msg: String) extends Throwable
-
   def default[F[_]]()(implicit
       F: Concurrent[F],
       servableService: ServableService[F],
@@ -46,34 +44,13 @@ object ApplicationDeployer extends Logging {
           executionGraph: ExecutionGraphRequest,
           kafkaStreaming: List[ApplicationKafkaStream],
           metadata: Map[String, String]
-      ): F[DeferredResult[F, Application]] =
+      ): F[Application] =
         for {
           composedApp <- composeApp(name, None, executionGraph, kafkaStreaming, metadata)
           repoApp     <- applicationRepository.create(composedApp)
           app = composedApp.copy(id = repoApp.id)
-          df <- Deferred[F, Application]
-          _ <-
-            startServices(app, df).void
-              .flatTap(_ => F.delay(logger.debug("App services started. All ok.")))
-              .handleErrorWith { ex =>
-                val failedApp = ex match {
-                  case IncompleteAppDeployment(incompleteApp, message) =>
-                    incompleteApp.copy(
-                      status = Application.Status.Failed,
-                      statusMessage = Option(message)
-                    )
-                  case x =>
-                    app.copy(
-                      status = Application.Status.Failed,
-                      statusMessage = Option(x.getMessage)
-                    )
-                }
-                F.delay(logger.error(s"Error while building application $failedApp", ex)) >>
-                  applicationRepository.update(failedApp) >>
-                  df.complete(failedApp).attempt.void
-              }
-              .start
-        } yield DeferredResult(app, df)
+          _ <- startServices(app).void.start
+        } yield app
 
       def composeApp(
           name: String,
@@ -125,8 +102,6 @@ object ApplicationDeployer extends Logging {
           namespace = namespace,
           signature = contract,
           kafkaStreaming = kafkaStreaming,
-          status = Application.Status.Assembling,
-          statusMessage = None,
           graph = graph,
           metadata = metadata
         )
@@ -150,7 +125,7 @@ object ApplicationDeployer extends Logging {
           }
         } yield name
 
-      private def startServices(app: Application, df: Deferred[F, Application]) = {
+      private def startServices(app: Application) = {
         val servableMetadata = Map(
           "applicationName" -> app.name,
           "applicationId"   -> app.id.toString
@@ -165,55 +140,19 @@ object ApplicationDeployer extends Logging {
                   newMetricServables <-
                     mvMetrics
                       .filter(_.config.servable.isEmpty)
-                      .traverse { x =>
-                        val foo = x;
-                        monitoringService.deployServable(x)
-                      }
+                      .traverse(x => monitoringService.deployServable(x))
                   _ <- F.delay(logger.debug(s"Deployed MetricServables: ${newMetricServables}"))
-                  result <- servableService.deploy(
+                  servable <- servableService.deploy(
                     i.modelVersion,
                     i.requiredDeploymentConfig,
                     servableMetadata
                   ) // NOTE maybe infer some app-specific labels?
-                  servable <- result.completed.get
                 } yield i.copy(servable = servable.some)
               }
             } yield ApplicationStage(variants, stage.signature)
           }
-          finishedApp =
-            app.copy(status = Application.Status.Ready, graph = ApplicationGraph(deployedStages))
+          finishedApp = app.copy(graph = ApplicationGraph(deployedStages))
           _ <- applicationRepository.update(finishedApp)
-          _ <-
-            finishedApp.graph.stages.toList
-              .flatMap(_.variants.toList)
-              .flatMap(_.servable)
-              .traverse { servable =>
-                servable.status match {
-                  case Servable.Status.Serving => servable.pure[F]
-                  case Servable.Status.NotServing =>
-                    F.raiseError[Servable](
-                      IncompleteAppDeployment(
-                        finishedApp,
-                        s"Servable ${servable.fullName} is in invalid state: ${servable.message}"
-                      )
-                    )
-                  case Servable.Status.NotAvailable =>
-                    F.raiseError[Servable](
-                      DomainError
-                        .internalError(
-                          s"Servable ${servable.fullName} is in invalid state: ${servable.message}"
-                        )
-                    )
-                  case Servable.Status.Starting =>
-                    F.raiseError[Servable](
-                      DomainError
-                        .internalError(
-                          s"Servable ${servable.fullName} is in invalid state: ${servable.message}"
-                        )
-                    )
-                }
-              }
-          _ <- df.complete(finishedApp)
         } yield finishedApp
       }
     }
