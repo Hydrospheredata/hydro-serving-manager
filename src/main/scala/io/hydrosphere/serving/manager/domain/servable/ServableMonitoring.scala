@@ -60,11 +60,11 @@ object ServableMonitoring extends Logging {
             (ServableStatus.NotAvailable, prevMessage)
           case (ServableStatus.NotServing, NotAvailable(_, _)) =>
             (ServableStatus.NotAvailable, prevMessage)
-          case (ServableStatus.NotServing, Available(_)) => (ServableStatus.NotServing, none)
-          case (_, Starting(_, warning))                 => (ServableStatus.NotServing, warning)
-          case (_, NotAvailable(_, message))             => (ServableStatus.NotAvailable, message.some)
-          case (_, NotServing(_, message))               => (ServableStatus.NotServing, message.some)
-          case (_, Ready(_, warning))                    => (ServableStatus.Serving, warning)
+          case (_, Available(_))             => (ServableStatus.NotServing, none)
+          case (_, Starting(_, warning))     => (ServableStatus.NotServing, warning)
+          case (_, NotAvailable(_, message)) => (ServableStatus.NotAvailable, message.some)
+          case (_, NotServing(_, message))   => (ServableStatus.NotServing, message.some)
+          case (_, Ready(_, warning))        => (ServableStatus.Serving, warning)
         }
     }
 }
