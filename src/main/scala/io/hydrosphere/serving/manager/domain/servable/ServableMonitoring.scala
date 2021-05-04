@@ -43,6 +43,8 @@ object ServableMonitoring extends Logging {
       }
 
       def updatedServable(servable: Servable, servEvent: CloudInstanceEvent): Servable = {
+        println(servable.toString)
+        println(servEvent.toString)
         val (newStatus, message) = getNewStatus(servable.status, servable.message, servEvent)
         servable.copy(status = newStatus, message = message)
       }
