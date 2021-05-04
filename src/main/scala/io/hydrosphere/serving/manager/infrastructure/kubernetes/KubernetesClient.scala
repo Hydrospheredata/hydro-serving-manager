@@ -14,7 +14,7 @@ import skuber.autoscaling.HorizontalPodAutoscaler
 import skuber.json.format._
 import streamz.converter._
 
-import scala.concurrent.{ExecutionContext}
+import scala.concurrent.ExecutionContext
 
 trait K8SDeployments[F[_]] {
   def get(name: String): F[Option[Deployment]]
