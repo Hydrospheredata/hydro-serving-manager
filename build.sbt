@@ -3,7 +3,7 @@ version := sys.props.getOrElse("appVersion", IO.read(file("version")).trim)
 organization := "io.hydrosphere.serving"
 homepage := Some(url("https://hydrosphere.io/serving-docs"))
 
-scalaVersion := "2.13.3"
+scalaVersion := "2.13.5"
 scalacOptions ++= Seq(
   "-unchecked",
   "-deprecation",
@@ -31,6 +31,7 @@ enablePlugins(BuildInfoPlugin, DockerPlugin)
 configs(IntegrationTest)
 ManagerDev.settings
 Defaults.itSettings
+
 buildInfoKeys := Seq[BuildInfoKey](
   name,
   version,
@@ -72,8 +73,11 @@ dockerfile in docker := {
   }
 }
 
-resolvers += "streamz at bintray" at "https://dl.bintray.com/streamz/maven/"
+resolvers += Resolver.bintrayRepo("streamz", "maven")
 resolvers +=
   "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/staging"
 
 libraryDependencies ++= Dependencies.all
+
+lazy val root    = project.in(file(".")).dependsOn(streamz % "compile->compile")
+lazy val streamz = ProjectRef(uri("https://github.com/krasserm/streamz.git"), "converter")

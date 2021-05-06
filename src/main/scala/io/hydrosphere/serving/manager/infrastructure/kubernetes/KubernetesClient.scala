@@ -14,7 +14,7 @@ import skuber.autoscaling.HorizontalPodAutoscaler
 import skuber.json.format._
 import streamz.converter._
 
-import scala.concurrent.{ExecutionContext}
+import scala.concurrent.ExecutionContext
 
 trait K8SDeployments[F[_]] {
   def get(name: String): F[Option[Deployment]]
@@ -64,7 +64,7 @@ case class KubernetesClient[F[_]](
     rs: K8SReplicaSets[F]
 ) {
   def events()(implicit c: Concurrent[F]): fs2.Stream[F, CloudInstanceEvent] =
-    rs.events().merge(services.events())
+    rs.events()
 }
 
 object KubernetesClient {
