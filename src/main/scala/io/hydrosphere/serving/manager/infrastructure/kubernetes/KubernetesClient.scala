@@ -64,7 +64,7 @@ case class KubernetesClient[F[_]](
     rs: K8SReplicaSets[F]
 ) {
   def events()(implicit c: Concurrent[F]): fs2.Stream[F, CloudInstanceEvent] =
-    rs.events().merge(services.events())
+    rs.events()
 }
 
 object KubernetesClient {
