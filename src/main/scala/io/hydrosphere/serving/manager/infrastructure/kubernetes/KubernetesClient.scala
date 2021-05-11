@@ -193,13 +193,16 @@ object KubernetesClient {
       m: Materializer
   ): K8SReplicaSets[F] =
     () => {
-      val rawStream = underlying.watchAll[ReplicaSet]().map(f => f.map(_.toEvent))
       for {
-        akkaStream <- fs2.Stream.eval(AsyncUtil.futureAsync(rawStream))
+        akkaStream <-
+          fs2.Stream.eval(AsyncUtil.futureAsync(underlying.watchAll[ReplicaSet](None, 20000)))
         evt <-
           akkaStream
+            .map(_.toEvent)
             .filter(_.isRight)
-            .map { case Right(value) => value }
+            .map {
+              case Right(value) => value
+            }
             .toStream[F]()
       } yield evt
     }
