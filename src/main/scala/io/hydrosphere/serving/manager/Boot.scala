@@ -20,7 +20,7 @@ object Boot extends IOApp with Logging {
             app.httpServer.start() >>
             app.grpcServer.start() >>
             app.applicationMonitoring.start() >>
-            app.servableMonitoring.start() >>  IO.never
+            app.servableMonitoring.start() >> IO.never
         }
       } yield ExitCode.Success
     }

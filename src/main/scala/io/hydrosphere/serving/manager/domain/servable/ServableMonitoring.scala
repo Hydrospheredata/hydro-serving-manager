@@ -37,6 +37,11 @@ object ServableMonitoring extends Logging {
 
             effect.value.as(())
           }
+          .onFinalizeCase {
+            case ExitCase.Completed => streamFinishMessage("completed")
+            case ExitCase.Error(e)  => streamFinishMessage("finished with error" + e)
+            case ExitCase.Canceled  => streamFinishMessage("cancelled")
+          }
           .compile
           .drain
           .start
@@ -66,5 +71,8 @@ object ServableMonitoring extends Logging {
           case (_, NotAvailable(_, message)) => (ServableStatus.NotAvailable, message.some)
           case (_, NotServing(_, message))   => (ServableStatus.NotServing, message.some)
         }
+
+      private def streamFinishMessage(msg: String) =
+        F.delay(logger.info("Servable monitoring stream was " + msg))
     }
 }
