@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.effect._
+import cats.syntax.all._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.api.grpc.{
   GrpcServer,
@@ -23,13 +24,14 @@ import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableMonitoring}
-import io.hydrosphere.serving.manager.infrastructure.db.Database
+import io.hydrosphere.serving.manager.infrastructure.db.{Database, FlywayClient}
 import io.hydrosphere.serving.manager.infrastructure.db.repository._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.grpc.GrpcChannel
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.RNG
+import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -42,16 +44,18 @@ case class App[F[_]](
     transactor: Transactor[F],
     migrationTool: ApplicationSignatureMigrationTool[F],
     servableMonitoring: ServableMonitoring[F],
-    applicationMonitoring: ApplicationMonitoring[F]
+    applicationMonitoring: ApplicationMonitoring[F],
+    flywayClient: FlywayClient[F]
 )
 
-object App {
+object App extends Logging {
+  def actorSystem[F[_]](name: String)(implicit F: Async[F]): Resource[F, ActorSystem] =
+    Resource.make(F.delay(ActorSystem(name)))(x => F.fromFuture(F.delay(x.terminate())).void)
+
   def make[F[_]](
       config: ManagerConfiguration,
       dockerClient: DockerdClient[F]
   )(implicit F: Async[F]): Resource[F, App[F]] = {
-    implicit val system                  = ActorSystem("manager")
-    implicit val materializer            = Materializer.createMaterializer(system)
     implicit val timeout                 = Timeout(5.minute)
     implicit val serviceExecutionContext = ExecutionContext.global
     implicit val grpcCtor                = GrpcChannel.plaintextFactory[F]
@@ -59,12 +63,14 @@ object App {
     implicit val uuidGen                 = UUIDGenerator.default[F]()
     implicit val dc                      = dockerClient
     for {
+      implicit0(actorSystem: ActorSystem) <- actorSystem("manager")
+      implicit0(materializer: Materializer) = Materializer.createMaterializer(actorSystem)
       rngF <- Resource.eval(RNG.default[F])
       cloudDriver =
         CloudDriver.fromConfig[F](dockerClient, config.cloudDriver, config.dockerRepository)
-      tx     <- Database.makeTransactor[F](config.database)
+      tx <- Database.makeTransactor[F](config.database)
+      _ = logger.info("Created DB transactor")
       flyway <- Resource.eval(Database.makeFlyway(tx))
-      _      <- Resource.eval(flyway.migrate())
 
       appPubSub        <- Resource.eval(ApplicationEvents.makeTopic)
       modelPubSub      <- Resource.eval(ModelVersionEvents.makeTopic)
@@ -135,6 +141,16 @@ object App {
         monitoringSub = monitoringPubSub._2,
         depSub = depPubSub._2
       )
-    } yield App(config, core, grpc, http, tx, migrator, servableMonitoring, applicationMonitoring)
+    } yield App(
+      config,
+      core,
+      grpc,
+      http,
+      tx,
+      migrator,
+      servableMonitoring,
+      applicationMonitoring,
+      flyway
+    )
   }
 }

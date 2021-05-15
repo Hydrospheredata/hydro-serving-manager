@@ -27,6 +27,7 @@ fork in (IntegrationTest, test) := true
 fork in (IntegrationTest, testOnly) := true
 
 enablePlugins(BuildInfoPlugin, DockerPlugin)
+addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 
 configs(IntegrationTest)
 ManagerDev.settings

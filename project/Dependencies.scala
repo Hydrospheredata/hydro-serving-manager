@@ -9,7 +9,7 @@ object Dependencies {
   val awsSdkVersion     = "1.11.312"
   val servingGrpcScala  = "3.0.0-dev3"
   val circeVersion      = "0.13.0"
-  val catsV             = "3.0.0"
+  val catsV             = "3.1.1"
   val fs2               = "3.0.3"
   val enumeratumV       = "1.6.0"
   val mockitoScalaV     = "1.16.37"
@@ -101,7 +101,6 @@ object Dependencies {
       "org.tpolecat"          %% "doobie-postgres"  % doobieV,
       "org.tpolecat"          %% "doobie-hikari"    % doobieV,
       "org.tpolecat"          %% "doobie-scalatest" % doobieV % "test, it",
-      "org.postgresql"         % "postgresql"       % postgresqlVersion,
       "org.flywaydb"           % "flyway-core"      % "4.2.0",
       "com.spotify"            % "docker-client"    % "8.16.0" exclude ("ch.qos.logback", "logback-classic"),
       "com.google.guava"       % "guava"            % "22.0",

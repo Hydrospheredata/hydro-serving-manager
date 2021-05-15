@@ -15,7 +15,10 @@ case class HikariConfiguration(
     maximumPoolSize: Int,
     initializationFailTimeout: Long = 20000L,
     leakDetectionThreshold: Long = 60000L,
-    maxLifetime: Long = MINUTES.toMillis(30)
+    maxLifetime: Long = MINUTES.toMillis(30),
+    registerMbeans: Boolean = true,
+    connectionTimeout: Long = 30000,
+    poolName: String = "manager-db-pool"
 )
 
 object HikariConfiguration {
@@ -31,6 +34,9 @@ object HikariConfiguration {
     hikariConfig.setInitializationFailTimeout(config.initializationFailTimeout)
     hikariConfig.setLeakDetectionThreshold(config.leakDetectionThreshold)
     hikariConfig.setMaxLifetime(config.maxLifetime)
+    hikariConfig.setPoolName(config.poolName)
+    hikariConfig.setRegisterMbeans(config.registerMbeans)
+    hikariConfig.setConnectionTimeout(config.connectionTimeout)
     hikariConfig
   }
 }

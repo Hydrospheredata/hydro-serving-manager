@@ -2,9 +2,9 @@ package io.hydrosphere.serving.manager.infrastructure.db
 
 import cats.effect.{Async, Resource}
 import cats.implicits._
+import doobie.Transactor
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
-import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.config.HikariConfiguration
 import org.flywaydb.core.Flyway
 
