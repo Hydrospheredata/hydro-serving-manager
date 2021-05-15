@@ -19,18 +19,17 @@ scalacOptions ++= Seq(
 
 publishArtifact := false
 
-parallelExecution in Test := false
-parallelExecution in IntegrationTest := false
+Test / parallelExecution := false
+IntegrationTest / parallelExecution := false
 
-fork in (Test, test) := true
-fork in (IntegrationTest, test) := true
-fork in (IntegrationTest, testOnly) := true
+Test / test / fork := true
+IntegrationTest / test / fork := true
+IntegrationTest / testOnly / fork := true
 
 enablePlugins(BuildInfoPlugin, DockerPlugin)
 addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 
 configs(IntegrationTest)
-ManagerDev.settings
 Defaults.itSettings
 
 buildInfoKeys := Seq[BuildInfoKey](
@@ -45,8 +44,8 @@ buildInfoKeys := Seq[BuildInfoKey](
 buildInfoPackage := "io.hydrosphere.serving"
 buildInfoOptions += BuildInfoOption.ToJson
 
-imageNames in docker := Seq(ImageName(s"hydrosphere/serving-manager:${version.value}"))
-dockerfile in docker := {
+docker / imageNames := Seq(ImageName(s"hydrosphere/serving-manager:${version.value}"))
+docker / dockerfile := {
   val jarFile: File       = (Compile / packageBin / sbt.Keys.`package`).value
   val classpath           = (Compile / dependencyClasspath).value
   val localConfigFile     = baseDirectory.value / "src" / "main" / "resources" / "application.conf"
@@ -74,11 +73,7 @@ dockerfile in docker := {
   }
 }
 
-resolvers += Resolver.bintrayRepo("streamz", "maven")
 resolvers +=
   "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/staging"
 
 libraryDependencies ++= Dependencies.all
-
-//lazy val root    = project.in(file(".")).dependsOn(streamz % "compile->compile")
-//lazy val streamz = ProjectRef(uri("https://github.com/krasserm/streamz.git"), "converter")
