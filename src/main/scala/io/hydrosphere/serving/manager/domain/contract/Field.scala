@@ -3,11 +3,12 @@ package io.hydrosphere.serving.manager.domain.contract
 import cats.Eq
 import cats.data.EitherNec
 import cats.implicits._
+import io.circe.syntax._
+import io.circe.Decoder.Result
+import io.circe.{Decoder, DecodingFailure, Encoder, HCursor, Json}
 import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.proto.contract.field.ModelField
 import io.hydrosphere.serving.proto.contract.field.ModelField.TypeOrSubfields
-import io.hydrosphere.serving.manager.infrastructure.protocol.TensorShapeDerivation._
-import io.hydrosphere.serving.manager.infrastructure.protocol.FieldDerivation._
 
 @JsonCodec
 sealed trait Field extends Product with Serializable {
@@ -74,4 +75,20 @@ object Field {
         }.toEither
     }
 
+  implicit val encF: Encoder[Field] = new Encoder[Field] {
+    override def apply(a: Field): Json =
+      a match {
+        case x: Field.Tensor => x.asJson
+        case x: Field.Map    => x.asJson
+      }
+  }
+
+  implicit val decF: Decoder[Field] = new Decoder[Field] {
+    override def apply(c: HCursor): Result[Field] =
+      c.value.as[Field.Map] match {
+        case Left(_) =>
+          c.value.as[Field.Tensor].leftMap(_ => DecodingFailure("Couldn't parse Field", Nil))
+        case Right(value) => Right(value)
+      }
+  }
 }

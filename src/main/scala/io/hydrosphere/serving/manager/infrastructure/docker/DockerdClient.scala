@@ -5,7 +5,12 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import cats.effect.Async
 import cats.implicits._
-import com.spotify.docker.client.DockerClient.{BuildParam, EventsParam, ListContainersParam, RemoveContainerParam}
+import com.spotify.docker.client.DockerClient.{
+  BuildParam,
+  EventsParam,
+  ListContainersParam,
+  RemoveContainerParam
+}
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerClientConfig
@@ -14,7 +19,7 @@ import io.circe.syntax._
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstanceEvent
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstanceEventAdapterInstances._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait DockerdClient[F[_]] {
 
@@ -49,6 +54,8 @@ trait DockerdClient[F[_]] {
 }
 
 object DockerdClient extends Logging {
+
+  final val ITERATOR_CHUNK_SIZE = 32
 
   case class DockerdClientException(error: String) extends Exception(error)
 
@@ -101,7 +108,7 @@ object DockerdClient extends Logging {
             )
         fs2.Stream
           .eval(rawStream)
-          .flatMap(x => fs2.Stream.fromIterator[F](x.asScala))
+          .flatMap(x => fs2.Stream.fromIterator[F](x.asScala, ITERATOR_CHUNK_SIZE))
           .map(logMessage => StandardCharsets.UTF_8.decode(logMessage.content()).toString)
       }
 
@@ -111,10 +118,13 @@ object DockerdClient extends Logging {
           registryAuth: RegistryAuth
       ): F[Unit] =
         F.async { cb =>
-          logger.debug(s"[DockerdClient] push image $image, $registryAuth")
-          val internalProgressHandler = DockerdClient.asyncProgressHandler(progressHandler, cb)
-          underlying.push(image, internalProgressHandler, registryAuth)
-          cb(().asRight)
+          F.delay {
+            logger.debug(s"[DockerdClient] push image $image, $registryAuth")
+            val internalProgressHandler = DockerdClient.asyncProgressHandler(progressHandler, cb)
+            underlying.push(image, internalProgressHandler, registryAuth)
+            cb(().asRight)
+            None
+          }
         }
 
       override def build(
@@ -124,17 +134,21 @@ object DockerdClient extends Logging {
           handler: ProgressHandler,
           params: List[BuildParam]
       ): F[String] =
-        F.asyncF { cb =>
-          logger.debug(s"[DockerdClient] build image $directory, $name, $dockerfile, $params")
-          val internalProgressHandler = DockerdClient.asyncProgressHandler(handler, cb)
-          proxyBuildParams.map { proxyParams =>
-            val fullParams = proxyParams ++ params
-            Option(
-              underlying.build(directory, name, dockerfile, internalProgressHandler, fullParams: _*)
-            ) match {
-              case Some(value) => cb(value.asRight)
-              case None        => cb(DockerdClientException("Can't build docker container").asLeft)
+        F.async { cb =>
+          F.defer {
+            logger.debug(s"[DockerdClient] build image $directory, $name, $dockerfile, $params")
+            val internalProgressHandler = DockerdClient.asyncProgressHandler(handler, cb)
+            val res = proxyBuildParams.map { proxyParams =>
+              val fullParams = proxyParams ++ params
+              Option(
+                underlying
+                  .build(directory, name, dockerfile, internalProgressHandler, fullParams: _*)
+              ) match {
+                case Some(value) => cb(value.asRight)
+                case None        => cb(DockerdClientException("Can't build docker container").asLeft)
+              }
             }
+            res.as(None)
           }
         }
 
@@ -175,7 +189,7 @@ object DockerdClient extends Logging {
               EventsParam.event("create"),
               EventsParam.event("start"),
               EventsParam.event("stop"),
-              EventsParam.`type`("container"),
+              EventsParam.`type`(Event.Type.CONTAINER),
               EventsParam.label("HS_INSTANCE_NAME"),
               EventsParam.label("HS_INSTANCE_MV_ID")
             )
@@ -183,10 +197,9 @@ object DockerdClient extends Logging {
         fs2.Stream
           .eval(rawStream)
           .map(_.asScala)
-          .flatMap(x => fs2.Stream.fromIterator[F](x))
+          .flatMap(x => fs2.Stream.fromIterator[F](x, ITERATOR_CHUNK_SIZE))
           .map(_.toEvent)
-          .filter(_.isRight)
-          .map { case Right(value) => value }
+          .collect { case Right(value) => value }
       }
     }
 

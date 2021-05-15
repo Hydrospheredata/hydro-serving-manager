@@ -1,6 +1,6 @@
 package io.hydrosphere.serving.manager.infrastructure
 
-import cats.effect.{IO, Timer}
+import cats.effect.IO
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.{ContainerConfig, ProgressMessage, RegistryAuth}
@@ -28,8 +28,6 @@ class DockerClientSpec extends GenericUnitTest {
 
   describe("DockerClient") {
     ignore("should handle logs correctly") {
-      implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
-
       val containerName = "keke"
 
       val client = DockerdClient.fromEnv[IO].unsafeRunSync()

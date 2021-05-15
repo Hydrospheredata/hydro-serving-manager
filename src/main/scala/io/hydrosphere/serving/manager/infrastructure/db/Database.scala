@@ -1,41 +1,29 @@
 package io.hydrosphere.serving.manager.infrastructure.db
 
-import cats.effect.{Async, Blocker, ContextShift, Resource, Sync}
+import cats.effect.{Async, Resource}
 import cats.implicits._
-import com.zaxxer.hikari.HikariDataSource
+import doobie.hikari.HikariTransactor
+import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.config.HikariConfiguration
-import javax.sql.DataSource
 import org.flywaydb.core.Flyway
 
-import scala.concurrent.ExecutionContext
+import javax.sql.DataSource
 
 object Database {
-  type HikariTransactor[M[_]] = Transactor.Aux[M, HikariDataSource]
-
-  def makeHikariDataSource[F[_]](hikariConfig: HikariConfiguration)(implicit F: Sync[F]): Resource[F, HikariDataSource] = {
-    val hkds = F.delay {
-      new HikariDataSource(HikariConfiguration.toConfig(hikariConfig))
-    }
-    Resource.make[F, HikariDataSource](hkds)(x => F.delay(x.close()))
-  }
-
   def makeTransactor[F[_]](
-    dataSource: HikariDataSource,
-    transactEc: ExecutionContext,
-    blocker: Blocker
-  )(
-    implicit F: Async[F],
-    cs: ContextShift[F]
-  ): F[HikariTransactor[F]] = {
-    F.delay {
-      Transactor.fromDataSource[F](dataSource, transactEc, blocker)
-    }
+      hikariConfig: HikariConfiguration
+  )(implicit F: Async[F]): Resource[F, HikariTransactor[F]] = {
+    val config = HikariConfiguration.toConfig(hikariConfig)
+    for {
+      connectEc <- ExecutionContexts.fixedThreadPool[F](hikariConfig.maximumPoolSize)
+      tx        <- HikariTransactor.fromHikariConfig(config, connectEc)
+    } yield tx
   }
 
   def makeFlyway[F[_], D <: DataSource](
-    tx: Transactor.Aux[F, D],
-  )(implicit F: Async[F]): F[FlywayClient[F]] = {
+      tx: Transactor.Aux[F, D]
+  )(implicit F: Async[F]): F[FlywayClient[F]] =
     for {
       fl <- tx.configure { x =>
         F.delay {
@@ -46,5 +34,4 @@ object Database {
         }
       }
     } yield fl
-  }
 }

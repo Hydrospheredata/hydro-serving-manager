@@ -1,6 +1,7 @@
 package io.hydrosphere.serving.manager
 
 import cats.effect._
+import cats.effect.std.Dispatcher
 import cats.implicits._
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
 import io.hydrosphere.serving.manager.domain.application.{
@@ -27,7 +28,6 @@ import io.hydrosphere.serving.manager.domain.model_version.{
 import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
-import io.hydrosphere.serving.manager.infrastructure.grpc.PredictionClient
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelUnpacker, StorageOps}
 import io.hydrosphere.serving.manager.util.UUIDGenerator
@@ -63,15 +63,14 @@ object Core {
   def make[F[_]](
       config: ManagerConfiguration
   )(implicit
-      F: ConcurrentEffect[F],
+      F: Async[F],
       ec: ExecutionContext,
-      timer: Timer[F],
+      timer: Clock[F],
       rng: RNG[F],
       uuid: UUIDGenerator[F],
       storageOps: StorageOps[F],
       dockerClient: DockerdClient[F],
       cloudDriver: CloudDriver[F],
-//    predictionCtor: PredictionClient.Factory[F],
       imageRepository: ImageRepository[F],
       modelRepo: ModelRepository[F],
       modelVersionRepo: ModelVersionRepository[F],
@@ -80,7 +79,7 @@ object Core {
       appRepo: ApplicationRepository[F],
       buildLogsRepo: BuildLogRepository[F],
       monitoringRepo: MonitoringRepository[F]
-  ): F[Core[F]] = {
+  ): F[Core[F]] =
     for {
       buildLoggingService <- BuildLoggingService.make[F]()
       core <- {
@@ -127,5 +126,4 @@ object Core {
         }
       }
     } yield core
-  }
 }

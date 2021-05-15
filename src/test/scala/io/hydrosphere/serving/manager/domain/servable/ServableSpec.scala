@@ -1,12 +1,11 @@
-package io.hydrosphere.serving.manager.domain
+package io.hydrosphere.serving.manager.domain.servable
 
-import cats.data.{NonEmptyList, OptionT}
-import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, IO, Timer}
+import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.implicits._
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.config.DefaultDeploymentConfiguration
-import io.hydrosphere.serving.manager.domain.application.{Application, ApplicationRepository}
+import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
 import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, CloudInstance}
 import io.hydrosphere.serving.manager.domain.contract.{DataType, Field, Signature, TensorShape}
 import io.hydrosphere.serving.manager.domain.deploy_config.{
@@ -17,20 +16,15 @@ import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version._
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringRepository
-import io.hydrosphere.serving.manager.domain.servable._
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository
 import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
-import org.mockito.Matchers
 
 import java.time.Instant
-import scala.concurrent.ExecutionContext
 
 class ServableSpec extends GenericUnitTest {
   implicit val rng: RNG[IO]               = RNG.default[IO].unsafeRunSync()
   implicit val nameGen: NameGenerator[IO] = NameGenerator.haiku[IO]()
   implicit val uuidGen: UUIDGenerator[IO] = UUIDGenerator.default[IO]()
-  implicit val timer: Timer[IO]           = IO.timer(ExecutionContext.global)
 
   val signature: Signature = Signature(
     signatureName = "test",

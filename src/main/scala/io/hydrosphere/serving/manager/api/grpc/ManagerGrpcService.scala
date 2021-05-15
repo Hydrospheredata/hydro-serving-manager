@@ -1,7 +1,8 @@
 package io.hydrosphere.serving.manager.api.grpc
 
-import cats.effect.Effect
 import cats.effect.implicits._
+import cats.effect.kernel.{Async, Sync}
+import cats.effect.std.Dispatcher
 import cats.implicits._
 import com.google.protobuf.empty.Empty
 import io.grpc.stub.StreamObserver
@@ -21,12 +22,15 @@ import io.hydrosphere.serving.proto.manager.api.{
   GetVersionRequest,
   RemoveServableRequest
 }
+import org.apache.logging.log4j.scala.Logging
 
 class ManagerGrpcService[F[_]](
     versionService: ModelVersionService[F],
-    servableService: ServableService[F]
-)(implicit F: Effect[F])
-    extends ManagerService {
+    servableService: ServableService[F],
+    dispatcher: Dispatcher[F]
+)(implicit F: Sync[F])
+    extends ManagerService
+    with Logging {
 
   def nonEmptyString(str: String): Option[String] =
     if (str.trim.nonEmpty) Some(str) else None
@@ -43,20 +47,21 @@ class ManagerGrpcService[F[_]](
       }
       .onError {
         case exception =>
-          Effect[F].delay {
+          F.delay {
+            logger.debug(exception)
             responseObserver.onError(exception)
           }
       }
 
-    fAction.toIO.unsafeRunAsyncAndForget()
+    dispatcher.unsafeRunAndForget(fAction)
   }
 
-  override def getVersion(request: GetVersionRequest): Future[grpcEntity.ModelVersion] = {
-    val f = for {
-      version <- versionService.get(request.id)
-    } yield Converters.fromModelVersion(version)
-    f.toIO.unsafeToFuture()
-  }
+  override def getVersion(request: GetVersionRequest): Future[grpcEntity.ModelVersion] =
+    dispatcher.unsafeToFuture {
+      for {
+        version <- versionService.get(request.id)
+      } yield Converters.fromModelVersion(version)
+    }
 
   override def deployServable(
       request: DeployServableRequest,
@@ -79,22 +84,21 @@ class ManagerGrpcService[F[_]](
             request.metadata
           )
       }
-      _         <- F.delay(responseObserver.onNext(Converters.fromServable(res)))
-      _         <- F.delay(responseObserver.onCompleted())
+      _ <- F.delay(responseObserver.onNext(Converters.fromServable(res)))
+      _ <- F.delay(responseObserver.onCompleted())
     } yield ()
 
-    flow
-      .onError { case x => F.delay(responseObserver.onError(x)) }
-      .toIO
-      .unsafeRunAsyncAndForget()
+    dispatcher.unsafeRunAndForget {
+      flow.onError { case x => F.delay(responseObserver.onError(x)) }
+    }
   }
 
-  override def removeServable(request: RemoveServableRequest): Future[grpcEntity.Servable] = {
-    val flow = for {
-      res <- servableService.stop(request.servableName)
-    } yield Converters.fromServable(res)
-    flow.toIO.unsafeToFuture()
-  }
+  override def removeServable(request: RemoveServableRequest): Future[grpcEntity.Servable] =
+    dispatcher.unsafeToFuture {
+      for {
+        res <- servableService.stop(request.servableName)
+      } yield Converters.fromServable(res)
+    }
 
   override def getServables(
       request: GetServablesRequest,
@@ -116,9 +120,21 @@ class ManagerGrpcService[F[_]](
       _ <- F.delay(responseObserver.onCompleted())
     } yield ()
 
-    flow
-      .onError { case x => F.delay(responseObserver.onError(x)) }
-      .toIO
-      .unsafeRunAsyncAndForget()
+    dispatcher.unsafeRunAndForget {
+      flow
+        .onError { case x => F.delay(responseObserver.onError(x)) }
+    }
   }
+}
+
+object ManagerGrpcService {
+  def make[F[_]](
+      versionService: ModelVersionService[F],
+      servableService: ServableService[F]
+  )(implicit F: Async[F]): F[ManagerGrpcService[F]] =
+    Dispatcher[F].use { dispatcher =>
+      F.pure {
+        new ManagerGrpcService[F](versionService, servableService, dispatcher)
+      }
+    }
 }

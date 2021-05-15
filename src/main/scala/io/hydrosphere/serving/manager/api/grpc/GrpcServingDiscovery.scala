@@ -1,8 +1,9 @@
 package io.hydrosphere.serving.manager.api.grpc
 
 import java.util.UUID
-import cats.effect.ConcurrentEffect
+import cats.effect.Async
 import cats.effect.implicits._
+import cats.effect.std.Dispatcher
 import cats.implicits._
 import com.google.protobuf.empty.Empty
 import fs2.concurrent.SignallingRef
@@ -22,7 +23,6 @@ import io.hydrosphere.serving.manager.domain.application.{
 import io.hydrosphere.serving.manager.domain.monitoring.{MetricSpecEvents, MonitoringRepository}
 import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableService}
 import io.hydrosphere.serving.manager.util.grpc.Converters
-
 import org.apache.logging.log4j.scala.Logging
 
 class GrpcServingDiscovery[F[_]](
@@ -31,19 +31,18 @@ class GrpcServingDiscovery[F[_]](
     metricSpecSub: MetricSpecEvents.Subscriber[F],
     appService: ApplicationService[F],
     servableService: ServableService[F],
-    monitoringService: MonitoringRepository[F]
-)(implicit F: ConcurrentEffect[F])
+    monitoringService: MonitoringRepository[F],
+    dispatcher: Dispatcher[F]
+)(implicit F: Async[F])
     extends ServingDiscovery
     with Logging {
-
-  private def runSync[A](f: => F[A]): A = f.toIO.unsafeRunSync()
 
   override def watchApplications(
       observer: StreamObserver[ApplicationDiscoveryEvent]
   ): StreamObserver[Empty] = {
     val id = UUID.randomUUID().toString
     logger.debug(s"Application watcher  $id registered")
-    runSync {
+    dispatcher.unsafeRunSync {
       for {
         apps <- appService.all()
         initEvents = apps.grouped(10).toList.map { batch =>
@@ -65,7 +64,7 @@ class GrpcServingDiscovery[F[_]](
                 }
                 ApplicationDiscoveryEvent(added = okApps)
               case ItemRemove(items) =>
-                ApplicationDiscoveryEvent(removedIds = items.map(_.toString))
+                ApplicationDiscoveryEvent(removedIds = items)
             }
             .evalMap(x => F.delay(observer.onNext(x)))
             .compile
@@ -76,11 +75,11 @@ class GrpcServingDiscovery[F[_]](
 
         override def onError(t: Throwable): Unit = {
           logger.debug("Application stream failed", t)
-          runSync(signal.set(true))
+          dispatcher.unsafeRunSync(signal.set(true))
         }
 
         override def onCompleted(): Unit =
-          runSync(signal.set(true))
+          dispatcher.unsafeRunSync(signal.set(true))
       }
     }
   }
@@ -90,7 +89,7 @@ class GrpcServingDiscovery[F[_]](
   ): StreamObserver[Empty] = {
     val id = UUID.randomUUID().toString
     logger.debug(s"Servable subscriber $id registered")
-    runSync {
+    dispatcher.unsafeRunSync {
       for {
         servables <- servableService.all()
         initEvents = servables.grouped(10).toList.map { batch =>
@@ -117,11 +116,11 @@ class GrpcServingDiscovery[F[_]](
 
         override def onError(t: Throwable): Unit = {
           logger.debug("Servable stream failed", t)
-          runSync(signal.set(true))
+          dispatcher.unsafeRunSync(signal.set(true))
         }
 
         override def onCompleted(): Unit =
-          runSync(signal.set(true))
+          dispatcher.unsafeRunSync(signal.set(true))
       }
     }
   }
@@ -131,38 +130,63 @@ class GrpcServingDiscovery[F[_]](
   ): StreamObserver[Empty] = {
     val id = UUID.randomUUID().toString
     logger.debug(s"MetricSpec subscriber $id registered")
-    val flow = for {
-      metrics <- monitoringService.all()
-      initEvents = metrics.grouped(10).toList.map { batch =>
-        val converted = batch.map(Converters.fromMetricSpec)
-        MetricSpecDiscoveryEvent(added = converted)
-      }
-      _      <- initEvents.traverse(ev => F.delay(responseObserver.onNext(ev)))
-      signal <- SignallingRef[F, Boolean](false)
-      _ <-
-        metricSpecSub.subscribe
-          .interruptWhen(signal)
-          .map {
-            case Initial => MetricSpecDiscoveryEvent()
-            case ItemUpdate(items) =>
-              MetricSpecDiscoveryEvent(added = items.map(Converters.fromMetricSpec))
-            case ItemRemove(items) => MetricSpecDiscoveryEvent(removedIdx = items)
-          }
-          .evalMap(x => F.delay(responseObserver.onNext(x)))
-          .compile
-          .drain
-          .start
-    } yield new StreamObserver[Empty] {
-      override def onNext(value: Empty): Unit = ()
+    dispatcher.unsafeRunSync {
+      for {
+        metrics <- monitoringService.all()
+        initEvents = metrics.grouped(10).toList.map { batch =>
+          val converted = batch.map(Converters.fromMetricSpec)
+          MetricSpecDiscoveryEvent(added = converted)
+        }
+        _      <- initEvents.traverse(ev => F.delay(responseObserver.onNext(ev)))
+        signal <- SignallingRef[F, Boolean](false)
+        _ <-
+          metricSpecSub.subscribe
+            .interruptWhen(signal)
+            .map {
+              case Initial => MetricSpecDiscoveryEvent()
+              case ItemUpdate(items) =>
+                MetricSpecDiscoveryEvent(added = items.map(Converters.fromMetricSpec))
+              case ItemRemove(items) => MetricSpecDiscoveryEvent(removedIdx = items)
+            }
+            .evalMap(x => F.delay(responseObserver.onNext(x)))
+            .compile
+            .drain
+            .start
+      } yield new StreamObserver[Empty] {
+        override def onNext(value: Empty): Unit = ()
 
-      override def onError(t: Throwable): Unit = {
-        logger.debug("Servable stream failed", t)
-        runSync(signal.set(true))
-      }
+        override def onError(t: Throwable): Unit = {
+          logger.debug("Servable stream failed", t)
+          dispatcher.unsafeRunSync(signal.set(true))
+        }
 
-      override def onCompleted(): Unit =
-        runSync(signal.set(true))
+        override def onCompleted(): Unit =
+          dispatcher.unsafeRunSync(signal.set(true))
+      }
     }
-    runSync(flow)
   }
+}
+
+object GrpcServingDiscovery {
+  def make[F[_]](
+      appSub: ApplicationEvents.Subscriber[F],
+      servableSub: ServableEvents.Subscriber[F],
+      metricSpecSub: MetricSpecEvents.Subscriber[F],
+      appService: ApplicationService[F],
+      servableService: ServableService[F],
+      monitoringService: MonitoringRepository[F]
+  )(implicit F: Async[F]): F[GrpcServingDiscovery[F]] =
+    Dispatcher[F].use { dispatcher =>
+      F.pure(
+        new GrpcServingDiscovery[F](
+          appSub,
+          servableSub,
+          metricSpecSub,
+          appService,
+          servableService,
+          monitoringService,
+          dispatcher
+        )
+      )
+    }
 }

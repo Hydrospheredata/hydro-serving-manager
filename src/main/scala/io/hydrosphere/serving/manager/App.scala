@@ -1,35 +1,19 @@
 package io.hydrosphere.serving.manager
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.util.Timeout
 import cats.effect._
-import cats.implicits._
-import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
-import org.apache.commons.io.IOUtils
-
 import io.hydrosphere.serving.manager.api.grpc.{
   GrpcServer,
   GrpcServingDiscovery,
   ManagerGrpcService
 }
 import io.hydrosphere.serving.manager.api.http.HttpServer
-import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationController
-import io.hydrosphere.serving.manager.api.http.controller.events.SSEController
-import io.hydrosphere.serving.manager.api.http.controller.model.{
-  ExternalModelController,
-  ModelController
-}
-import io.hydrosphere.serving.manager.api.http.controller.servable.ServableController
-import io.hydrosphere.serving.manager.api.http.controller.{
-  DeploymentConfigController,
-  HostSelectorController,
-  MonitoringController
-}
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
-import io.hydrosphere.serving.manager.domain.application.{ApplicationEvents, ApplicationMonitoring}
 import io.hydrosphere.serving.manager.domain.application.migrations.ApplicationSignatureMigrationTool
+import io.hydrosphere.serving.manager.domain.application.{ApplicationEvents, ApplicationMonitoring}
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.deploy_config.{
   DeploymentConfigurationEvents,
@@ -38,18 +22,14 @@ import io.hydrosphere.serving.manager.domain.deploy_config.{
 import io.hydrosphere.serving.manager.domain.image.ImageRepository
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
-import io.hydrosphere.serving.manager.domain.servable.{
-  ServableEvents,
-  ServableMonitoring,
-  ServableRepository
-}
+import io.hydrosphere.serving.manager.domain.servable.{ServableEvents, ServableMonitoring}
 import io.hydrosphere.serving.manager.infrastructure.db.Database
 import io.hydrosphere.serving.manager.infrastructure.db.repository._
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.grpc.GrpcChannel
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
-import io.hydrosphere.serving.manager.util.random.RNG
 import io.hydrosphere.serving.manager.util.UUIDGenerator
+import io.hydrosphere.serving.manager.util.random.RNG
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -66,12 +46,12 @@ case class App[F[_]](
 )
 
 object App {
-  def make[F[_]: ConcurrentEffect: ContextShift: Timer](
+  def make[F[_]](
       config: ManagerConfiguration,
       dockerClient: DockerdClient[F]
-  ): Resource[F, App[F]] = {
+  )(implicit F: Async[F]): Resource[F, App[F]] = {
     implicit val system                  = ActorSystem("manager")
-    implicit val materializer            = ActorMaterializer()
+    implicit val materializer            = Materializer.createMaterializer(system)
     implicit val timeout                 = Timeout(5.minute)
     implicit val serviceExecutionContext = ExecutionContext.global
     implicit val grpcCtor                = GrpcChannel.plaintextFactory[F]
@@ -79,21 +59,18 @@ object App {
     implicit val uuidGen                 = UUIDGenerator.default[F]()
     implicit val dc                      = dockerClient
     for {
-      rngF <- Resource.liftF(RNG.default[F])
+      rngF <- Resource.eval(RNG.default[F])
       cloudDriver =
         CloudDriver.fromConfig[F](dockerClient, config.cloudDriver, config.dockerRepository)
-      hk         <- Database.makeHikariDataSource[F](config.database)
-      blocker    <- Blocker[F]
-      transactEc <- ExecutionContexts.cachedThreadPool[F]
-      tx         <- Resource.liftF(Database.makeTransactor[F](hk, transactEc, blocker))
-      flyway     <- Resource.liftF(Database.makeFlyway(tx))
-      _          <- Resource.liftF(flyway.migrate())
+      tx     <- Database.makeTransactor[F](config.database)
+      flyway <- Resource.eval(Database.makeFlyway(tx))
+      _      <- Resource.eval(flyway.migrate())
 
-      appPubSub        <- Resource.liftF(ApplicationEvents.makeTopic)
-      modelPubSub      <- Resource.liftF(ModelVersionEvents.makeTopic)
-      servablePubSub   <- Resource.liftF(ServableEvents.makeTopic)
-      monitoringPubSub <- Resource.liftF(MetricSpecEvents.makeTopic)
-      depPubSub        <- Resource.liftF(DeploymentConfigurationEvents.makeTopic)
+      appPubSub        <- Resource.eval(ApplicationEvents.makeTopic)
+      modelPubSub      <- Resource.eval(ModelVersionEvents.makeTopic)
+      servablePubSub   <- Resource.eval(ServableEvents.makeTopic)
+      monitoringPubSub <- Resource.eval(MetricSpecEvents.makeTopic)
+      depPubSub        <- Resource.eval(DeploymentConfigurationEvents.makeTopic)
       core <- {
         implicit val rng                        = rngF
         implicit val cd                         = cloudDriver
@@ -114,7 +91,7 @@ object App {
           DBMonitoringRepository.make(config.defaultDeploymentConfiguration)
         implicit val imageRepo = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
 
-        Resource.liftF(Core.make[F](config))
+        Resource.eval(Core.make[F](config))
       }
       migrator = {
         implicit val tx1 = tx
@@ -125,38 +102,20 @@ object App {
           core.repos.depConfRepository
         )
       }
-      grpcService = new ManagerGrpcService[F](core.versionService, core.servableService)
-      discoveryService = new GrpcServingDiscovery[F](
-        appPubSub._2,
-        servablePubSub._2,
-        monitoringPubSub._2,
-        core.appService,
-        core.servableService,
-        core.repos.monitoringRepository
+      grpcService <-
+        Resource.eval(ManagerGrpcService.make[F](core.versionService, core.servableService))
+      discoveryService <- Resource.eval(
+        GrpcServingDiscovery.make[F](
+          appPubSub._2,
+          servablePubSub._2,
+          monitoringPubSub._2,
+          core.appService,
+          core.servableService,
+          core.repos.monitoringRepository
+        )
       )
       grpc = GrpcServer.default(config, grpcService, discoveryService)
 
-      externalModelController = new ExternalModelController[F](core.modelService)
-
-      modelController = new ModelController[F](
-        core.modelService,
-        core.repos.modelRepo,
-        core.versionService,
-        core.buildLoggingService
-      )
-      appController      = new ApplicationController[F](core.appService)
-      hsController       = new HostSelectorController[F]
-      servableController = new ServableController[F](core.servableService, cloudDriver)
-      sseController = new SSEController[F](
-        appPubSub._2,
-        modelPubSub._2,
-        servablePubSub._2,
-        monitoringPubSub._2,
-        depPubSub._2
-      )
-      monitoringController =
-        new MonitoringController[F](core.monitoringService, core.repos.monitoringRepository)
-      depConfController = new DeploymentConfigController[F](core.deploymentConfigService)
       servableMonitoring = ServableMonitoring.make(
         cloudDriver,
         core.repos.servableRepo
@@ -166,16 +125,15 @@ object App {
         appRepo = core.repos.appRepo,
         appPub = appPubSub._1
       )
-      http = HttpServer.akkaBased(
+      http <- HttpServer.akkaBased(
         config = config.application,
-        modelRoutes = modelController.routes,
-        applicationRoutes = appController.routes,
-        hostSelectorRoutes = hsController.routes,
-        servableRoutes = servableController.routes,
-        sseRoutes = sseController.routes,
-        monitoringRoutes = monitoringController.routes,
-        externalModelRoutes = externalModelController.routes,
-        deploymentConfRoutes = depConfController.routes
+        core = core,
+        cloudDriver = cloudDriver,
+        appSub = appPubSub._2,
+        servSub = servablePubSub._2,
+        modelSub = modelPubSub._2,
+        monitoringSub = monitoringPubSub._2,
+        depSub = depPubSub._2
       )
     } yield App(config, core, grpc, http, tx, migrator, servableMonitoring, applicationMonitoring)
   }

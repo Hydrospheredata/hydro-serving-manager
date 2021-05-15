@@ -1,8 +1,8 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import cats.data.OptionT
+import cats.effect.kernel.MonadCancel
 import cats.implicits._
-import cats.effect.Bracket
 import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
@@ -106,7 +106,7 @@ object DBMonitoringRepository {
          """.update
 
   def make[F[_]](defaultDC: DeploymentConfiguration)(implicit
-      F: Bracket[F, Throwable],
+      F: MonadCancel[F, Throwable],
       tx: Transactor[F],
       pub: MetricSpecEvents.Publisher[F]
   ): MonitoringRepository[F] =

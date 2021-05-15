@@ -1,7 +1,7 @@
 package io.hydrosphere.serving.manager.api.http.controller.model
 
 import io.circe.generic.JsonCodec
-import io.hydrosphere.serving.manager.domain.contract.{Signature}
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 
 @JsonCodec

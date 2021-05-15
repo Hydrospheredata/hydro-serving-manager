@@ -1,7 +1,7 @@
 package io.hydrosphere.serving.manager.domain.image
 
 import cats.effect.Sync
-import com.spotify.docker.client.{DockerClient, ProgressHandler}
+import com.spotify.docker.client.ProgressHandler
 import io.hydrosphere.serving.manager.config.DockerRepositoryConfiguration
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.image.repositories.{

@@ -5,9 +5,6 @@ import cats.effect.Async
 import scala.concurrent.{ExecutionContext, Future}
 
 object AsyncUtil {
-  def futureAsync[F[_] : Async, T](future: => Future[T])(implicit ec: ExecutionContext): F[T] = {
-    Async[F].async[T] { cb =>
-      future.onComplete(x => cb(x.toEither))
-    }
-  }
+  def futureAsync[F[_], T](future: => Future[T])(implicit F: Async[F], ec: ExecutionContext): F[T] =
+    Async[F].fromFuture(Async[F].delay(future))
 }

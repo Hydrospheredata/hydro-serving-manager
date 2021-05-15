@@ -1,13 +1,18 @@
 package io.hydrosphere.serving.manager.api.http.controller
 
 import akka.http.scaladsl.server.Route
-import cats.effect.Effect
-import io.hydrosphere.serving.manager.domain.deploy_config.{DeploymentConfiguration, DeploymentConfigurationService}
+import cats.effect.Async
+import cats.effect.std.Dispatcher
+import io.hydrosphere.serving.manager.domain.deploy_config.{
+  DeploymentConfiguration,
+  DeploymentConfigurationService
+}
+
 import javax.ws.rs.Path
 
 @Path("/deployment_configuration")
-class DeploymentConfigController[F[_]: Effect](
-  deploymentConfigService: DeploymentConfigurationService[F]
+class DeploymentConfigController[F[_]: Dispatcher](
+    deploymentConfigService: DeploymentConfigurationService[F]
 ) extends AkkaHttpControllerDsl {
 
   @Path("/")
@@ -41,4 +46,13 @@ class DeploymentConfigController[F[_]: Effect](
   }
 
   val routes: Route = getByName ~ deleteByName ~ create ~ listAll
+}
+
+object DeploymentConfigController {
+  def make[F[_]](
+      deploymentConfigService: DeploymentConfigurationService[F]
+  )(implicit F: Async[F]) =
+    Dispatcher[F].map { implicit disp =>
+      new DeploymentConfigController[F](deploymentConfigService)
+    }
 }

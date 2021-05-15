@@ -1,7 +1,5 @@
 package io.hydrosphere.serving.manager.domain.application
 
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBApplicationRepository.ApplicationRow
-
 trait ApplicationRepository[F[_]] {
   def create(entity: Application): F[Application]
 

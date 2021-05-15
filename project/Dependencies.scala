@@ -9,12 +9,12 @@ object Dependencies {
   val awsSdkVersion     = "1.11.312"
   val servingGrpcScala  = "3.0.0-dev3"
   val circeVersion      = "0.13.0"
-  val catsV             = "2.2.0"
-  val envoyDataPlaneApi = "v1.6.0_1"
-  val fs2               = "2.4.4"
+  val catsV             = "3.0.0"
+  val fs2               = "3.0.3"
   val enumeratumV       = "1.6.0"
   val mockitoScalaV     = "1.16.37"
   val monocleV          = "3.0.0-M4"
+  val doobieV           = "1.0.0-M2"
 
   lazy val awsDependencies = Seq(
     "com.amazonaws" % "aws-java-sdk-ecs"     % awsSdkVersion,
@@ -97,10 +97,10 @@ object Dependencies {
     Seq(
       "org.typelevel"         %% "kittens"          % "2.2.1",
       "org.typelevel"         %% "cats-effect"      % catsV,
-      "org.tpolecat"          %% "doobie-core"      % "0.9.0",
-      "org.tpolecat"          %% "doobie-postgres"  % "0.9.0",
-      "org.tpolecat"          %% "doobie-scalatest" % "0.9.0" % "test, it",
-      "com.zaxxer"             % "HikariCP"         % "2.6.3", // doobie-hikari depends on hikari 3.3.1 which has weird pool retries.
+      "org.tpolecat"          %% "doobie-core"      % doobieV,
+      "org.tpolecat"          %% "doobie-postgres"  % doobieV,
+      "org.tpolecat"          %% "doobie-hikari"    % doobieV,
+      "org.tpolecat"          %% "doobie-scalatest" % doobieV % "test, it",
       "org.postgresql"         % "postgresql"       % postgresqlVersion,
       "org.flywaydb"           % "flyway-core"      % "4.2.0",
       "com.spotify"            % "docker-client"    % "8.16.0" exclude ("ch.qos.logback", "logback-classic"),

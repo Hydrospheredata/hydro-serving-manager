@@ -2,9 +2,9 @@ package io.hydrosphere.serving.manager.domain.clouddriver
 
 sealed trait CloudInstanceEventAdapterError extends Throwable
 
-final case object MissingLabel extends CloudInstanceEventAdapterError
+case object MissingLabel extends CloudInstanceEventAdapterError
 
-final case object UnhandledEvent extends CloudInstanceEventAdapterError
+case object UnhandledEvent extends CloudInstanceEventAdapterError
 
 final case class MissingField(message: String) extends CloudInstanceEventAdapterError
 

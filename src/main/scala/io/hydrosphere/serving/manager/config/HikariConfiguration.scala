@@ -5,6 +5,8 @@ import cats.derived.semiauto
 import com.zaxxer.hikari.HikariConfig
 import io.hydrosphere.serving.manager.util.Secret
 
+import scala.concurrent.duration.MINUTES
+
 case class HikariConfiguration(
     jdbcUrl: String,
     username: String,
@@ -12,7 +14,8 @@ case class HikariConfiguration(
     driverClassname: String = "org.postgresql.Driver",
     maximumPoolSize: Int,
     initializationFailTimeout: Long = 20000L,
-    leakDetectionThreshold: Long = 60000L
+    leakDetectionThreshold: Long = 60000L,
+    maxLifetime: Long = MINUTES.toMillis(30)
 )
 
 object HikariConfiguration {
@@ -27,6 +30,7 @@ object HikariConfiguration {
     hikariConfig.setMaximumPoolSize(config.maximumPoolSize)
     hikariConfig.setInitializationFailTimeout(config.initializationFailTimeout)
     hikariConfig.setLeakDetectionThreshold(config.leakDetectionThreshold)
+    hikariConfig.setMaxLifetime(config.maxLifetime)
     hikariConfig
   }
 }

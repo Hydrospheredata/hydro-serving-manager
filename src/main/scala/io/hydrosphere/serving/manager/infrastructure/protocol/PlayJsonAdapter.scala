@@ -5,10 +5,12 @@ import io.circe.{Decoder, DecodingFailure, Encoder, HCursor, Json}
 import play.api.libs.json.{
   JsArray,
   JsBoolean,
+  JsFalse,
   JsNull,
   JsNumber,
   JsObject,
   JsString,
+  JsTrue,
   JsValue,
   Reads,
   Writes
@@ -31,7 +33,8 @@ object PlayJsonAdapter {
     p match {
       case JsNumber(i)   => i.asJson
       case JsString(s)   => s.asJson
-      case JsBoolean(b)  => b.asJson
+      case JsTrue        => true.asJson
+      case JsFalse       => false.asJson
       case JsNull        => Json.Null
       case JsArray(arr)  => arr.map(playToCirce).asJson
       case JsObject(obj) => obj.view.mapValues(playToCirce).toMap.asJson

@@ -16,7 +16,7 @@ case class ServableView(
 )
 
 object ServableView {
-  def fromServable(s: Servable) =
+  def fromServable(s: Servable): ServableView =
     ServableView(
       modelVersion = s.modelVersion,
       status = s.status,

@@ -1,14 +1,13 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import java.time.Instant
-
-import cats.effect.Bracket
 import cats.implicits._
 import cats.data.NonEmptyList
-
+import cats.effect.kernel.MonadCancel
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
+import doobie.implicits.legacy.instant._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.monitoring.MonitoringConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
@@ -21,8 +20,7 @@ import io.hydrosphere.serving.manager.domain.model_version.{
 }
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBModelRepository.ModelRow
 import io.hydrosphere.serving.manager.infrastructure.db.Metas._
-import io.hydrosphere.serving.manager.domain.contract.{DataType, Field, Signature, TensorShape}
-
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.circe.parser._
 import io.circe.syntax._
 import io.circe.Json
@@ -262,7 +260,7 @@ object DBModelVersionRepository {
       """.stripMargin.update
 
   def make[F[_]]()(implicit
-      F: Bracket[F, Throwable],
+      F: MonadCancel[F, Throwable],
       tx: Transactor[F],
       modelPub: ModelVersionEvents.Publisher[F]
   ): ModelVersionRepository[F] =

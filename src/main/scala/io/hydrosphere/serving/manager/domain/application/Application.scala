@@ -42,8 +42,10 @@ case class Application(
     graph: ApplicationGraph,
     metadata: Map[String, String] = Map.empty
 ) {
-  lazy val servables        = graph.stages.flatMap(s => s.variants.map(_.servable)).toList.flatten
-  lazy val statusAndMessage = ServableStatusComposer.combineStatuses(servables)
+  lazy val servables: List[Servable] =
+    graph.stages.flatMap(s => s.variants.map(_.servable)).toList.flatten
+  lazy val statusAndMessage: (List[String], ServableStatus) =
+    ServableStatusComposer.combineStatuses(servables)
 
   val status: Application.Status = statusAndMessage._2 match {
     case ServableStatus.Serving      => Application.Status.Ready

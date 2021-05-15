@@ -1,10 +1,5 @@
 package io.hydrosphere.serving.manager.domain.servable
 
-import cats.effect.Bracket
-import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
-import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository
-
 trait ServableRepository[F[_]] {
   def all(): F[List[Servable]]
 

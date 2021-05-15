@@ -1,31 +1,18 @@
-package io.hydrosphere.serving.manager.domain
+package io.hydrosphere.serving.manager.domain.servable
 
-import java.time.Instant
 import cats.effect.IO
 import cats.implicits._
-import com.amazonaws.services.ecs.model.transform.DeploymentConfigurationJsonUnmarshaller
-import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
+import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.domain.model.Model
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionStatus}
-import io.hydrosphere.serving.manager.domain.monitoring.{
-  CustomModelMetricSpec,
-  CustomModelMetricSpecConfiguration,
-  Monitoring,
-  MonitoringRepository,
-  ThresholdCmpOperator
-}
-import io.hydrosphere.serving.manager.domain.servable.{
-  Servable,
-  ServableGC,
-  ServableRepository,
-  ServableService
-}
-import io.hydrosphere.serving.proto.contract.signature.ModelSignature
+import io.hydrosphere.serving.manager.domain.monitoring._
 import org.mockito.Mockito
+
+import java.time.Instant
 
 class ServableGCSpec extends GenericUnitTest {
   describe("Servable Garbage Collector") {

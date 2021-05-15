@@ -2,12 +2,10 @@ package io.hydrosphere.serving.manager.domain.application
 
 import cats.data.NonEmptyList
 import cats.syntax.either._
-
 import io.hydrosphere.serving.manager.domain.DomainError
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import io.hydrosphere.serving.proto.contract.errors.MergeError
-import io.hydrosphere.serving.proto.contract.ops.ModelSignatureOps
 import io.hydrosphere.serving.manager.domain.contract.Signature
+import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
+import io.hydrosphere.serving.proto.contract.ops.ModelSignatureOps
 
 object ApplicationValidator {
 

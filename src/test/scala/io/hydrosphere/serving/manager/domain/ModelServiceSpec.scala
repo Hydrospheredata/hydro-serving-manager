@@ -2,8 +2,7 @@ package io.hydrosphere.serving.manager.domain
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.concurrent.Deferred
-import cats.effect.{Clock, IO}
+import cats.effect.{Clock, Deferred, IO}
 import cats.syntax.option._
 import io.hydrosphere.serving.manager.domain.contract.DataProfileType.IMAGE
 import io.hydrosphere.serving.manager.domain.contract.DataType.DT_INT32
@@ -13,7 +12,7 @@ import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurati
 
 import java.nio.file.{Path, Paths}
 import java.time.Instant
-import io.hydrosphere.serving.manager.GenericUnitTest
+import io.hydrosphere.serving.manager.{CompletedDeferred, GenericUnitTest}
 import io.hydrosphere.serving.manager.api.http.controller.model.ModelUploadMetadata
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.contract.{Field, Signature}
@@ -28,8 +27,7 @@ import io.hydrosphere.serving.manager.util.DeferredResult
 
 class ModelServiceSpec extends GenericUnitTest {
   val dummyImage: DockerImage   = DockerImage("a", "b")
-  implicit val clock: Clock[IO] = Clock.create[IO]
-
+  implicit val clock: Clock[IO] = Clock[IO]
   describe("Model service") {
     describe("name validation") {
       it("should reject uppercase letters") {
@@ -175,7 +173,8 @@ class ModelServiceSpec extends GenericUnitTest {
         when(modelRepo.get(anyLong)).thenReturn(IO(None))
 
         val storageMock = mock[ModelUnpacker[IO]]
-        when(storageMock.unpack(uploadFile)).thenReturn(IO(ModelFileStructure.forRoot(uploadFile)))
+        when(storageMock.unpack(uploadFile))
+          .thenReturn(IO(ModelFileStructure.forRoot(uploadFile)))
         when(modelRepo.get(modelName)).thenReturn(IO(None))
         when(modelRepo.create(Model(0, modelName))).thenReturn(IO(model))
 
@@ -184,11 +183,7 @@ class ModelServiceSpec extends GenericUnitTest {
           IO(
             DeferredResult(
               modelVersion,
-              new Deferred[IO, ModelVersion.Internal] {
-                override def get: IO[ModelVersion.Internal] = IO(modelVersion)
-
-                override def complete(a: ModelVersion.Internal): IO[Unit] = IO.unit
-              }
+              CompletedDeferred[IO](modelVersion)
             )
           )
         )
@@ -277,11 +272,7 @@ class ModelServiceSpec extends GenericUnitTest {
           IO(
             DeferredResult(
               modelVersion,
-              new Deferred[IO, ModelVersion.Internal] {
-                override def get: IO[ModelVersion.Internal] = IO(modelVersion)
-
-                override def complete(a: ModelVersion.Internal): IO[Unit] = IO.unit
-              }
+              CompletedDeferred[IO](modelVersion)
             )
           )
         )

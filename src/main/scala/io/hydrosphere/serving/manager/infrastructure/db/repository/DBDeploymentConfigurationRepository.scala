@@ -1,17 +1,18 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import cats.data.NonEmptyList
-import cats.effect.Bracket
+import cats.effect.kernel.MonadCancel
 import cats.implicits._
 import doobie.Fragments
 import doobie.implicits._
+import doobie.util.meta.Meta
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.infrastructure.db.Metas.jsonCodecMeta
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBDeploymentConfigurationRepository._
 
 class DBDeploymentConfigurationRepository[F[_]]()(implicit
-    F: Bracket[F, Throwable],
+    F: MonadCancel[F, Throwable],
     tx: Transactor[F],
     pub: DeploymentConfigurationEvents.Publisher[F]
 ) extends DeploymentConfigurationRepository[F] {
@@ -29,10 +30,11 @@ class DBDeploymentConfigurationRepository[F[_]]()(implicit
 }
 
 object DBDeploymentConfigurationRepository {
-  implicit val containerMeta  = jsonCodecMeta[K8sContainerConfig]
-  implicit val podMeta        = jsonCodecMeta[K8sPodConfig]
-  implicit val deploymentMeta = jsonCodecMeta[K8sDeploymentConfig]
-  implicit val hpaMeta        = jsonCodecMeta[K8sHorizontalPodAutoscalerConfig]
+  implicit val containerMeta: Meta[K8sContainerConfig]   = jsonCodecMeta[K8sContainerConfig]
+  implicit val podMeta: Meta[K8sPodConfig]               = jsonCodecMeta[K8sPodConfig]
+  implicit val deploymentMeta: Meta[K8sDeploymentConfig] = jsonCodecMeta[K8sDeploymentConfig]
+  implicit val hpaMeta: Meta[K8sHorizontalPodAutoscalerConfig] =
+    jsonCodecMeta[K8sHorizontalPodAutoscalerConfig]
 
   def allQ: doobie.Query0[DeploymentConfiguration] =
     sql"SELECT * FROM hydro_serving.deployment_configuration".query[DeploymentConfiguration]

@@ -79,5 +79,5 @@ resolvers +=
 
 libraryDependencies ++= Dependencies.all
 
-lazy val root    = project.in(file(".")).dependsOn(streamz % "compile->compile")
-lazy val streamz = ProjectRef(uri("https://github.com/krasserm/streamz.git"), "converter")
+//lazy val root    = project.in(file(".")).dependsOn(streamz % "compile->compile")
+//lazy val streamz = ProjectRef(uri("https://github.com/krasserm/streamz.git"), "converter")
