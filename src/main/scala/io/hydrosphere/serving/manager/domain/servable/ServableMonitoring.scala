@@ -4,29 +4,22 @@ import cats.data.OptionT
 import cats.implicits._
 import cats.effect._
 import cats.effect.implicits._
+import cats.effect.kernel.Resource.ExitCase
 import io.hydrosphere.serving.manager.domain.servable.Servable.{Status => ServableStatus}
-import io.hydrosphere.serving.manager.domain.clouddriver.{
-  Available,
-  CloudDriver,
-  CloudInstanceEvent,
-  NotAvailable,
-  NotServing,
-  Ready,
-  Starting
-}
+import io.hydrosphere.serving.manager.domain.clouddriver._
 import org.apache.logging.log4j.scala.Logging
 
 trait ServableMonitoring[F[_]] {
-  def start(): F[Fiber[F, Unit]]
+  def start(): F[Fiber[F, Throwable, Unit]]
 }
 
 object ServableMonitoring extends Logging {
   def make[F[_]](
       cloudDriver: CloudDriver[F],
       repo: ServableRepository[F]
-  )(implicit F: Concurrent[F]): ServableMonitoring[F] =
+  )(implicit F: Async[F]): ServableMonitoring[F] =
     new ServableMonitoring[F] {
-      override def start(): F[Fiber[F, Unit]] = {
+      override def start(): F[Fiber[F, Throwable, Unit]] = {
         logger.info("Servable monitoring has been started")
         cloudDriver.getEvents
           .evalTap { servEvent =>
@@ -34,13 +27,12 @@ object ServableMonitoring extends Logging {
               servable <- OptionT(repo.get(servEvent.instanceName))
               _        <- OptionT.liftF(repo.upsert(updatedServable(servable, servEvent)))
             } yield ()
-
-            effect.value.as(())
+            effect.value.void
           }
           .onFinalizeCase {
-            case ExitCase.Completed => streamFinishMessage("completed")
-            case ExitCase.Error(e)  => streamFinishMessage("finished with error" + e)
-            case ExitCase.Canceled  => streamFinishMessage("cancelled")
+            case ExitCase.Succeeded  => streamFinishMessage("completed")
+            case ExitCase.Errored(e) => streamFinishMessage("finished with error" + e)
+            case ExitCase.Canceled   => streamFinishMessage("cancelled")
           }
           .compile
           .drain

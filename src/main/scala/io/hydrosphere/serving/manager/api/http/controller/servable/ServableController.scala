@@ -4,27 +4,25 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.stream.scaladsl.Source
-import cats.effect.{ConcurrentEffect, ContextShift, Effect}
+import cats.effect.kernel.Async
+import cats.effect.std.Dispatcher
 import cats.implicits._
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
 import io.hydrosphere.serving.manager.domain.servable.ServableService
-import skuber.Pod
 
 import javax.ws.rs.Path
-import streamz.converter._
-
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import io.circe.syntax._
+import streamz.converter._
 
 @Path("/servable")
 class ServableController[F[_]](
     servableService: ServableService[F],
     cloudDriver: CloudDriver[F]
 )(implicit
-    F: ConcurrentEffect[F],
-    cs: ContextShift[F],
+    F: Async[F],
+    dispatcher: Dispatcher[F],
     ec: ExecutionContext,
     actorSystem: ActorSystem
 ) extends AkkaHttpControllerDsl {
@@ -99,4 +97,15 @@ class ServableController[F[_]](
 
   def routes =
     listServables ~ getServable ~ deployModel ~ stopServable ~ sseServableLogs
+}
+
+object ServableController {
+  def make[F[_]](
+      servableService: ServableService[F],
+      cloudDriver: CloudDriver[F]
+  )(implicit
+      F: Async[F],
+      ec: ExecutionContext,
+      actorSystem: ActorSystem
+  ) = Dispatcher[F].map(implicit disp => new ServableController[F](servableService, cloudDriver))
 }

@@ -23,7 +23,7 @@ object CloudInstanceEventAdapterInstances {
 
   implicit val dockerEventsAdapter: CloudInstanceEventAdapter[DockerEvent] = (event: DockerEvent) =>
     {
-      val attributes = event.actor().attributes().some;
+      val attributes = event.actor().attributes().some
       val name       = attributes.map(_.get(CloudDriver.Labels.ServiceName))
       val action     = event.action().some
 
@@ -41,7 +41,7 @@ object CloudInstanceEventAdapterInstances {
 
   implicit val rsAdapter: CloudInstanceEventAdapter[WatchEvent[ReplicaSet]] =
     (value: WatchEvent[ReplicaSet]) => {
-      val replicaSet = value._object;
+      val replicaSet = value._object
 
       val currentReplicasOrError: ErrorOr[Int] = replicaSet.status.map(_.replicas) match {
         case Some(replicas) => replicas.asRight
@@ -61,14 +61,14 @@ object CloudInstanceEventAdapterInstances {
         if (currentReplicas == 0)
           NotServing(instanceName, "All pods aren't available")
         else if (currentReplicas < desiredReplicas)
-          Ready(instanceName, s"${currentReplicas} from ${desiredReplicas} are available".some)
+          Ready(instanceName, s"$currentReplicas from $desiredReplicas are available".some)
         else
           Ready(instanceName)
     }
 
   implicit val serviceAdapter: CloudInstanceEventAdapter[WatchEvent[Service]] =
     (value: WatchEvent[Service]) => {
-      val service = value._object;
+      val service = value._object
 
       val instanceNameOrError: ErrorOr[String] = getInstanceName(service)
 

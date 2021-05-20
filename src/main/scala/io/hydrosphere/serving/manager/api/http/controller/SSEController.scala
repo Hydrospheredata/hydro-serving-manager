@@ -1,28 +1,25 @@
-package io.hydrosphere.serving.manager.api.http.controller.events
-
-import java.util.UUID
+package io.hydrosphere.serving.manager.api.http.controller
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
-import akka.stream.ActorMaterializer
+import akka.http.scaladsl.server.Route
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
-import cats.effect.{ConcurrentEffect, ContextShift}
-import streamz.converter._
+import cats.effect.kernel.{Async, Resource}
+import cats.effect.std.Dispatcher
 import io.circe.syntax._
-
-import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
 import io.hydrosphere.serving.manager.discovery._
 import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
-import io.hydrosphere.serving.manager.domain.deploy_config
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationEvents
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.ServableEvents
+import streamz.converter._
 
-
+import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
@@ -31,17 +28,17 @@ class SSEController[F[_]](
     modelSubscriber: ModelVersionEvents.Subscriber[F],
     servableSubscriber: ServableEvents.Subscriber[F],
     metricSpecSubscriber: MetricSpecEvents.Subscriber[F],
-    depSubscriber: DeploymentConfigurationEvents.Subscriber[F],
+    depSubscriber: DeploymentConfigurationEvents.Subscriber[F]
 )(implicit
-    F: ConcurrentEffect[F],
-    cs: ContextShift[F],
+    F: Async[F],
+    dispatcher: Dispatcher[F],
     ec: ExecutionContext,
     actorSystem: ActorSystem
 ) extends AkkaHttpControllerDsl {
 
-  implicit val am = ActorMaterializer.create(actorSystem)
+  implicit private val am = Materializer.createMaterializer(actorSystem)
 
-  def subscribe =
+  def subscribe: Route =
     pathPrefix("events") {
       get {
         val id = UUID.randomUUID().toString
@@ -71,11 +68,32 @@ class SSEController[F[_]](
       }
     }
 
-  val routes = subscribe
+  val routes: Route = subscribe
 
 }
 
 object SSEController {
+  def make[F[_]](
+      applicationSubscriber: ApplicationEvents.Subscriber[F],
+      modelSubscriber: ModelVersionEvents.Subscriber[F],
+      servableSubscriber: ServableEvents.Subscriber[F],
+      metricSpecSubscriber: MetricSpecEvents.Subscriber[F],
+      depSubscriber: DeploymentConfigurationEvents.Subscriber[F]
+  )(implicit
+      F: Async[F],
+      ec: ExecutionContext,
+      actorSystem: ActorSystem
+  ) =
+    Dispatcher[F].map { implicit disp =>
+      new SSEController[F](
+        applicationSubscriber,
+        modelSubscriber,
+        servableSubscriber,
+        metricSpecSubscriber,
+        depSubscriber
+      )
+    }
+
   def fromDepConfDiscovery(x: DeploymentConfigurationEvents.Event): List[ServerSentEvent] =
     x match {
       case DiscoveryEvent.Initial => Nil
@@ -146,7 +164,7 @@ object SSEController {
       case DiscoveryEvent.ItemRemove(items) =>
         items.map { i =>
           ServerSentEvent(
-            data = i.toString,
+            data = i,
             `type` = "ApplicationRemove"
           )
         }

@@ -2,12 +2,9 @@ package io.hydrosphere.serving.manager.domain.servable
 
 import cats.data.OptionT
 import cats.effect._
-import cats.effect.concurrent.Deferred
-import cats.effect.implicits._
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
-import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstance.Status
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.deploy_config.{
   DeploymentConfiguration,
@@ -19,11 +16,9 @@ import io.hydrosphere.serving.manager.domain.model_version.{
   ModelVersionStatus
 }
 import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
-import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator}
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.NameGenerator
 import org.apache.logging.log4j.scala.Logging
-
-import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
   def get(name: String): F[Servable]
@@ -74,7 +69,7 @@ object ServableService extends Logging {
       defaultDC: DeploymentConfiguration
   )(implicit
       F: Concurrent[F],
-      timer: Timer[F],
+      timer: Clock[F],
       nameGenerator: NameGenerator[F],
       idGenerator: UUIDGenerator[F],
       cloudDriver: CloudDriver[F],
@@ -117,7 +112,7 @@ object ServableService extends Logging {
             case x =>
               F.raiseError[Unit](
                 DomainError.invalidRequest(
-                  s"Can't create a Servable for a model version with status ${x}. Released status expected."
+                  s"Can't create a Servable for a model version with status $x. Released status expected."
                 )
               )
           }
@@ -158,7 +153,7 @@ object ServableService extends Logging {
           _ <- metricSpec match {
             case Some(_) =>
               val error = DomainError.invalidRequest(
-                s"Can't delete servable because it's used by MetricSpec ${metricSpec}"
+                s"Can't delete servable because it's used by MetricSpec $metricSpec"
               )
               F.raiseError[Unit](error)
             case None => F.unit
@@ -241,6 +236,6 @@ object ServableService extends Logging {
 
       override def get(name: String): F[Servable] =
         OptionT(servableRepository.get(name))
-          .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find Servable with name=${name}")))
+          .getOrElseF(F.raiseError(DomainError.notFound(s"Can't find Servable with name=$name")))
     }
 }

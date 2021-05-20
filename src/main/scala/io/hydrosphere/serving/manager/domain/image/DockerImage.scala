@@ -7,17 +7,19 @@ import scala.util.matching.Regex
 
 @JsonCodec
 case class DockerImage(
-  name: String,
-  tag: String,
-  sha256: Option[String] = None
+    name: String,
+    tag: String,
+    sha256: Option[String] = None
 ) {
-  
+
   def fullName: String = name + ":" + tag
 
-  def replaceHost(host: String): Either[Throwable, DockerImage] = name match {
-    case DockerImage.referenceRegexp(_, _, capturedName, _, _) => DockerImage(s"$host/$capturedName", tag, sha256).asRight
-    case x => new Exception(s"Can't parse image name $x").asLeft
-  }
+  def replaceHost(host: String): Either[Throwable, DockerImage] =
+    name match {
+      case DockerImage.referenceRegexp(_, _, capturedName, _, _) =>
+        DockerImage(s"$host/$capturedName", tag, sha256).asRight
+      case x => new Exception(s"Can't parse image name $x").asLeft
+    }
 }
 
 object DockerImage {
@@ -34,10 +36,10 @@ object DockerImage {
   // with at least one letter or number, with following parts able to be
   // separated by one period, one or two underscore and multiple dashes.
   val nameComponentRegexp: Regex =
-  expression(
-    alphaNumericRegexp,
-    optional(repeated(separatorRegexp, alphaNumericRegexp))
-  )
+    expression(
+      alphaNumericRegexp,
+      optional(repeated(separatorRegexp, alphaNumericRegexp))
+    )
 
   // domainComponentRegexp restricts the registry domain component of a
   // repository name to start with a component as defined by DomainRegexp
@@ -49,29 +51,32 @@ object DockerImage {
   // allowed by DNS to ensure backwards compatibility with Docker image
   // names.
   val domainRegexp: Regex =
-  expression(
-    domainComponentRegexp,
-    optional(repeated(literal("."), domainComponentRegexp)),
-    optional(literal(":"), "[0-9]+".r)
-  )
+    expression(
+      domainComponentRegexp,
+      optional(repeated(literal("."), domainComponentRegexp)),
+      optional(literal(":"), "[0-9]+".r)
+    )
 
   // tagRegexp matches valid tag names. From docker/docker:graph/tags.go.
   val tagRegexp: Regex = "[\\w][\\w.-]{0,127}".r
 
   // digestRegexp matches valid digests.
-  val digestRegexp: Regex = "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}".r
+  val digestRegexp: Regex =
+    "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}".r
 
   // nameRegexp is the format for the name component of references. The
   // regexp has capturing groups for the domain and name part.
   val nameRegexp: Regex = new Regex(
     expression(
-      optional(capture(domainRegexp)), literal("/"),
+      optional(capture(domainRegexp)),
+      literal("/"),
       capture(
         nameComponentRegexp,
         optional(repeated(literal("/"), nameComponentRegexp))
       )
     ).toString,
-    "domain", "name"
+    "domain",
+    "name"
   )
 
   // anchoredNameRegexp is used to parse a name value, capturing the
@@ -84,7 +89,8 @@ object DockerImage {
         optional(repeated(literal("/"), nameComponentRegexp))
       )
     ).toString,
-    "domain", "name"
+    "domain",
+    "name"
   ).anchored
 
   // referenceRegexp is the full supported format of a reference. The regexp
@@ -96,7 +102,11 @@ object DockerImage {
       optional(literal(":"), capture(tagRegexp)),
       optional(literal("@"), capture(digestRegexp))
     ).toString,
-    "fullName", "domain", "name", "tag", "digest"
+    "fullName",
+    "domain",
+    "name",
+    "tag",
+    "digest"
   )
 
   // identifierRegexp is the format for string identifier used as a
@@ -119,14 +129,14 @@ object DockerImage {
 
   // repeated wraps the regexp in a non-capturing group to get one or more
   // matches.
-  def repeated(res: Regex*): Regex = ("(?:" + expression(res:_*).toString + ")+").r
+  def repeated(res: Regex*): Regex = ("(?:" + expression(res: _*).toString + ")+").r
 
   // optional wraps the expression in a non-capturing group and makes the
   // production optional.
-  def optional(res: Regex*): Regex = ("(?:" + expression(res:_*).toString + ")?").r
+  def optional(res: Regex*): Regex = ("(?:" + expression(res: _*).toString + ")?").r
 
   // capture wraps the expression in a capturing group.
-  def capture(res: Regex*): Regex = ("(" + expression(res:_*).toString + ")").r
+  def capture(res: Regex*): Regex = ("(" + expression(res: _*).toString + ")").r
 
-  val dummyImage = DockerImage("hydrosphere/serving-runtime-dummy", "latest")
+  val dummyImage: DockerImage = DockerImage("hydrosphere/serving-runtime-dummy", "latest")
 }

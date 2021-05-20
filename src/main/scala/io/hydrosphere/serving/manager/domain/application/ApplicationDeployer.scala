@@ -1,8 +1,7 @@
 package io.hydrosphere.serving.manager.domain.application
 
 import cats.data.OptionT
-import cats.effect.Concurrent
-import cats.effect.concurrent.Deferred
+import cats.effect.Async
 import cats.effect.implicits._
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
@@ -15,8 +14,7 @@ import io.hydrosphere.serving.manager.domain.model_version.{
   ModelVersionStatus
 }
 import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableService}
-import io.hydrosphere.serving.manager.util.DeferredResult
+import io.hydrosphere.serving.manager.domain.servable.ServableService
 import org.apache.logging.log4j.scala.Logging
 
 trait ApplicationDeployer[F[_]] {
@@ -30,7 +28,7 @@ trait ApplicationDeployer[F[_]] {
 
 object ApplicationDeployer extends Logging {
   def default[F[_]]()(implicit
-      F: Concurrent[F],
+      F: Async[F],
       servableService: ServableService[F],
       versionRepository: ModelVersionRepository[F],
       applicationRepository: ApplicationRepository[F],
@@ -141,7 +139,7 @@ object ApplicationDeployer extends Logging {
                     mvMetrics
                       .filter(_.config.servable.isEmpty)
                       .traverse(x => monitoringService.deployServable(x))
-                  _ <- F.delay(logger.debug(s"Deployed MetricServables: ${newMetricServables}"))
+                  _ <- F.delay(logger.debug(s"Deployed MetricServables: $newMetricServables"))
                   servable <- servableService.deploy(
                     i.modelVersion,
                     i.requiredDeploymentConfig,

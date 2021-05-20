@@ -33,7 +33,7 @@ object DeploymentConfigurationService {
       override def get(name: String): F[DeploymentConfiguration] =
         OptionT(hsRepo.get(name))
           .getOrElseF(
-            F.raiseError(DomainError.notFound(s"DeploymentConfiguration ${name} not found"))
+            F.raiseError(DomainError.notFound(s"DeploymentConfiguration $name not found"))
           )
 
       override def delete(name: String): F[DeploymentConfiguration] =

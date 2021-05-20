@@ -15,19 +15,13 @@ import io.hydrosphere.serving.manager.infrastructure.kubernetes.KubernetesClient
 import scala.concurrent.ExecutionContext
 
 object CloudInstance {
-
   sealed trait Status
 
   object Status {
-
-    case object Starting extends Status
-
+    case object Starting                              extends Status
     final case class Running(host: String, port: Int) extends Status
-
-    case object Stopped extends Status
-
+    case object Stopped                               extends Status
   }
-
 }
 
 case class CloudInstance(
@@ -72,7 +66,6 @@ object CloudDriver {
       dockerRepoConf: DockerRepositoryConfiguration
   )(implicit
       F: Async[F],
-      cs: ContextShift[F],
       c: Concurrent[F],
       ex: ExecutionContext,
       actorSystem: ActorSystem,

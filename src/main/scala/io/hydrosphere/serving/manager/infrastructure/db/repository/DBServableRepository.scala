@@ -1,10 +1,10 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
-import cats.effect.Bracket
 import cats.implicits._
 import doobie._
 import doobie.implicits._
 import doobie.postgres.implicits._
+import doobie.implicits.legacy.instant._
 import doobie.util.transactor.Transactor
 import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableEvents, ServableRepository}
@@ -16,9 +16,9 @@ import cats.data.OptionT
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import DBDeploymentConfigurationRepository._
+import cats.effect.kernel.MonadCancel
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
 import io.hydrosphere.serving.manager.util.JsonOps._
-
 import io.circe.syntax._
 import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.manager.infrastructure.db.Metas._
@@ -160,7 +160,7 @@ object DBServableRepository {
       """.stripMargin.query[JoinedServableRow]
 
   def make[F[_]](defaultDC: DeploymentConfiguration)(implicit
-      F: Bracket[F, Throwable],
+      F: MonadCancel[F, Throwable],
       tx: Transactor[F],
       servablePub: ServableEvents.Publisher[F]
   ) =

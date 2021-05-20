@@ -58,5 +58,5 @@ object Metas {
     decode[ApplicationGraph](str).leftMap(_.getMessage)
   }
 
-  implicit val natMeta: Meta[Instant] = Meta[Timestamp].imap(_.toInstant)(Timestamp.from(_))
+  implicit val natMeta: Meta[Instant] = Meta[Timestamp].imap(_.toInstant)(Timestamp.from)
 }

@@ -10,7 +10,7 @@ sealed trait DomainError extends Throwable {
 }
 
 object DomainError {
-  implicit val config = Configuration.default.withDiscriminator("error")
+  implicit val config: Configuration = Configuration.default.withDiscriminator("error")
 
   final case class NotFound(message: String) extends DomainError
 

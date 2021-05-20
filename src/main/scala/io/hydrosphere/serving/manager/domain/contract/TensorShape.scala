@@ -4,6 +4,8 @@ import cats.Eq
 import io.circe.generic.JsonCodec
 import io.hydrosphere.serving.proto.contract.tensor.{TensorShape => GTensorShape}
 import cats.syntax.eq._
+import io.circe.syntax._
+import io.circe.{Decoder, Encoder, HCursor, Json}
 
 /**
   * If Some, then acts like a numpy ndarray shape
@@ -11,7 +13,7 @@ import cats.syntax.eq._
   */
 sealed trait TensorShape extends Product with Serializable
 
-case object TensorShape {
+object TensorShape {
   @JsonCodec
   case class Static(dims: List[Long]) extends TensorShape
   case object Dynamic                 extends TensorShape
@@ -44,4 +46,18 @@ case object TensorShape {
       case (TensorShape.Static(dims1), TensorShape.Static(dims2)) => dims1 === dims2
       case _                                                      => false
     }
+
+  implicit val enc: Encoder[TensorShape] = {
+    case v: Static => v.asJson
+    case Dynamic   => Json.Null
+  }
+
+  implicit val dec: Decoder[TensorShape] = (c: HCursor) => {
+    if (c.value.isNull)
+      Right(Dynamic)
+    else
+      c.downField("dims")
+        .as[List[Long]]
+        .map(Static.apply)
+  }
 }

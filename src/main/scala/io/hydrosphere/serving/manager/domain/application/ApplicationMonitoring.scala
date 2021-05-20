@@ -8,7 +8,7 @@ import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableEvents}
 import org.apache.logging.log4j.scala.Logging
 
 trait ApplicationMonitoring[F[_]] {
-  def start(): F[Fiber[F, Unit]]
+  def start(): F[Fiber[F, Throwable, Unit]]
 }
 
 object ApplicationMonitoring extends Logging {
@@ -18,7 +18,7 @@ object ApplicationMonitoring extends Logging {
       appPub: ApplicationEvents.Publisher[F]
   )(implicit F: Concurrent[F]): ApplicationMonitoring[F] =
     new ApplicationMonitoring[F] {
-      override def start(): F[Fiber[F, Unit]] = {
+      override def start(): F[Fiber[F, Throwable, Unit]] = {
         logger.info("Application monitoring has been started")
         servableSub.subscribe.evalMap(updateApp).compile.drain.start
       }

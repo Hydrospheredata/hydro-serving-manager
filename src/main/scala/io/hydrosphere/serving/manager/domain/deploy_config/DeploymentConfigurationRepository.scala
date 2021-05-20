@@ -1,7 +1,7 @@
 package io.hydrosphere.serving.manager.domain.deploy_config
 
 import cats.MonadError
-import cats.effect.Bracket
+import cats.effect.MonadCancel
 import io.hydrosphere.serving.manager.domain.DomainError
 import cats.implicits._
 import doobie.util.transactor.Transactor
@@ -19,7 +19,7 @@ trait DeploymentConfigurationRepository[F[_]] {
 
 object DeploymentConfigurationRepository {
   def make[F[_]](defaultDC: DeploymentConfiguration)(implicit
-      F: Bracket[F, Throwable],
+      F: MonadCancel[F, Throwable],
       tx: Transactor[F],
       pub: DeploymentConfigurationEvents.Publisher[F]
   ): DeploymentConfigurationRepository[F] = {

@@ -72,7 +72,6 @@ object KubernetesClient {
       config: CloudDriverConfiguration.Kubernetes
   )(implicit
       ex: ExecutionContext,
-      cs: ContextShift[F],
       actorSystem: ActorSystem,
       materializer: Materializer
   ): KubernetesClient[F] = {
@@ -85,7 +84,6 @@ object KubernetesClient {
       underlying: K8SRequestContext
   )(implicit
       F: Async[F],
-      cs: ContextShift[F],
       ec: ExecutionContext,
       actorSystem: ActorSystem,
       materializer: Materializer
@@ -100,7 +98,6 @@ object KubernetesClient {
 
   def podImpl[F[_]](underlying: K8SRequestContext)(implicit
       F: Async[F],
-      cs: ContextShift[F],
       ec: ExecutionContext,
       actorSystem: ActorSystem,
       materializer: Materializer
@@ -123,7 +120,6 @@ object KubernetesClient {
       underlying: K8SRequestContext
   )(implicit
       F: Async[F],
-      cs: ContextShift[F],
       ec: ExecutionContext,
       actorSystem: ActorSystem,
       materializer: Materializer
@@ -138,16 +134,15 @@ object KubernetesClient {
         AsyncUtil.futureAsync(underlying.delete[Service](name, gracePeriodSeconds))
 
       override def list: F[List[Service]] =
-        AsyncUtil.futureAsync(underlying.list[ServiceList]).map(_.toList)
+        AsyncUtil.futureAsync(underlying.list[ServiceList]()).map(_.toList)
 
       override def events(): fs2.Stream[F, CloudInstanceEvent] = {
-        val rawStream = underlying.watchAll[Service]().map(f => f.map(_.toEvent))
+        val rawStream = F.delay(underlying.watchAll[Service]().map(f => f.map(_.toEvent)))
         for {
-          akkaStream <- fs2.Stream.eval(AsyncUtil.futureAsync(rawStream))
+          akkaStream <- fs2.Stream.eval(F.fromFuture(rawStream))
           evt <-
             akkaStream
-              .filter(_.isRight)
-              .map { case Right(value) => value }
+              .collect { case Right(value) => value }
               .toStream[F]()
         } yield evt
       }
@@ -167,7 +162,7 @@ object KubernetesClient {
         AsyncUtil.futureAsync(underlying.delete[Deployment](name, gracePeriodSeconds))
 
       override def list: F[List[Deployment]] =
-        AsyncUtil.futureAsync(underlying.list[DeploymentList]).map(_.toList)
+        AsyncUtil.futureAsync(underlying.list[DeploymentList]()).map(_.toList)
     }
 
   def hpaImpl[F[_]](
@@ -189,7 +184,6 @@ object KubernetesClient {
   )(implicit
       F: Async[F],
       ec: ExecutionContext,
-      cs: ContextShift[F],
       m: Materializer
   ): K8SReplicaSets[F] =
     () => {

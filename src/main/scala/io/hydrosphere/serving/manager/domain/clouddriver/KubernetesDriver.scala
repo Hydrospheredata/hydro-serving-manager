@@ -1,6 +1,5 @@
 package io.hydrosphere.serving.manager.domain.clouddriver
 
-import cats.MonadError
 import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.implicits._
@@ -15,10 +14,11 @@ import io.hydrosphere.serving.manager.infrastructure.kubernetes.KubernetesClient
 import skuber.Container.PullPolicy
 import skuber.Resource.Quantity
 import skuber.Service.Port
+import skuber._
 import skuber.apps.v1.Deployment
 import skuber.autoscaling.HorizontalPodAutoscaler.CrossVersionObjectReference
 import skuber.autoscaling.{CPUTargetUtilization, HorizontalPodAutoscaler}
-import skuber._
+
 import scala.language.reflectiveCalls
 import scala.util.Try
 

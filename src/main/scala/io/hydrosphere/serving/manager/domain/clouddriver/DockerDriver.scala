@@ -11,8 +11,7 @@ import io.hydrosphere.serving.manager.domain.clouddriver.DockerDriver.Internals.
 import io.hydrosphere.serving.manager.domain.deploy_config._
 import io.hydrosphere.serving.manager.domain.image.DockerImage
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
-
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 class DockerDriver[F[_]](

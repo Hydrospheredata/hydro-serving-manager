@@ -2,12 +2,11 @@ package io.hydrosphere.serving.manager
 
 import java.nio.file.{Path, Paths}
 import cats.data.EitherT
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import io.hydrosphere.serving.manager.domain.DomainError
-
 import org.mockito.ArgumentMatchersSugar
 import org.mockito.MockitoSugar
-
 import org.scalatest.funspec.AsyncFunSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{Assertion, EitherValues}
@@ -21,8 +20,7 @@ trait GenericUnitTest
     with MockitoSugar
     with ArgumentMatchersSugar {
   implicit val ec: ExecutionContextExecutor = ExecutionContext.global
-  implicit val cs: ContextShift[IO]         = IO.contextShift(ec)
-
+  implicit val runtime: IORuntime           = cats.effect.unsafe.implicits.global
   protected def ioAssert(body: => IO[Assertion]): Future[Assertion] =
     body.unsafeToFuture()
 

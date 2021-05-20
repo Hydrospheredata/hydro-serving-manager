@@ -1,7 +1,5 @@
 package io.hydrosphere.serving.manager.domain.servable
 
-import java.util.concurrent.TimeUnit
-
 import cats.{Applicative, Monad}
 import cats.effect.implicits._
 import cats.effect._
@@ -20,112 +18,101 @@ trait ServableGC[F[_]] {
   def unmark(modelVersion: ModelVersion.Internal): F[Unit]
 }
 
-
 object ServableGC {
 
   type GCState = TrieMap[Long, Long]
 
-  def noop[F[_]]()(implicit F: Applicative[F]): ServableGC[F] = {
+  def noop[F[_]]()(implicit F: Applicative[F]): ServableGC[F] =
     new ServableGC[F] {
       override def mark(modelVersion: ModelVersion.Internal): F[Unit] = F.unit
 
       override def unmark(modelVersion: ModelVersion.Internal): F[Unit] = F.unit
     }
-  }
 
-  def empty[F[_]](deletionDelay: FiniteDuration)(
-    implicit
-    F: Concurrent[F],
-    timer: Timer[F],
-    appRepo: ApplicationRepository[F],
-    servableRepository: ServableRepository[F],
-    servService: ServableService[F],
-    monitoringRepository: MonitoringRepository[F],
-    monitoringService: Monitoring[F]
-  ): F[ServableGC[F]] = {
+  def empty[F[_]](deletionDelay: FiniteDuration)(implicit
+      F: Async[F],
+      timer: Clock[F],
+      appRepo: ApplicationRepository[F],
+      servableRepository: ServableRepository[F],
+      servService: ServableService[F],
+      monitoringRepository: MonitoringRepository[F],
+      monitoringService: Monitoring[F]
+  ): F[ServableGC[F]] =
     withState(TrieMap.empty[Long, Long], deletionDelay)
-  }
 
-  def withState[F[_]](state: GCState, deletionDelay: FiniteDuration)(
-    implicit
-    F: Concurrent[F],
-    clock: Clock[F],
-    appRepo: ApplicationRepository[F],
-    servableRepository: ServableRepository[F],
-    servService: ServableService[F],
-    monitoringRepository: MonitoringRepository[F],
-    monitoringService: Monitoring[F]
-  ): F[ServableGC[F]] = {
+  def withState[F[_]](state: GCState, deletionDelay: FiniteDuration)(implicit
+      F: Async[F],
+      clock: Clock[F],
+      appRepo: ApplicationRepository[F],
+      servableRepository: ServableRepository[F],
+      servService: ServableService[F],
+      monitoringRepository: MonitoringRepository[F],
+      monitoringService: Monitoring[F]
+  ): F[ServableGC[F]] =
     for {
       _ <- gcLoopStep[F](state, deletionDelay).foreverM[Unit].start
     } yield new ServableGC[F] {
-      override def mark(modelVersion: ModelVersion.Internal): F[Unit] = {
+      override def mark(modelVersion: ModelVersion.Internal): F[Unit] =
         for {
-          time <- clock.monotonic(TimeUnit.MILLISECONDS)
-        } yield state += (modelVersion.id -> time)
-      }
+          time <- clock.monotonic
+        } yield state += (modelVersion.id -> time.toMillis)
 
-      override def unmark(modelVersion: ModelVersion.Internal): F[Unit] = F.delay {
-        state -= modelVersion.id
-      }
+      override def unmark(modelVersion: ModelVersion.Internal): F[Unit] =
+        F.delay {
+          state -= modelVersion.id
+        }
     }
-  }
 
   def gcLoopStep[F[_]](
-    state: GCState,
-    deletionDelay: FiniteDuration
+      state: GCState,
+      deletionDelay: FiniteDuration
   )(implicit
-    F: Monad[F],
-    clock: Clock[F],
-    appRepo: ApplicationRepository[F],
-    servService: ServableService[F],
-    servableRepository: ServableRepository[F],
-    monitoringRepository: MonitoringRepository[F],
-    monitoringService: Monitoring[F]
-  ): F[Unit] = {
+      F: Monad[F],
+      clock: Clock[F],
+      appRepo: ApplicationRepository[F],
+      servService: ServableService[F],
+      servableRepository: ServableRepository[F],
+      monitoringRepository: MonitoringRepository[F],
+      monitoringService: Monitoring[F]
+  ): F[Unit] =
     for {
-      currentTime <- clock.monotonic(TimeUnit.MILLISECONDS)
+      currentTime <- clock.monotonic
       newState <- state.toList.flatTraverse {
         case (key, timestamp) =>
-          if (currentTime >= deletionDelay.toMillis + timestamp) {
+          if (currentTime.toMillis >= deletionDelay.toMillis + timestamp)
             gcModelVersion[F](key).map(x => List(x))
-          } else {
+          else
             List.empty[Long].pure[F]
-          }
       }
     } yield state --= newState
-  }
 
-  def gcModelVersion[F[_]](modelVersionId: Long)(
-    implicit
-    F: Monad[F],
-    appRepo: ApplicationRepository[F],
-    servService: ServableService[F],
-    servableRepository: ServableRepository[F],
-    monitoringRepository: MonitoringRepository[F],
-    monitoringService: Monitoring[F]
-  ): F[Long] = {
+  def gcModelVersion[F[_]](modelVersionId: Long)(implicit
+      F: Monad[F],
+      appRepo: ApplicationRepository[F],
+      servService: ServableService[F],
+      servableRepository: ServableRepository[F],
+      monitoringRepository: MonitoringRepository[F],
+      monitoringService: Monitoring[F]
+  ): F[Long] =
     for {
       apps <- appRepo.findVersionUsage(modelVersionId)
       _ <- apps match {
         case Nil => deleteServables[F](modelVersionId)
-        case _ => F.unit
+        case _   => F.unit
       }
     } yield modelVersionId
-  }
 
-  def deleteServables[F[_]](modelVersionId: Long)(
-    implicit
-    F: Monad[F],
-    servService: ServableService[F],
-    servRepo: ServableRepository[F],
-    monitoringRepository: MonitoringRepository[F],
-    monitoringService: Monitoring[F]
-  ): F[Unit] = {
+  def deleteServables[F[_]](modelVersionId: Long)(implicit
+      F: Monad[F],
+      servService: ServableService[F],
+      servRepo: ServableRepository[F],
+      monitoringRepository: MonitoringRepository[F],
+      monitoringService: Monitoring[F]
+  ): F[Unit] =
     for {
       // delete model servables
       servables <- servRepo.findForModelVersion(modelVersionId)
-      _ <- servables.traverse(x => servService.stop(x.name))
+      _         <- servables.traverse(x => servService.stop(x.name))
 
       // delete monitoring servables
       specs <- monitoringRepository.forModelVersion(modelVersionId)
@@ -140,5 +127,4 @@ object ServableGC {
       _ <- emptySpecs.traverse(monitoringService.update)
 
     } yield ()
-  }
 }

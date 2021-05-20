@@ -2,6 +2,7 @@ package io.hydrosphere.serving.manager.domain.application
 
 import cats.data._
 import cats.effect.Concurrent
+import cats.effect.kernel.Async
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.DomainError.NotFound
@@ -31,7 +32,7 @@ trait ApplicationService[F[_]] {
 object ApplicationService extends Logging {
 
   def apply[F[_]]()(implicit
-      F: Concurrent[F],
+      F: Async[F],
       applicationRepository: ApplicationRepository[F],
       versionRepository: ModelVersionRepository[F],
       servableService: ServableService[F],

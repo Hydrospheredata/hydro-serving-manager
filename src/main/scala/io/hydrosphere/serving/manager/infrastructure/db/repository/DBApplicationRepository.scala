@@ -1,10 +1,9 @@
 package io.hydrosphere.serving.manager.infrastructure.db.repository
 
 import cats.data.{NonEmptyList, OptionT}
-import cats.effect.Bracket
+import cats.effect.kernel.MonadCancel
 import cats.implicits._
 import doobie._
-import doobie.free.connection
 import doobie.implicits._
 import doobie.postgres.implicits._
 import doobie.util.transactor.Transactor
@@ -12,14 +11,12 @@ import io.circe
 import io.circe.generic.JsonCodec
 import io.circe.parser._
 import io.circe.syntax._
-
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
 import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableStatusComposer}
-import io.hydrosphere.serving.manager.domain.servable.Servable.{Status => ServableStatus}
+import io.hydrosphere.serving.manager.domain.servable.Servable
 import io.hydrosphere.serving.manager.util.CollectionOps._
 import io.hydrosphere.serving.manager.infrastructure.db.Metas._
 
@@ -234,7 +231,7 @@ object DBApplicationRepository {
       """.stripMargin.update
 
   def make[F[_]](defaultDC: DeploymentConfiguration)(implicit
-      F: Bracket[F, Throwable],
+      F: MonadCancel[F, Throwable],
       tx: Transactor[F],
       appPublisher: ApplicationEvents.Publisher[F]
   ): ApplicationRepository[F] =

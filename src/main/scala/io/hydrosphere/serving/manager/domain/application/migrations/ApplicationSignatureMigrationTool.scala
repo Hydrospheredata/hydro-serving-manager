@@ -1,15 +1,9 @@
 package io.hydrosphere.serving.manager.domain.application.migrations
 
-import cats.effect.Bracket
+import cats.effect.kernel.MonadCancel
 import cats.implicits._
 import doobie.util.transactor.Transactor
-import io.hydrosphere.serving.manager.domain.application.{
-  Application,
-  ApplicationKafkaStream,
-  ApplicationRepository,
-  ApplicationServable,
-  GraphComposer
-}
+import io.hydrosphere.serving.manager.domain.application._
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionRepository}
 import io.hydrosphere.serving.manager.infrastructure.db.repository.{
   DBApplicationRepository,
@@ -38,7 +32,10 @@ object ApplicationSignatureMigrationTool extends Logging {
       modelVersionRepo: ModelVersionRepository[F],
       servableRepo: ServableRepository[F],
       deploymentRepo: DeploymentConfigurationRepository[F]
-  )(implicit F: Bracket[F, Throwable], tx: Transactor[F]) =
+  )(implicit
+      F: MonadCancel[F, Throwable],
+      tx: Transactor[F]
+  ): ApplicationSignatureMigrationTool[F] =
     new ApplicationSignatureMigrationTool[F] {
       override def getAndRecover(): F[Unit] = {
         logger.info("Start recovering process...")
