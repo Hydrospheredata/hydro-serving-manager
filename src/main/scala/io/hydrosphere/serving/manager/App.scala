@@ -8,7 +8,6 @@ import cats.implicits._
 import doobie.util.ExecutionContexts
 import doobie.util.transactor.Transactor
 import org.apache.commons.io.IOUtils
-
 import io.hydrosphere.serving.manager.api.grpc.{
   GrpcServer,
   GrpcServingDiscovery,
@@ -30,7 +29,7 @@ import io.hydrosphere.serving.manager.api.http.controller.{
 import io.hydrosphere.serving.manager.config.ManagerConfiguration
 import io.hydrosphere.serving.manager.domain.application.{ApplicationEvents, ApplicationMonitoring}
 import io.hydrosphere.serving.manager.domain.application.migrations.ApplicationSignatureMigrationTool
-import io.hydrosphere.serving.manager.domain.clouddriver.CloudDriver
+import io.hydrosphere.serving.manager.domain.clouddriver.{CloudDriver, ServableStates}
 import io.hydrosphere.serving.manager.domain.deploy_config.{
   DeploymentConfigurationEvents,
   DeploymentConfigurationRepository
@@ -157,9 +156,11 @@ object App {
       monitoringController =
         new MonitoringController[F](core.monitoringService, core.repos.monitoringRepository)
       depConfController = new DeploymentConfigController[F](core.deploymentConfigService)
+      state <- Resource.liftF(ServableStates.make[F](config.cloudDriver))
       servableMonitoring = ServableMonitoring.make(
         cloudDriver,
-        core.repos.servableRepo
+        core.repos.servableRepo,
+        state
       )
       applicationMonitoring = ApplicationMonitoring.make(
         servableSub = servablePubSub._2,

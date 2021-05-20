@@ -64,7 +64,7 @@ case class KubernetesClient[F[_]](
     rs: K8SReplicaSets[F]
 ) {
   def events()(implicit c: Concurrent[F]): fs2.Stream[F, CloudInstanceEvent] =
-    rs.events()
+    rs.events().merge(services.events())
 }
 
 object KubernetesClient {
@@ -140,17 +140,17 @@ object KubernetesClient {
       override def list: F[List[Service]] =
         AsyncUtil.futureAsync(underlying.list[ServiceList]).map(_.toList)
 
-      override def events(): fs2.Stream[F, CloudInstanceEvent] = {
-        val rawStream = underlying.watchAll[Service]().map(f => f.map(_.toEvent))
+      override def events(): fs2.Stream[F, CloudInstanceEvent] =
         for {
-          akkaStream <- fs2.Stream.eval(AsyncUtil.futureAsync(rawStream))
+          akkaStream <-
+            fs2.Stream.eval(AsyncUtil.futureAsync(underlying.watchAll[Service](None, 20000)))
           evt <-
             akkaStream
+              .map(_.toEvent)
               .filter(_.isRight)
               .map { case Right(value) => value }
               .toStream[F]()
         } yield evt
-      }
     }
 
   def deploymentImpl[F[_]](

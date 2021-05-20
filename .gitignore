@@ -4,6 +4,7 @@
 .metals
 .bloop
 .bsp
+.gradle
 
 ### Maven template
 target/
