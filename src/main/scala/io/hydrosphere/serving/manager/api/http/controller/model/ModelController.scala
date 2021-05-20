@@ -30,7 +30,6 @@ class ModelController[F[_]](
     buildLoggingService: BuildLoggingService[F]
 )(implicit
     F: Async[F],
-    dispatcher: Dispatcher[F],
     system: ActorSystem,
     materializer: Materializer
 ) extends AkkaHttpControllerDsl {
@@ -40,7 +39,10 @@ class ModelController[F[_]](
   def listModels =
     path("model") {
       get {
-        completeF(modelRepo.all())
+        completeF {
+          modelRepo.all()
+
+        }
       }
     }
 

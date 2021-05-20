@@ -79,10 +79,10 @@ object Core {
       appRepo: ApplicationRepository[F],
       buildLogsRepo: BuildLogRepository[F],
       monitoringRepo: MonitoringRepository[F]
-  ): F[Core[F]] =
+  ): Resource[F, Core[F]] =
     for {
       buildLoggingService <- BuildLoggingService.make[F]()
-      core <- {
+      core <- Resource.eval {
         implicit val bl: BuildLoggingService[F]      = buildLoggingService
         implicit val nameGen: NameGenerator[F]       = NameGenerator.haiku[F]()
         implicit val modelUnpacker: ModelUnpacker[F] = ModelUnpacker.default[F]

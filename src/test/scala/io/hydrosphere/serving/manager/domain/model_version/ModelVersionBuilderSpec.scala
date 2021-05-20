@@ -2,10 +2,9 @@ package io.hydrosphere.serving.manager.domain.model_version
 
 import java.nio.file.{Path, Paths}
 import cats.implicits._
-import cats.effect.{Concurrent, IO}
+import cats.effect.{Concurrent, IO, Resource}
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.ProgressHandler
-
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.domain.image.{DockerImage, ImageRepository}
@@ -14,7 +13,6 @@ import io.hydrosphere.serving.manager.domain.model_build.{BuildLoggingService, M
 import io.hydrosphere.serving.manager.infrastructure.docker.DockerdClient
 import io.hydrosphere.serving.manager.infrastructure.storage.{ModelFileStructure, StorageOps}
 import io.hydrosphere.serving.manager.util.DockerProgress
-
 import org.mockito.invocation.InvocationOnMock
 
 import scala.concurrent.duration._
@@ -72,11 +70,8 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         }
 
         val bl = new BuildLoggingService[IO] {
-          override def makeLogger(modelVersion: ModelVersion.Internal): IO[ProgressHandler] =
-            IO(DockerProgress.makeLogger(println))
-
-          override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
-
+          override def logger(modelVersion: ModelVersion.Internal): Resource[IO, ProgressHandler] =
+            Resource.make(IO(DockerProgress.makeLogger(println)))(_ => IO.unit)
           override def getLogs(
               modelVersionId: Long,
               sinceLine: Int
@@ -152,10 +147,8 @@ class ModelVersionBuilderSpec extends GenericUnitTest {
         )
 
         val bl = new BuildLoggingService[IO] {
-          override def makeLogger(modelVersion: ModelVersion.Internal): IO[ProgressHandler] =
-            IO(DockerProgress.makeLogger(println))
-
-          override def finishLogging(modelVersion: Long): IO[Option[Unit]] = IO(Some(()))
+          override def logger(modelVersion: ModelVersion.Internal): Resource[IO, ProgressHandler] =
+            Resource.make(IO(DockerProgress.makeLogger(println)))(_ => IO.unit)
 
           override def getLogs(
               modelVersionId: Long,

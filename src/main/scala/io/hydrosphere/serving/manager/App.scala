@@ -65,10 +65,10 @@ object App extends Logging {
     for {
       implicit0(actorSystem: ActorSystem) <- actorSystem("manager")
       implicit0(materializer: Materializer) = Materializer.createMaterializer(actorSystem)
-      rngF <- Resource.eval(RNG.default[F])
-      cloudDriver =
+      implicit0(rngF: RNG[F]) <- Resource.eval(RNG.default[F])
+      implicit0(cloudDriver: CloudDriver[F]) =
         CloudDriver.fromConfig[F](dockerClient, config.cloudDriver, config.dockerRepository)
-      tx <- Database.makeTransactor[F](config.database)
+      implicit0(tx: Transactor[F]) <- Database.makeTransactor[F](config.database)
       _ = logger.info("Created DB transactor")
       flyway <- Resource.eval(Database.makeFlyway(tx))
 
@@ -78,9 +78,6 @@ object App extends Logging {
       monitoringPubSub <- Resource.eval(MetricSpecEvents.makeTopic)
       depPubSub        <- Resource.eval(DeploymentConfigurationEvents.makeTopic)
       core <- {
-        implicit val rng                        = rngF
-        implicit val cd                         = cloudDriver
-        implicit val itx                        = tx
         implicit val (appPub, appSub)           = appPubSub
         implicit val (modelPub, modelSub)       = modelPubSub
         implicit val (servablePub, servableSub) = servablePubSub
@@ -97,17 +94,14 @@ object App extends Logging {
           DBMonitoringRepository.make(config.defaultDeploymentConfiguration)
         implicit val imageRepo = ImageRepository.fromConfig(dockerClient, config.dockerRepository)
 
-        Resource.eval(Core.make[F](config))
+        Core.make[F](config)
       }
-      migrator = {
-        implicit val tx1 = tx
-        ApplicationSignatureMigrationTool.default(
-          core.repos.appRepo,
-          core.repos.versionRepo,
-          core.repos.servableRepo,
-          core.repos.depConfRepository
-        )
-      }
+      migrator = ApplicationSignatureMigrationTool.default(
+        core.repos.appRepo,
+        core.repos.versionRepo,
+        core.repos.servableRepo,
+        core.repos.depConfRepository
+      )
       grpcService <-
         Resource.eval(ManagerGrpcService.make[F](core.versionService, core.servableService))
       discoveryService <- Resource.eval(

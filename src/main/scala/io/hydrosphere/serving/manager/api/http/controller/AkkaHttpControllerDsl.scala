@@ -25,6 +25,12 @@ trait AkkaHttpControllerDsl extends ErrorAccumulatingCirceSupport with Directive
 
   import AkkaHttpControllerDsl._
 
+  final case class WithDispatcher[F[_]: Async]() {
+    def apply[T](x: Dispatcher[F] => F[T]): F[T] = Dispatcher[F].use(x)
+  }
+
+  final def withDispatcher[F[_]: Async]: WithDispatcher[F] = WithDispatcher[F]()
+
   final def getFileWithMeta[F[_], T: Decoder, R: ToResponseMarshaller](
       callback: (Option[Path], Option[T]) => F[R]
   )(implicit
@@ -35,10 +41,11 @@ trait AkkaHttpControllerDsl extends ErrorAccumulatingCirceSupport with Directive
   ): Route =
     entity(as[Multipart.FormData]) { formdata =>
       val parts = formdata.parts.mapAsync(2) { part =>
-        logger.debug(s"Got part ${part.name} filename=${part.filename}")
+        logger.debug(s"Got part ${part.name}")
         part.name match {
           case "payload" if part.filename.isDefined =>
             val filename = part.filename.get
+            logger.debug(s"Part ${part.name} filename=$filename")
             val tempPath = Files.createTempFile("payload", filename)
             part.entity.dataBytes
               .runWith(FileIO.toPath(tempPath))
@@ -46,9 +53,12 @@ trait AkkaHttpControllerDsl extends ErrorAccumulatingCirceSupport with Directive
 
           case "metadata" if part.filename.isEmpty =>
             part.toStrict(5.minutes).map { k =>
-              val res = parse(k.entity.data.utf8String)
+              val raw = k.entity.data.utf8String
+              logger.debug(s"Part ${part.name} metadata=$raw")
+              val res = parse(raw)
                 .flatMap(_.as[T])
-                .getOrElse(throw DomainError.invalidRequest("Can't parse json in metadata part"))
+                .toTry
+                .get
               UploadMeta(res)
             }
 

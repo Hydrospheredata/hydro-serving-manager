@@ -1,7 +1,7 @@
 package io.hydrosphere.serving.manager.domain.model_build
 
 import cats.effect.implicits._
-import cats.effect.kernel.{Async, Deferred}
+import cats.effect.kernel.{Async, Deferred, Resource}
 import cats.implicits._
 import com.spotify.docker.client.DockerClient.BuildParam
 import com.spotify.docker.client.ProgressHandler
@@ -42,10 +42,13 @@ object ModelVersionBuilder {
           modelFileStructure: ModelFileStructure
       ): F[DeferredResult[F, ModelVersion.Internal]] =
         for {
-          init     <- initialVersion(model, metadata)
-          handler  <- buildLoggingService.makeLogger(init)
+          init <- initialVersion(model, metadata)
+          handler = buildLoggingService.logger(init)
           deferred <- Deferred[F, ModelVersion.Internal]
-          _        <- handleBuild(init, modelFileStructure, handler).flatMap(deferred.complete).start
+          _ <- handleBuild(init, modelFileStructure, handler)
+            .flatTap(deferred.complete)
+            .flatTap(_ => F.delay(logger.debug(s"Model build finished ${init.fullName}")))
+            .start
         } yield DeferredResult(init, deferred)
 
       def initialVersion(model: Model, metadata: ModelVersionMetadata): F[ModelVersion.Internal] =
@@ -84,31 +87,30 @@ object ModelVersionBuilder {
       def handleBuild(
           mv: ModelVersion.Internal,
           modelFileStructure: ModelFileStructure,
-          handler: ProgressHandler
-      ): F[ModelVersion.Internal] = {
-        val innerCompleted = for {
-          buildPath <- prepare(mv, modelFileStructure)
-          imageSha  <- buildImage(buildPath.root, mv.image, handler)
-          newDockerImage = mv.image.copy(sha256 = Some(imageSha))
-          finishedVersion = mv.copy(
-            image = newDockerImage,
-            finished = Instant.now().some,
-            status = ModelVersionStatus.Released
-          )
-          _ <- imageRepository.push(finishedVersion.image, handler)
-          _ <- buildLoggingService.finishLogging(mv.id)
-          _ <- modelVersionRepository.update(finishedVersion)
-        } yield finishedVersion
+          handlerResource: Resource[F, ProgressHandler]
+      ): F[ModelVersion.Internal] =
+        handlerResource.use { handler =>
+          val innerCompleted = for {
+            buildPath <- prepare(mv, modelFileStructure)
+            imageSha  <- buildImage(buildPath.root, mv.image, handler)
+            newDockerImage = mv.image.copy(sha256 = Some(imageSha))
+            finishedVersion = mv.copy(
+              image = newDockerImage,
+              finished = Instant.now().some,
+              status = ModelVersionStatus.Released
+            )
+            _ <- imageRepository.push(finishedVersion.image, handler)
+            _ <- modelVersionRepository.update(finishedVersion)
+          } yield finishedVersion
 
-        innerCompleted.handleErrorWith { err =>
-          for {
-            _ <- F.delay(logger.error("Model version build failed", err))
-            failed = mv.copy(status = ModelVersionStatus.Failed, finished = Instant.now().some)
-            _ <- buildLoggingService.finishLogging(mv.id).attempt
-            _ <- modelVersionRepository.update(failed).attempt
-          } yield failed
+          innerCompleted.handleErrorWith { err =>
+            for {
+              _ <- F.delay(logger.error("Model version build failed", err))
+              failed = mv.copy(status = ModelVersionStatus.Failed, finished = Instant.now().some)
+              _ <- modelVersionRepository.update(failed).attempt
+            } yield failed
+          }
         }
-      }
 
       def prepare(
           modelVersion: ModelVersion.Internal,

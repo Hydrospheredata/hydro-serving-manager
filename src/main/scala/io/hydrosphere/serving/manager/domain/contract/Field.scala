@@ -7,10 +7,10 @@ import io.circe.syntax._
 import io.circe.Decoder.Result
 import io.circe.{Decoder, DecodingFailure, Encoder, HCursor, Json}
 import io.circe.generic.JsonCodec
+import io.circe.generic.extras.ConfiguredJsonCodec
 import io.hydrosphere.serving.proto.contract.field.ModelField
 import io.hydrosphere.serving.proto.contract.field.ModelField.TypeOrSubfields
 
-@JsonCodec
 sealed trait Field extends Product with Serializable {
   def name: String
   def shape: TensorShape
