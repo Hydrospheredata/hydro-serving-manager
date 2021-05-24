@@ -41,7 +41,9 @@ class KubernetesDriver[F[_]](
     } yield CloudInstance(
       modelVersionId,
       serviceName,
-      CloudInstance.Status.Running(host, port)
+      CloudInstance.Status.Running,
+      host = host.some,
+      port = port.some
     )
 
   override def instances: F[List[CloudInstance]] =

@@ -22,7 +22,7 @@ object CloudInstance {
 
     case object Starting extends Status
 
-    final case class Running(host: String, port: Int) extends Status
+    case object Running extends Status
 
     case object Stopped extends Status
 
@@ -33,7 +33,9 @@ object CloudInstance {
 case class CloudInstance(
     modelVersionId: Long,
     name: String,
-    status: CloudInstance.Status
+    status: CloudInstance.Status,
+    host: Option[String],
+    port: Option[Int]
 )
 
 trait CloudDriver[F[_]] {

@@ -36,6 +36,14 @@ object Converters {
       ModelVersionStatus.Failed     -> grpcEntity.ModelVersionStatus.Failed
     )
 
+  final val applicationStatusMap
+      : BiMap[Application.Status, grpcEntity.Application.ApplicationStatus.Recognized] =
+    BiMap(
+      Application.Status.Assembling -> grpcEntity.Application.ApplicationStatus.ASSEMBLING,
+      Application.Status.Ready      -> grpcEntity.Application.ApplicationStatus.READY,
+      Application.Status.Failed     -> grpcEntity.Application.ApplicationStatus.FAILED
+    )
+
   def mapThresholdOperator(
       thresholdCmpOperator: ThresholdCmpOperator
   ): grpcEntity.ThresholdConfig.CmpOp =
@@ -119,25 +127,32 @@ object Converters {
   def fromApp(app: Application): grpcEntity.Application = {
     val stages    = toGStages(app.graph)
     val signature = Signature.toProto(app.signature)
+    val status = applicationStatusMap.forward
+      .getOrElse(app.status, grpcEntity.Application.ApplicationStatus.FAILED)
 
     grpcEntity.Application(
       id = app.id.toString,
       name = app.name,
       signature = signature.some,
       pipeline = stages.toList,
-      metadata = app.metadata
+      metadata = app.metadata,
+      status = status
     )
   }
 
   def toGServable(mv: ApplicationServable): Option[grpcEntity.Servable] =
     mv.servable.map { s =>
+      val status =
+        servableStatusMap.forward
+          .getOrElse(s.status, grpcEntity.Servable.ServableStatus.NOT_AVAILABlE)
       grpcEntity.Servable(
         host = s.host.getOrElse(""),
         port = s.port.getOrElse(0),
         weight = mv.weight,
         modelVersion = fromModelVersion(mv.modelVersion).some,
         name = s.name,
-        metadata = s.metadata
+        metadata = s.metadata,
+        status = status
       )
     }
 

@@ -64,18 +64,18 @@ object ServableMonitoring extends Logging {
           .compile
           .drain
 
-      def updatedServable(servable: Servable, servEvent: ServableEvent): Servable = {
-        val (status, message) = servEvent match {
-          case ServableNotReady(message) => (NotServing, message.some)
-          case ServableReady(message)    => (Serving, message)
-          case ServableStarting          => (Starting, None)
-          case _                         => (servable.status, servable.message)
+      def updatedServable(servable: Servable, servEvent: ServableEvent): Servable =
+        servEvent match {
+          case ServableNotReady(message) =>
+            servable.copy(status = NotServing, message = message.some)
+          case ServableReady(message) =>
+            servable.copy(status = Serving, message = message)
+          case ServableStarting =>
+            servable.copy(status = Starting, message = None)
+          case _ => servable
         }
 
-        servable.copy(status = status, message = message)
-      }
-
-      private def streamFinishMessage(msg: String) =
+      private def streamFinishMessage(msg: String): F[Unit] =
         F.delay(logger.info("Servable monitoring stream was " + msg))
     }
 }
