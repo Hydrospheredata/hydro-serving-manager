@@ -9,9 +9,6 @@ import io.hydrosphere.serving.manager.domain.application.{
   ApplicationKafkaStream
 }
 import io.hydrosphere.serving.manager.domain.contract.Signature
-import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfiguration
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersion
-import io.hydrosphere.serving.manager.domain.servable.{Servable, ServableView}
 
 @JsonCodec
 case class ApplicationGraphView(
@@ -22,8 +19,8 @@ object ApplicationGraphView {
   @JsonCodec
   case class VariantView(
       modelVersionId: Long,
-      servable: Option[ServableView],
-      deploymentConfiguration: Option[DeploymentConfiguration],
+      servable: Option[String],
+      deploymentConfiguration: Option[String],
       weight: Int
   )
 
@@ -38,8 +35,8 @@ object ApplicationGraphView {
       val variants = s.variants.map { ss =>
         VariantView(
           ss.modelVersion.id,
-          ss.servable.map(ServableView.fromServable),
-          ss.requiredDeploymentConfig,
+          ss.servable.map(_.name),
+          ss.requiredDeploymentConfig.map(_.name),
           ss.weight
         )
       }
