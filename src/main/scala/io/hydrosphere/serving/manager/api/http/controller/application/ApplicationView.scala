@@ -19,8 +19,8 @@ object ApplicationGraphView {
   @JsonCodec
   case class VariantView(
       modelVersionId: Long,
-      servable: Option[String],
-      deploymentConfiguration: Option[String],
+      servableName: Option[String],
+      deploymentConfigurationName: Option[String],
       weight: Int
   )
 

@@ -5,22 +5,22 @@ import io.hydrosphere.serving.manager.domain.servable.Servable
 
 @JsonCodec
 case class ServableView(
-    modelVersion: Long,
+    modelVersionId: Long,
     status: Servable.Status,
+    statusMessage: Option[String],
     fullName: String,
     metadata: Map[String, String],
-    deploymentConfiguration: String,
-    statusMessage: Option[String]
+    deploymentConfigurationName: String
 )
 
 object ServableView {
   def fromServable(s: Servable): ServableView =
     ServableView(
-      modelVersion = s.modelVersion.id,
-      status = s.status,
-      statusMessage = s.message,
-      fullName = s.name,
-      metadata = s.metadata,
-      deploymentConfiguration = s.deploymentConfiguration.name
+      s.modelVersion.id,
+      s.status,
+      s.message,
+      s.name,
+      s.metadata,
+      s.deploymentConfiguration.name
     )
 }
