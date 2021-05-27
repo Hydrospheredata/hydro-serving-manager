@@ -1,7 +1,6 @@
 package io.hydrosphere.serving.manager.api.http.controller.events
 
 import java.util.UUID
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
@@ -10,7 +9,6 @@ import akka.stream.scaladsl.Source
 import cats.effect.{ConcurrentEffect, ContextShift}
 import streamz.converter._
 import io.circe.syntax._
-
 import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.api.http.controller.application.ApplicationView
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
@@ -18,10 +16,9 @@ import io.hydrosphere.serving.manager.discovery._
 import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
 import io.hydrosphere.serving.manager.domain.deploy_config
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationEvents
-import io.hydrosphere.serving.manager.domain.model_version.ModelVersionEvents
+import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionEvents}
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.ServableEvents
-
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -31,7 +28,7 @@ class SSEController[F[_]](
     modelSubscriber: ModelVersionEvents.Subscriber[F],
     servableSubscriber: ServableEvents.Subscriber[F],
     metricSpecSubscriber: MetricSpecEvents.Subscriber[F],
-    depSubscriber: DeploymentConfigurationEvents.Subscriber[F],
+    depSubscriber: DeploymentConfigurationEvents.Subscriber[F]
 )(implicit
     F: ConcurrentEffect[F],
     cs: ContextShift[F],
@@ -120,7 +117,10 @@ object SSEController {
       case DiscoveryEvent.ItemUpdate(items) =>
         items.map { mv =>
           ServerSentEvent(
-            data = mv.asJson.spaces2,
+            data = mv match {
+              case m: ModelVersion.Internal => m.asJson.spaces2
+              case m: ModelVersion.External => m.asJson.spaces2
+            },
             `type` = "ModelUpdate"
           )
         }
@@ -146,7 +146,7 @@ object SSEController {
       case DiscoveryEvent.ItemRemove(items) =>
         items.map { i =>
           ServerSentEvent(
-            data = i.toString,
+            data = i,
             `type` = "ApplicationRemove"
           )
         }
