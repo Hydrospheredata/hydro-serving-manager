@@ -135,13 +135,15 @@ object ServableService extends Logging {
             deploymentConfiguration = deployConfig.getOrElse(defaultDC)
           )
           servable <- servableRepository.upsert(initServable)
-          _ <- cloudDriver.run(
+          cloudInstance <- cloudDriver.run(
             servable.name,
             servable.modelVersion.id,
             servable.modelVersion.image,
             servable.deploymentConfiguration
           )
-        } yield servable
+          newServable = servable.copy(host = cloudInstance.host, port = cloudInstance.port)
+          updatedServable <- servableRepository.upsert(newServable)
+        } yield updatedServable
 
       override def stop(name: String): F[Servable] =
         for {

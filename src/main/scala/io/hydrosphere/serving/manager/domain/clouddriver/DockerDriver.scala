@@ -96,19 +96,23 @@ class DockerDriver[F[_]](
       .map(_.tail) // NB: name is '/container-name'. We need to remove the slash.
       .map(n => s"dns:///$n")
     (mName, mMvId).mapN { (name, mvId) =>
-      c.state() match {
-        case ContainerState.Running(_) =>
-          val host =
-            maybeName.getOrElse(Internals.extractIpAddress(c.networkSettings(), config.networkName))
-          val status = CloudInstance.Status.Running(host, DefaultConstants.DEFAULT_APP_PORT)
-          CloudInstance(mvId, name, status)
-        case ContainerState.Created(_) =>
-          CloudInstance(mvId, name, CloudInstance.Status.Starting)
-        case ContainerState.Restarting(_) =>
-          CloudInstance(mvId, name, CloudInstance.Status.Starting)
-        case _ =>
-          CloudInstance(mvId, name, CloudInstance.Status.Stopped)
+      val host =
+        maybeName.getOrElse(Internals.extractIpAddress(c.networkSettings(), config.networkName))
+      val port = DefaultConstants.DEFAULT_APP_PORT.some
+      val status = c.state() match {
+        case ContainerState.Running(_)    => CloudInstance.Status.Running
+        case ContainerState.Created(_)    => CloudInstance.Status.Starting
+        case ContainerState.Restarting(_) => CloudInstance.Status.Starting
+        case _                            => CloudInstance.Status.Stopped
       }
+
+      CloudInstance(
+        mvId,
+        name,
+        status,
+        host.some,
+        DefaultConstants.DEFAULT_APP_PORT.some
+      )
     }
   }
 

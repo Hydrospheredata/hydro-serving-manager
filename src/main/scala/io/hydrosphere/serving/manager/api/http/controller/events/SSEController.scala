@@ -4,6 +4,7 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
+import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import cats.effect.{ConcurrentEffect, ContextShift}
@@ -36,9 +37,9 @@ class SSEController[F[_]](
     actorSystem: ActorSystem
 ) extends AkkaHttpControllerDsl {
 
-  implicit val am = ActorMaterializer.create(actorSystem)
+  implicit val am: ActorMaterializer = ActorMaterializer.create(actorSystem)
 
-  def subscribe =
+  def subscribe: Route =
     pathPrefix("events") {
       get {
         val id = UUID.randomUUID().toString
