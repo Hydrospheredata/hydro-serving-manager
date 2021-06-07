@@ -1,10 +1,8 @@
 package io.hydrosphere.serving.manager.api.http.controller.events
 
 import java.util.UUID
-import akka.actor.ActorSystem
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import cats.effect.{ConcurrentEffect, ContextShift}
 import streamz.converter._
@@ -14,12 +12,12 @@ import io.hydrosphere.serving.manager.api.http.controller.application.Applicatio
 import io.hydrosphere.serving.manager.api.http.controller.servable.ServableView
 import io.hydrosphere.serving.manager.discovery._
 import io.hydrosphere.serving.manager.domain.application.ApplicationEvents
-import io.hydrosphere.serving.manager.domain.deploy_config
 import io.hydrosphere.serving.manager.domain.deploy_config.DeploymentConfigurationEvents
 import io.hydrosphere.serving.manager.domain.model_version.{ModelVersion, ModelVersionEvents}
 import io.hydrosphere.serving.manager.domain.monitoring.MetricSpecEvents
 import io.hydrosphere.serving.manager.domain.servable.ServableEvents
 
+import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
@@ -31,12 +29,10 @@ class SSEController[F[_]](
     depSubscriber: DeploymentConfigurationEvents.Subscriber[F]
 )(implicit
     F: ConcurrentEffect[F],
-    cs: ContextShift[F],
-    ec: ExecutionContext,
-    actorSystem: ActorSystem
+    cs: ContextShift[F]
 ) extends AkkaHttpControllerDsl {
-
-  implicit val am = ActorMaterializer.create(actorSystem)
+  val executor                      = Executors.newCachedThreadPool()
+  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(executor)
 
   def subscribe =
     pathPrefix("events") {

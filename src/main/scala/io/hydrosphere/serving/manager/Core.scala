@@ -79,8 +79,9 @@ object Core {
       servableRepo: ServableRepository[F],
       appRepo: ApplicationRepository[F],
       buildLogsRepo: BuildLogRepository[F],
-      monitoringRepo: MonitoringRepository[F]
-  ): F[Core[F]] = {
+      monitoringRepo: MonitoringRepository[F],
+      cs: ContextShift[F]
+  ): F[Core[F]] =
     for {
       buildLoggingService <- BuildLoggingService.make[F]()
       core <- {
@@ -127,5 +128,4 @@ object Core {
         }
       }
     } yield core
-  }
 }

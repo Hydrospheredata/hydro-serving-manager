@@ -78,6 +78,7 @@ object App {
     implicit val storageOps              = StorageOps.default[F]
     implicit val uuidGen                 = UUIDGenerator.default[F]()
     implicit val dc                      = dockerClient
+
     for {
       rngF <- Resource.liftF(RNG.default[F])
       cloudDriver =

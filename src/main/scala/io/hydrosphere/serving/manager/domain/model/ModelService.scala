@@ -2,7 +2,7 @@ package io.hydrosphere.serving.manager.domain.model
 
 import java.nio.file.Path
 import cats.data.OptionT
-import cats.effect.Clock
+import cats.effect.{Clock, ContextShift}
 import cats.implicits._
 import cats.{Monad, MonadError}
 import io.hydrosphere.serving.manager.api.http.controller.model._
@@ -19,6 +19,9 @@ import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.ModelFetch
 import io.hydrosphere.serving.manager.util.DeferredResult
 import io.hydrosphere.serving.manager.util.InstantClockSyntax._
 import org.apache.logging.log4j.scala.Logging
+
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
 
 trait ModelService[F[_]] {
   def get(modelId: Long): F[Model]
@@ -48,9 +51,12 @@ object ModelService {
       appRepo: ApplicationRepository[F],
       servableRepo: ServableRepository[F],
       fetcher: ModelFetcher[F],
-      modelVersionBuilder: ModelVersionBuilder[F]
+      modelVersionBuilder: ModelVersionBuilder[F],
+      cs: ContextShift[F]
   ): ModelService[F] =
     new ModelService[F] with Logging {
+      val ex = Executors.newCachedThreadPool()
+      val ec = ExecutionContext.fromExecutor(ex)
 
       def deleteModel(modelId: Long): F[Model] =
         for {
@@ -84,7 +90,7 @@ object ModelService {
               .leftMap(x => InvalidRequest(x.toList.mkString))
           )
           parentModel <- createIfNecessary(versionMetadata.modelName)
-          b           <- modelVersionBuilder.build(parentModel, versionMetadata, modelPath)
+          b           <- cs.evalOn(ec)(modelVersionBuilder.build(parentModel, versionMetadata, modelPath))
         } yield b
 
       def createIfNecessary(modelName: String): F[Model] =

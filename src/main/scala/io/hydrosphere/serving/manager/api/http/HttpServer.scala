@@ -14,6 +14,7 @@ import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.config.ApplicationConfig
 import io.hydrosphere.serving.manager.util.AsyncUtil
 
+import java.util.concurrent.Executors
 import scala.collection.immutable.Seq
 import scala.concurrent.ExecutionContext
 
@@ -23,24 +24,26 @@ trait HttpServer[F[_]] {
 
 object HttpServer extends AkkaHttpControllerDsl {
 
-  def akkaBased[F[_] : Async](
-    config: ApplicationConfig,
-    modelRoutes: Route,
-    applicationRoutes: Route,
-    hostSelectorRoutes: Route,
-    servableRoutes: Route,
-    sseRoutes: Route,
-    monitoringRoutes: Route,
-    externalModelRoutes: Route,
-    deploymentConfRoutes: Route,
+  def akkaBased[F[_]: Async](
+      config: ApplicationConfig,
+      modelRoutes: Route,
+      applicationRoutes: Route,
+      hostSelectorRoutes: Route,
+      servableRoutes: Route,
+      sseRoutes: Route,
+      monitoringRoutes: Route,
+      externalModelRoutes: Route,
+      deploymentConfRoutes: Route
   )(implicit
-    as: ActorSystem,
-    am: ActorMaterializer,
-    ec: ExecutionContext
+      as: ActorSystem,
+      am: ActorMaterializer
   ): HttpServer[F] = {
+    val es                            = Executors.newCachedThreadPool()
+    implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(es)
+
     val controllerRoutes: Route = pathPrefix("v2") {
       handleExceptions(commonExceptionHandler) {
-          modelRoutes ~
+        modelRoutes ~
           externalModelRoutes ~
           applicationRoutes ~
           hostSelectorRoutes ~
