@@ -4,14 +4,19 @@ import cats.data.OptionT
 import cats.implicits._
 import cats.effect._
 import cats.effect.implicits._
-import io.hydrosphere.serving.manager.domain.servable.Servable.{Status => ServableStatus}
+import io.hydrosphere.serving.manager.domain.clouddriver.docker.DockerEvent
+import io.hydrosphere.serving.manager.domain.clouddriver.k8s.K8sEvent
 import io.hydrosphere.serving.manager.domain.clouddriver.{
-  Available,
   CloudDriver,
-  CloudInstanceEvent,
-  NotAvailable,
+  ServableEvent,
+  ServableNotReady,
+  ServableReady,
+  ServableStarting,
+  ServableStates
+}
+import io.hydrosphere.serving.manager.domain.servable.Servable.Status.{
   NotServing,
-  Ready,
+  Serving,
   Starting
 }
 import org.apache.logging.log4j.scala.Logging
@@ -23,56 +28,51 @@ trait ServableMonitoring[F[_]] {
 object ServableMonitoring extends Logging {
   def make[F[_]](
       cloudDriver: CloudDriver[F],
-      repo: ServableRepository[F]
+      repo: ServableRepository[F],
+      servableStates: ServableStates[F]
   )(implicit F: Concurrent[F]): ServableMonitoring[F] =
     new ServableMonitoring[F] {
       override def start(): F[Fiber[F, Unit]] = {
-        logger.info("Servable monitoring has been started")
+        logger.info("Servable stream has been started")
+        stream.start
+      }
+
+      def stream: F[Unit] =
         cloudDriver.getEvents
-          .evalTap { servEvent =>
+          .evalTap { cloudInstanceEvent =>
             val effect = for {
-              servable <- OptionT(repo.get(servEvent.instanceName))
-              _        <- OptionT.liftF(repo.upsert(updatedServable(servable, servEvent)))
+              servable  <- OptionT(repo.get(cloudInstanceEvent.instanceName))
+              servEvent <- OptionT.liftF(servableStates.handleEvent(cloudInstanceEvent))
+              _         <- OptionT.liftF(repo.upsert(updatedServable(servable, servEvent)))
             } yield ()
 
             effect.value.as(())
           }
           .onFinalizeCase {
-            case ExitCase.Completed => streamFinishMessage("completed")
-            case ExitCase.Error(e)  => streamFinishMessage("finished with error" + e)
-            case ExitCase.Canceled  => streamFinishMessage("cancelled")
+            case ExitCase.Completed =>
+              for {
+                _        <- streamFinishMessage("completed")
+                reStream <- stream
+              } yield reStream
+            case ExitCase.Error(e) =>
+              for {
+                _        <- streamFinishMessage("finished with error " + e)
+                reStream <- stream
+              } yield reStream
+            case ExitCase.Canceled => streamFinishMessage("cancelled")
           }
           .compile
           .drain
-          .start
-      }
 
-      def updatedServable(servable: Servable, servEvent: CloudInstanceEvent): Servable = {
-        val (newStatus, message) = getNewStatus(servable.status, servable.message, servEvent)
-        servable.copy(status = newStatus, message = message)
-      }
-
-      def getNewStatus(
-          prevStatus: ServableStatus,
-          prevMessage: Option[String],
-          eventType: CloudInstanceEvent
-      ): (ServableStatus, Option[String]) =
-        (prevStatus, eventType) match {
-          case (ServableStatus.NotAvailable, Available(_)) => (ServableStatus.Serving, none)
-          case (ServableStatus.NotAvailable, Ready(_, _)) =>
-            (ServableStatus.NotAvailable, prevMessage)
-          case (ServableStatus.NotAvailable, NotServing(_, _)) =>
-            (ServableStatus.NotAvailable, prevMessage)
-          case (ServableStatus.NotServing, NotAvailable(_, _)) =>
-            (ServableStatus.NotAvailable, prevMessage)
-          case (_, Available(_))             => (ServableStatus.Serving, none)
-          case (_, Ready(_, warning))        => (ServableStatus.Serving, warning)
-          case (_, Starting(_, warning))     => (ServableStatus.Starting, warning)
-          case (_, NotAvailable(_, message)) => (ServableStatus.NotAvailable, message.some)
-          case (_, NotServing(_, message))   => (ServableStatus.NotServing, message.some)
+      def updatedServable(servable: Servable, servEvent: ServableEvent): Servable =
+        servEvent match {
+          case ServableNotReady(msg) => servable.copy(status = NotServing, message = msg.some)
+          case ServableReady(msg)    => servable.copy(status = Serving, message = msg)
+          case ServableStarting      => servable.copy(status = Starting, message = None)
+          case _                     => servable
         }
 
-      private def streamFinishMessage(msg: String) =
+      private def streamFinishMessage(msg: String): F[Unit] =
         F.delay(logger.info("Servable monitoring stream was " + msg))
     }
 }

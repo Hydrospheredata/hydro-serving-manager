@@ -25,8 +25,9 @@ trait AkkaHttpControllerDsl extends ErrorAccumulatingCirceSupport with Directive
 
   import AkkaHttpControllerDsl._
 
-  final def getFileWithMeta[F[_] : Effect, T: Decoder, R: ToResponseMarshaller](callback: (Option[Path], Option[T]) => F[R])
-                                                                               (implicit mat: Materializer, ec: ExecutionContext): Route = {
+  final def getFileWithMeta[F[_]: Effect, T: Decoder, R: ToResponseMarshaller](
+      callback: (Option[Path], Option[T]) => F[R]
+  )(implicit mat: Materializer, ec: ExecutionContext): Route =
     entity(as[Multipart.FormData]) { formdata =>
       val parts = formdata.parts.mapAsync(2) { part =>
         logger.debug(s"Got part ${part.name} filename=${part.filename}")
@@ -41,8 +42,12 @@ trait AkkaHttpControllerDsl extends ErrorAccumulatingCirceSupport with Directive
           case "metadata" if part.filename.isEmpty =>
             part.toStrict(5.minutes).map { k =>
               val res = parse(k.entity.data.utf8String)
-                .flatMap(_.as[T])
-                .getOrElse(throw DomainError.invalidRequest("Can't parse json in metadata part"))
+                .flatMap(_.as[T]) match {
+                case Left(value) =>
+                  logger.error("Can't parse json in metadata part", value)
+                  throw DomainError.invalidRequest(s"Can't parse json in metadata part: $value")
+                case Right(value) => value
+              }
               UploadMeta(res)
             }
 
@@ -60,54 +65,58 @@ trait AkkaHttpControllerDsl extends ErrorAccumulatingCirceSupport with Directive
 
       completeF {
         entitiesF.flatMap { entities =>
-          val file = entities.collectFirst { case UploadFile(x) => x }
+          val file     = entities.collectFirst { case UploadFile(x) => x }
           val metadata = entities.collectFirst { case UploadMeta(meta) => meta.asInstanceOf[T] }
           callback(file, metadata)
         }
       }
     }
-  }
 
-  final def withF[F[_] : Effect, T: ToResponseMarshaller](res: F[T])(f: T => Route): Route = {
+  final def withF[F[_]: Effect, T: ToResponseMarshaller](res: F[T])(f: T => Route): Route =
     onComplete(Effect[F].toIO(res).unsafeToFuture()) {
       case Success(result) =>
         f(result)
       case Failure(err) => commonExceptionHandler(err)
     }
-  }
 
-  final def completeF[F[_] : Effect, T: ToResponseMarshaller](res: F[T]): Route  = {
+  final def completeF[F[_]: Effect, T: ToResponseMarshaller](res: F[T]): Route =
     withF(res)(complete(_))
-  }
 
-  final def commonExceptionHandler: ExceptionHandler = ExceptionHandler {
-    case x: DomainError.NotFound =>
-      complete(
-        HttpResponse(
-          status = StatusCodes.NotFound,
-          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].asJson.spaces2)
+  final def commonExceptionHandler: ExceptionHandler =
+    ExceptionHandler {
+      case x: DomainError.NotFound =>
+        complete(
+          HttpResponse(
+            status = StatusCodes.NotFound,
+            entity = HttpEntity(
+              ContentTypes.`application/json`,
+              x.asInstanceOf[DomainError].asJson.spaces2
+            )
+          )
         )
-      )
-    case x: DomainError.InvalidRequest =>
-      complete(
-        HttpResponse(
-          status = StatusCodes.BadRequest,
-          entity = HttpEntity(ContentTypes.`application/json`, x.asInstanceOf[DomainError].asJson.spaces2)
+      case x: DomainError.InvalidRequest =>
+        complete(
+          HttpResponse(
+            status = StatusCodes.BadRequest,
+            entity = HttpEntity(
+              ContentTypes.`application/json`,
+              x.asInstanceOf[DomainError].asJson.spaces2
+            )
+          )
         )
-      )
-    case p: Throwable =>
-      logger.error(p.toString)
-      logger.error(p.getStackTrace.mkString("\n"))
-      complete(
-        HttpResponse(
-          StatusCodes.InternalServerError,
-          entity = Map(
-            "error" -> "InternalException",
-            "message" -> Option(p.toString).getOrElse(s"Unknown error: $p")
-          ).asJson.spaces2
+      case p: Throwable =>
+        logger.error(p.toString)
+        logger.error(p.getStackTrace.mkString("\n"))
+        complete(
+          HttpResponse(
+            StatusCodes.InternalServerError,
+            entity = Map(
+              "error"   -> "InternalException",
+              "message" -> Option(p.toString).getOrElse(s"Unknown error: $p")
+            ).asJson.spaces2
+          )
         )
-      )
-  }
+    }
 }
 
 object AkkaHttpControllerDsl {

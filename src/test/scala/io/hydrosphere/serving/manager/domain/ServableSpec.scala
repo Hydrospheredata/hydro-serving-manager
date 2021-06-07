@@ -95,7 +95,7 @@ class ServableSpec extends GenericUnitTest {
         mock[DeploymentConfigurationService[IO]]
 
       implicit val cloudDriver: CloudDriver[IO] = mock[CloudDriver[IO]]
-      val cloudInstance                         = CloudInstance(1, "kek", CloudInstance.Status.Starting)
+      val cloudInstance                         = CloudInstance(1, "kek", CloudInstance.Status.Starting, None, None)
       when(
         cloudDriver.run(
           name = any[String],
@@ -140,7 +140,7 @@ class ServableSpec extends GenericUnitTest {
         mock[DeploymentConfigurationService[IO]]
 
       implicit val cloudDriver: CloudDriver[IO] = mock[CloudDriver[IO]]
-      val cloudInstance                         = CloudInstance(1, "kek", CloudInstance.Status.Starting)
+      val cloudInstance                         = CloudInstance(1, "kek", CloudInstance.Status.Starting, None, None)
       when(
         cloudDriver.run(
           name = any[String],
