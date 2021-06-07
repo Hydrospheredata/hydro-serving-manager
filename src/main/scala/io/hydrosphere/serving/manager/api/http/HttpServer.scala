@@ -38,8 +38,8 @@ object HttpServer extends AkkaHttpControllerDsl {
       as: ActorSystem,
       am: ActorMaterializer
   ): HttpServer[F] = {
-    val es                            = Executors.newCachedThreadPool()
-    implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(es)
+    val ex                            = Executors.newCachedThreadPool()
+    implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(ex)
 
     val controllerRoutes: Route = pathPrefix("v2") {
       handleExceptions(commonExceptionHandler) {
@@ -55,13 +55,17 @@ object HttpServer extends AkkaHttpControllerDsl {
     }
 
     val buildInfoRoute = pathPrefix("buildinfo") {
-      complete(HttpResponse(
-        status = StatusCodes.OK,
-        entity = HttpEntity(ContentTypes.`application/json`, BuildInfo.toJson)
-      ))
+      complete(
+        HttpResponse(
+          status = StatusCodes.OK,
+          entity = HttpEntity(ContentTypes.`application/json`, BuildInfo.toJson)
+        )
+      )
     }
 
-    val routes: Route = CorsDirectives.cors(CorsSettings.defaultSettings.withAllowedMethods(Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))) {
+    val routes: Route = CorsDirectives.cors(
+      CorsSettings.defaultSettings.withAllowedMethods(Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))
+    ) {
       pathPrefix("health") {
         complete("OK")
       } ~
@@ -70,9 +74,10 @@ object HttpServer extends AkkaHttpControllerDsl {
         }
     }
     new HttpServer[F] {
-      override def start(): F[Http.ServerBinding] = AsyncUtil.futureAsync {
-        Http().bindAndHandle(routes, "0.0.0.0", config.port)
-      }
+      override def start(): F[Http.ServerBinding] =
+        AsyncUtil.futureAsync {
+          Http().bindAndHandle(routes, "0.0.0.0", config.port)
+        }
     }
   }
 }

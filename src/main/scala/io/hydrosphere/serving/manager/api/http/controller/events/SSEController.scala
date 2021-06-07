@@ -31,8 +31,8 @@ class SSEController[F[_]](
     F: ConcurrentEffect[F],
     cs: ContextShift[F]
 ) extends AkkaHttpControllerDsl {
-  val executor                      = Executors.newCachedThreadPool()
-  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(executor)
+  val ex                            = Executors.newCachedThreadPool()
+  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(ex)
 
   def subscribe =
     pathPrefix("events") {
