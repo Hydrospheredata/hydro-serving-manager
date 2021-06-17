@@ -17,9 +17,11 @@ class DockerServableStates[F[_]: Sync](ref: Ref[F, Map[String, DockerServableSta
       servableState =
         state.getOrElse[DockerServableState](event.instanceName, DockerServableState.default)
       newState = event match {
-        case Create(_)        => DockerServableState(ContainerReady)
+        case Create(_)        => DockerServableState(ContainerStarted)
         case Start(_)         => DockerServableState(ContainerStarted)
         case Stop(_, message) => DockerServableState(ContainerStopped(message))
+        case _: Healthy       => DockerServableState(ContainerReady)
+        case _: Unhealthy     => DockerServableState(ContainerStopped("Container is unhealthy"))
         case _                => servableState
       }
       _ <- ref.update(_ + (event.instanceName -> newState))

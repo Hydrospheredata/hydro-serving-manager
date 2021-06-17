@@ -8,4 +8,6 @@ trait DockerEvent extends CloudInstanceEvent {
 
 final case class Create(instanceName: String)                extends DockerEvent
 final case class Start(instanceName: String)                 extends DockerEvent
+final case class Healthy(instanceName: String)               extends DockerEvent
+final case class Unhealthy(instanceName: String)             extends DockerEvent
 final case class Stop(instanceName: String, message: String) extends DockerEvent
