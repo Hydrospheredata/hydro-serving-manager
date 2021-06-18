@@ -20,9 +20,11 @@ object DockerCloudInstanceEventAdapter {
       case (_, None) => MissingField("Couldn't get attribute field from Docker's event").asLeft
       case (Some(name), Some(action)) =>
         action match {
-          case "create" => Create(name).asRight
-          case "start"  => Start(name).asRight
-          case "stop"   => Stop(name, "was internally stopped").asRight
+          case "create"                   => Create(name).asRight
+          case "start"                    => Start(name).asRight
+          case "health_status: healthy"   => Healthy(name).asRight
+          case "health_status: unhealthy" => Unhealthy(name).asRight
+          case "stop"                     => Stop(name, "was internally stopped").asRight
         }
     }
   }

@@ -5,7 +5,12 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import cats.effect.Async
 import cats.implicits._
-import com.spotify.docker.client.DockerClient.{BuildParam, EventsParam, ListContainersParam, RemoveContainerParam}
+import com.spotify.docker.client.DockerClient.{
+  BuildParam,
+  EventsParam,
+  ListContainersParam,
+  RemoveContainerParam
+}
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient, ProgressHandler}
 import io.hydrosphere.serving.manager.config.DockerClientConfig
@@ -175,6 +180,7 @@ object DockerdClient extends Logging {
               EventsParam.event("create"),
               EventsParam.event("start"),
               EventsParam.event("stop"),
+              EventsParam.event("health_status"),
               EventsParam.`type`("container"),
               EventsParam.label("HS_INSTANCE_NAME"),
               EventsParam.label("HS_INSTANCE_MV_ID")
