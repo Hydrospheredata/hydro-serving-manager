@@ -14,6 +14,7 @@ import io.hydrosphere.serving.manager.api.http.controller.AkkaHttpControllerDsl
 import io.hydrosphere.serving.manager.config.ApplicationConfig
 import io.hydrosphere.serving.manager.util.AsyncUtil
 
+import java.util.concurrent.Executors
 import scala.collection.immutable.Seq
 import scala.concurrent.ExecutionContext
 
@@ -23,24 +24,26 @@ trait HttpServer[F[_]] {
 
 object HttpServer extends AkkaHttpControllerDsl {
 
-  def akkaBased[F[_] : Async](
-    config: ApplicationConfig,
-    modelRoutes: Route,
-    applicationRoutes: Route,
-    hostSelectorRoutes: Route,
-    servableRoutes: Route,
-    sseRoutes: Route,
-    monitoringRoutes: Route,
-    externalModelRoutes: Route,
-    deploymentConfRoutes: Route,
+  def akkaBased[F[_]: Async](
+      config: ApplicationConfig,
+      modelRoutes: Route,
+      applicationRoutes: Route,
+      hostSelectorRoutes: Route,
+      servableRoutes: Route,
+      sseRoutes: Route,
+      monitoringRoutes: Route,
+      externalModelRoutes: Route,
+      deploymentConfRoutes: Route
   )(implicit
-    as: ActorSystem,
-    am: ActorMaterializer,
-    ec: ExecutionContext
+      as: ActorSystem,
+      am: ActorMaterializer
   ): HttpServer[F] = {
+    val ex                            = Executors.newCachedThreadPool()
+    implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(ex)
+
     val controllerRoutes: Route = pathPrefix("v2") {
       handleExceptions(commonExceptionHandler) {
-          modelRoutes ~
+        modelRoutes ~
           externalModelRoutes ~
           applicationRoutes ~
           hostSelectorRoutes ~
@@ -52,13 +55,17 @@ object HttpServer extends AkkaHttpControllerDsl {
     }
 
     val buildInfoRoute = pathPrefix("buildinfo") {
-      complete(HttpResponse(
-        status = StatusCodes.OK,
-        entity = HttpEntity(ContentTypes.`application/json`, BuildInfo.toJson)
-      ))
+      complete(
+        HttpResponse(
+          status = StatusCodes.OK,
+          entity = HttpEntity(ContentTypes.`application/json`, BuildInfo.toJson)
+        )
+      )
     }
 
-    val routes: Route = CorsDirectives.cors(CorsSettings.defaultSettings.withAllowedMethods(Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))) {
+    val routes: Route = CorsDirectives.cors(
+      CorsSettings.defaultSettings.withAllowedMethods(Seq(GET, POST, HEAD, OPTIONS, PUT, DELETE))
+    ) {
       pathPrefix("health") {
         complete("OK")
       } ~
@@ -67,9 +74,10 @@ object HttpServer extends AkkaHttpControllerDsl {
         }
     }
     new HttpServer[F] {
-      override def start(): F[Http.ServerBinding] = AsyncUtil.futureAsync {
-        Http().bindAndHandle(routes, "0.0.0.0", config.port)
-      }
+      override def start(): F[Http.ServerBinding] =
+        AsyncUtil.futureAsync {
+          Http().bindAndHandle(routes, "0.0.0.0", config.port)
+        }
     }
   }
 }

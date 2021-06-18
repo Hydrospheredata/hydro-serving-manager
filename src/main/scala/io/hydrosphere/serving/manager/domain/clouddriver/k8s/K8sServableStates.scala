@@ -17,14 +17,11 @@ class K8sServableStates[F[_]: Sync](ref: Ref[F, Map[String, K8sServableState]])
       servableState =
         state.getOrElse[K8sServableState](event.instanceName, K8sServableState.default)
       newServableState = event match {
-        case ReplicaSetIsFailed(_, msg) =>
-          servableState.copy(rs = RsIsFailed(msg))
-        case ReplicaSetIsOk(_, msg) =>
-          servableState.copy(rs = RsIsOk(msg))
-        case ServiceIsAvailable(_) => servableState.copy(svc = SvcIsAvailable)
-        case ServiceIsUnavailable(_, message) =>
-          servableState.copy(svc = SvcIsUnavailable(message))
-        case _ => servableState
+        case ReplicaSetIsFailed(_, msg)       => servableState.copy(rs = RsIsFailed(msg))
+        case ReplicaSetIsOk(_, msg)           => servableState.copy(rs = RsIsOk(msg))
+        case ServiceIsAvailable(_)            => servableState.copy(svc = SvcIsAvailable)
+        case ServiceIsUnavailable(_, message) => servableState.copy(svc = SvcIsUnavailable(message))
+        case _                                => servableState
       }
       _ <- ref.update(_ + (event.instanceName -> newServableState))
       servableEvent = K8sServableState.toServableEvent(newServableState)

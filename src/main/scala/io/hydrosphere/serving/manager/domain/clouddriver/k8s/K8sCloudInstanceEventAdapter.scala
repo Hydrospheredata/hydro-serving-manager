@@ -41,9 +41,7 @@ object K8sCloudInstanceEventAdapter {
         desiredReplicas <- desiredReplicasOrError
         currentReplicas <- currentReplicasOrError
       } yield
-        if (currentReplicas == 0)
-          ReplicaSetIsFailed(name, "All pods aren't available")
-        else if (currentReplicas < desiredReplicas)
+        if (currentReplicas < desiredReplicas)
           ReplicaSetIsOk(
             name,
             s"$currentReplicas from $desiredReplicas are available".some

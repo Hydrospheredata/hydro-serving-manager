@@ -66,13 +66,10 @@ object ServableMonitoring extends Logging {
 
       def updatedServable(servable: Servable, servEvent: ServableEvent): Servable =
         servEvent match {
-          case ServableNotReady(message) =>
-            servable.copy(status = NotServing, message = message.some)
-          case ServableReady(message) =>
-            servable.copy(status = Serving, message = message)
-          case ServableStarting =>
-            servable.copy(status = Starting, message = None)
-          case _ => servable
+          case ServableNotReady(msg) => servable.copy(status = NotServing, message = msg.some)
+          case ServableReady(msg)    => servable.copy(status = Serving, message = msg)
+          case ServableStarting      => servable.copy(status = Starting, message = None)
+          case _                     => servable
         }
 
       private def streamFinishMessage(msg: String): F[Unit] =

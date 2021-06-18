@@ -49,7 +49,7 @@ object ModelVersionBuilder {
           _        <- handleBuild(init, modelFileStructure, handler).flatMap(deferred.complete).start
         } yield DeferredResult(init, deferred)
 
-      def initialVersion(model: Model, metadata: ModelVersionMetadata) =
+      private def initialVersion(model: Model, metadata: ModelVersionMetadata) =
         for {
           version <- modelVersionService.getNextModelVersion(model.id)
           image = imageRepository.getImage(metadata.modelName, version.toString)
@@ -70,7 +70,7 @@ object ModelVersionBuilder {
           modelVersion <- modelVersionRepository.create(mv)
         } yield mv.copy(id = modelVersion.id)
 
-      def buildImage(buildPath: Path, image: DockerImage, handler: ProgressHandler) =
+      private def buildImage(buildPath: Path, image: DockerImage, handler: ProgressHandler) =
         for {
           imageId <- dockerClient.build(
             buildPath,
@@ -82,7 +82,7 @@ object ModelVersionBuilder {
           res <- dockerClient.inspectImage(imageId)
         } yield res.id().stripPrefix("sha256:")
 
-      def handleBuild(
+      private def handleBuild(
           mv: ModelVersion.Internal,
           modelFileStructure: ModelFileStructure,
           handler: ProgressHandler
@@ -111,7 +111,7 @@ object ModelVersionBuilder {
         }
       }
 
-      def prepare(
+      private def prepare(
           modelVersion: ModelVersion.Internal,
           modelFileStructure: ModelFileStructure
       ): F[ModelFileStructure] =
