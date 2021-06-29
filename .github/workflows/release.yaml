@@ -101,14 +101,14 @@ jobs:
         run: |
           GRPC_VERSION=$(curl -Ls https://pypi.org/pypi/hydro-serving-grpc/json | jq -r '.releases | keys[-1]')
           echo $GRPC_VERSION
-          find . -type f -name "Dependencies.scala" -exec sed -i '' 's/val servingGrpcScala.*/val servingGrpcScala = "$GRPC_VERSION"/g' {} +
+          find . -type f -name "Dependencies.scala" -print0 | xargs -0 sed -i '' 's/val servingGrpcScala.*/val servingGrpcScala = "$GRPC_VERSION"/g'
           
       - name: Bump grpc to latest stable version
         if: github.event.inputs.grpc_version == '' && github.event.inputs.release == 'global'
         run: |
           GRPC_VERSION=$(curl -Ls https://pypi.org/pypi/hydro-serving-grpc/json | jq -r .info.version)
           echo $GRPC_VERSION
-          find . -type f -name "Dependencies.scala" -exec sed -i '' 's/val servingGrpcScala.*/val servingGrpcScala = "$GRPC_VERSION"/g' {} +
+          find . -type f -name "Dependencies.scala"  -print0 | xargs -0 sed -i '' 's/val servingGrpcScala.*/val servingGrpcScala = "$GRPC_VERSION"/g'
         
       - name: Set VERSION variable
         if: github.event.inputs.version == ''
