@@ -97,7 +97,9 @@ jobs:
       # Bump service version  
       - name: 'Get Previous tag'
         id: previoustag
-        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        uses: jessicalostinspace/github-action-get-regex-branch@v1.0.2
+        with:
+          regex-string: 'master'
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
@@ -105,7 +107,7 @@ jobs:
         id: bump_version
         uses: christian-draeger/increment-semantic-version@1.0.2
         with:
-          current-version: ${{ steps.previoustag.outputs.tag }}
+          current-version: ${{ steps.previoustag.outputs.last-semver }}
           version-fragment: ${{ github.event.inputs.bump }}
 
       - name: Set VERSION variable
