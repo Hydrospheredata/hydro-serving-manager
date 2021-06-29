@@ -137,7 +137,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build image
-        run: "sbt -DappVersion=v${{ env.VERSION }} docker"
+        run: "sbt -DappVersion=${{ env.VERSION }} docker"
 
       ## Personal - remove after complete or not
       - name: Retag image
