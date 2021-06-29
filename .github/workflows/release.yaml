@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: bump rule (major|minor|patch)
-        default: patch
+        description: bump rule (major|feature|bug|rc)
+        default: bug
         required: false
 
       version:
@@ -93,20 +93,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
 
       # Bump service version  
-      - name: Bump version
-        if: github.event.inputs.version == ''
-        uses: fwilhe2/bump-version@0.1.2
-        id: bump
+      - name: 'Get Previous tag'
+        id: previoustag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Bump release version
+        id: bump_version
+        uses: christian-draeger/increment-semantic-version@1.0.2
         with:
-          component: ${{ github.event.inputs.bump }}
+          current-version: ${{ steps.previoustag.outputs.tag }}
+          version-fragment: ${{ github.event.inputs.bump }}
 
       - name: Set VERSION variable
         if: github.event.inputs.version == ''
-        run: echo VERSION=${{ steps.bump.outputs.newVersion }} >> $GITHUB_ENV
+        run: echo VERSION=${{ steps.bump_version.outputs.next-version }} >> $GITHUB_ENV
         
       - name: Set VERSION variable
         if: github.event.inputs.version != ''
