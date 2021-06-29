@@ -53,6 +53,7 @@ jobs:
         key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt', '**/Dependencies.scala') }}
         
     - name: Build image
+      if: github.event_name != 'workflow_dispatch'
       run: "sbt -DappVersion=${{ github.sha }} docker"
       
     - name: Docker Login
@@ -62,6 +63,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
        
     - name: Push image
+      if: github.event_name != 'workflow_dispatch'
       run: "docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}"
         
     - name: Update image version in hydro-serving repo
@@ -110,21 +112,16 @@ jobs:
       - name: Set VERSION variable
         if: github.event.inputs.version != ''
         run: echo VERSION=${{ github.event.inputs.version }} >> $GITHUB_ENV
-        
-      - name: Docker Image Artifact Download
-        uses: ishworkh/docker-image-artifact-download@v1
-        with:
-          image: "${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}"
           
       - name: Docker Login
         uses: docker/login-action@v1.9.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          
-      - name: Retag image
-        run: "docker tag ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE }}:v${{ env.VERSION }}"
-      
+
+      - name: Build image
+        run: "sbt -DappVersion=v${{ env.VERSION }} docker"
+                
       - name: Push image
         run: "docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:v${{ env.VERSION }}"
 
