@@ -170,7 +170,7 @@ jobs:
           git push
           
       - name: Tag commit
-        run: "git tag v${{ env.VERSION }}"
+        run: "git tag ${{ env.VERSION }}"
         
       - name: Push tag
         run: "git push --tags"
