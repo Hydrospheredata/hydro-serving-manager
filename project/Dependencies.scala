@@ -1,6 +1,6 @@
 import sbt._
 
-object Dependencies {
+object Dependencies { 
   val akkaVersion       = "2.6.9"
   val akkaHttpVersion   = "10.2.0"
   val log4j2Version     = "2.13.3"
@@ -26,7 +26,7 @@ object Dependencies {
     "com.amazonaws" % "aws-java-sdk-route53" % awsSdkVersion
   )
 
-  lazy val kubernetesDependencies = Seq("io.skuber" %% "skuber" % "2.6.0")
+  lazy val kuval servingGrpcScala = "test"
 
   lazy val akkaDependencies = Seq(
     "com.typesafe.akka" %% "akka-actor"  % akkaVersion,
@@ -77,10 +77,10 @@ object Dependencies {
     "io.circe" %% "circe-parser",
     "io.circe" %% "circe-generic-extras"
   ).map(_ % circeVersion)
-  lazy val akkaCirceDependencies = Seq("de.heikoseeberger" %% "akka-http-circe" % "1.31.0")
+  lazy val akkaCirceDependencies = Seq("de.heikoseeval servingGrpcScala = "test"
   lazy val enumeratumDependencies = Seq(
-    "com.beachape" %% "enumeratum"       % enumeratumV,
-    "com.beachape" %% "enumeratum-circe" % enumeratumV
+    "com.val servingGrpcScala = "test"
+    "com.val servingGrpcScala = "test"
   )
 
   lazy val all = logDependencies ++
@@ -89,7 +89,7 @@ object Dependencies {
     akkaHttpDependencies ++
     awsDependencies ++
     grpcDependencies ++
-    kubernetesDependencies ++
+    kuval servingGrpcScala = "test"
     mlDependencies ++
     circeDependencies ++
     akkaCirceDependencies ++
@@ -97,13 +97,13 @@ object Dependencies {
     Seq(
       "org.typelevel"         %% "kittens"          % "2.2.1",
       "org.typelevel"         %% "cats-effect"      % catsV,
-      "org.tpolecat"          %% "doobie-core"      % "0.9.0",
-      "org.tpolecat"          %% "doobie-postgres"  % "0.9.0",
-      "org.tpolecat"          %% "doobie-scalatest" % "0.9.0" % "test, it",
-      "com.zaxxer"             % "HikariCP"         % "2.6.3", // doobie-hikari depends on hikari 3.3.1 which has weird pool retries.
+      "org.tpolecat"          %% "dooval servingGrpcScala = "test"
+      "org.tpolecat"          %% "dooval servingGrpcScala = "test"
+      "org.tpolecat"          %% "dooval servingGrpcScala = "test"
+      "com.zaxxer"             % "HikariCP"         % "2.6.3", // dooval servingGrpcScala = "test"
       "org.postgresql"         % "postgresql"       % postgresqlVersion,
       "org.flywaydb"           % "flyway-core"      % "4.2.0",
-      "com.spotify"            % "docker-client"    % "8.16.0" exclude ("ch.qos.logback", "logback-classic"),
+      "com.spotify"            % "docker-client"    % "8.16.0" exclude ("ch.qos.logval servingGrpcScala = "test"
       "com.google.guava"       % "guava"            % "22.0",
       "com.github.pureconfig" %% "pureconfig"       % "0.14.0",
       "co.fs2"                %% "fs2-core"         % fs2,
