@@ -28,9 +28,9 @@ on:
 #   HYDRO_SERVING_TOKEN - github token with write access to hydro-serving repo
 
 env:
-  HYDRO_SERVING_REPO: Hydrospheredata/hydro-serving
+  HYDRO_SERVING_REPO: akastav/hydro-serving
   IMAGE: serving-manager # name of the built image
-  REGISTRY: hydrosphere
+  REGISTRY: akastav
   
 jobs:
   Build_and_publish:
