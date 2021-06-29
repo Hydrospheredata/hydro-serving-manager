@@ -116,12 +116,12 @@ jobs:
 
       # Bump dependencies
       - name: Bump grpc
-        if: github.event.inputs.grpc_version == '' && github.event.inputs.release == 'local'
-        run: echo GRPC_VERSION=$(curl -Ls https://pypi.org/pypi/hydro-serving-grpc/json | jq -r '.releases | keys[-1]') >> $GITHUB_ENV
-          
-      - name: Bump grpc to latest stable version
-        if: github.event.inputs.grpc_version == '' && github.event.inputs.release == 'global'
-        run: echo GRPC_VERSION=$(curl -Ls https://pypi.org/pypi/hydro-serving-grpc/json | jq -r .info.version) >> $GITHUB_ENV
+        if: github.event.inputs.grpc_version == ''
+        run: echo GRPC_VERSION=$(curl -s https://search.maven.org/solrsearch/select\?q\=g:%22io.hydrosphere%22+AND+a:%22serving-grpc-scala_2.13%22\&core\=gav\&rows\=1\&wt\=json | jq -r '.response.docs[].v') >> $GITHUB_ENV
+
+      - name: Set grpc from inputs
+        if: github.event.inputs.grpc_version != ''
+        run: echo GRPC_VERSION=${{ github.event.inputs.grpc_version }} >> $GITHUB_ENV
 
       - name: Find and Replace dependency
         uses: jacobtomlinson/gha-find-replace@master
