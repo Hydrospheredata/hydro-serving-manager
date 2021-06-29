@@ -158,10 +158,10 @@ jobs:
       ## Personal - remove after complete or not
       - name: Retag image
         if: github.event_name != 'workflow_dispatch'
-        run: "docker tag hydrosphere/${{ env.IMAGE }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE }}:v${{ env.VERSION }}"
+        run: "docker tag hydrosphere/${{ env.IMAGE }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.VERSION }}"
 
       - name: Push image
-        run: "docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:v${{ env.VERSION }}"
+        run: "docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.VERSION }}"
 
       - name: Commit new version
         run: "echo ${{ env.VERSION }} > version"
