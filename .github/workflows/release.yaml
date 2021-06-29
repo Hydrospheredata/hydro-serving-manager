@@ -61,7 +61,11 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
-       
+
+    ## Personal - remove after complete or not
+    - name: Retag image
+      run: "docker tag hydrosphere/${{ env.IMAGE }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE }}:v${{ env.VERSION }}"
+
     - name: Push image
       if: github.event_name != 'workflow_dispatch'
       run: "docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}"
