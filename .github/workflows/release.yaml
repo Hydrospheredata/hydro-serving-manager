@@ -39,6 +39,7 @@ env:
   
 jobs:
   Build_and_publish:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -86,7 +87,6 @@ jobs:
         inputs: '{"service_image_name":"${{ env.IMAGE }}", "registry_url":"${{ env.REGISTRY }}", "tag":"${{ github.sha }}"}'
       
   Release:
-    needs: [Build_and_publish]
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     
@@ -99,7 +99,7 @@ jobs:
       # Bump service version  
       - name: Bump version
         if: github.event.inputs.version == ''
-        uses: fwilhe2/bump-version@main
+        uses: fwilhe2/bump-version@0.1.2
         id: bump
         with:
           component: ${{ github.event.inputs.bump }}
@@ -115,7 +115,7 @@ jobs:
       # Bump dependencies
       - name: Bump grpc
         if: github.event.inputs.grpc_version == '' && github.event.inputs.release == 'local'
-        run: echo GRPC_VERSION=$(curl -Ls https://pypi.org/pypi/hydro-serving-grpc/json | jq -r '.releases | keys[-1]')
+        run: echo GRPC_VERSION=$(curl -Ls https://pypi.org/pypi/hydro-serving-grpc/json | jq -r '.releases | keys[-1]') >> $GITHUB_ENV
           
       - name: Bump grpc to latest stable version
         if: github.event.inputs.grpc_version == '' && github.event.inputs.release == 'global'
@@ -125,7 +125,7 @@ jobs:
         uses: jacobtomlinson/gha-find-replace@master
         with:
           find: "val servingGrpcScala.*"
-          replace: 'val servingGrpcScala = "$GRPC_VERSION"'
+          replace: "val servingGrpcScala = \"$GRPC_VERSION\""
           include: "Dependencies.scala"
 
       - name: Docker Login
