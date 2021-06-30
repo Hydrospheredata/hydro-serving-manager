@@ -1,9 +1,9 @@
 name: release
 on:
-  # push:
-  #   branches:
-  #     - master
-  #     - main
+  push:
+    branches:
+      - master
+      - main
       
   workflow_dispatch:
     inputs:
@@ -39,7 +39,7 @@ env:
   
 jobs:
   Build_and_publish:
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -73,9 +73,9 @@ jobs:
 
     - name: Push image
       run: "docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}"
-        
+
+    # Update docker compose and helm    
     - name: Update image version in hydro-serving repo
-      if: github.event_name == 'push'
       uses: aurelien-baudet/workflow-dispatch@v2.1.1
       with:
         workflow: Local release
@@ -140,9 +140,7 @@ jobs:
           replace: "val servingGrpcScala  = \"${{ env.GRPC_VERSION }}\""
           include: "Dependencies.scala"
 
-      - name: Debug dep 
-        run: cat ./project/Dependencies.scala
-
+      # Build docker image
       - name: Docker Login
         uses: docker/login-action@v1.9.0
         with:
@@ -159,6 +157,7 @@ jobs:
       - name: Push image
         run: "docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.VERSION }}"
 
+      # Commit changes
       - name: Commit new version
         run: "echo ${{ env.VERSION }} > version"
 
