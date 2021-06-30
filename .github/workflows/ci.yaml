@@ -1,60 +1,61 @@
 name: ci
 on: pull_request
 
-jobs:
-        
-  Setup:
-  # Try to load dependecies from cache, install dependecies on cache miss
+jobs:                
+  Test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
         
+      - name: Setup scala
+        uses: olafurpg/setup-scala@v10
+        with:
+         java-version: adopt@1.11
+        
       - name: Restore cache
-        id: restore-cache
         uses: actions/cache@v2.1.5
         with:
           path: |
             ~/.ivy2/cache
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt', '**/Dependencies.scala') }}
-      
-      - name: Setup scala
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: olafurpg/setup-scala@v10
-        with:
-         java-version: adopt@1.11
-          
+
       - name: Initialize project
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: "sbt initialize"
-                
-  Test:
-    runs-on: ubuntu-latest
-    needs: [Setup]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        
-      - name: Setup scala
-        uses: olafurpg/setup-scala@v10
+
+      # Bump service version  
+      - name: Get latest tag
+        id: get-latest-tag
+        uses: actions-ecosystem/action-get-latest-tag@v1
+
+      - name: Bump release version
+        id: bump_version
+        uses: christian-draeger/increment-semantic-version@1.0.2
         with:
-         java-version: adopt@1.11
-        
-      - name: Restore cache
-        uses: actions/cache@v2.1.5
+          current-version: ${{ steps.get-latest-tag.outputs.tag }}
+          version-fragment: 'rc'
+
+      - name: Set VERSION variable
+        run: echo VERSION=${{ steps.bump_version.outputs.next-version }} >> $GITHUB_ENV
+
+      #Bump dependencies
+      - name: Bump grpc
+        run: echo GRPC_VERSION=$(curl -s https://search.maven.org/solrsearch/select\?q\=g:%22io.hydrosphere%22+AND+a:%22serving-grpc-scala_2.13%22\&core\=gav\&rows\=1\&wt\=json | jq -r '.response.docs[].v') >> $GITHUB_ENV
+
+      - name: Find and Replace dependency
+        uses: jacobtomlinson/gha-find-replace@master
         with:
-          path: |
-            ~/.ivy2/cache
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt', '**/Dependencies.scala') }}
-                  
+          find: "val servingGrpcScala.*"
+          replace: "val servingGrpcScala  = \"${{ env.GRPC_VERSION }}\""
+          include: "Dependencies.scala"
+
       - name: Run tests
         run: "sbt test"
         
   Build_image:
     runs-on: ubuntu-latest
-    needs: [Setup]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -71,8 +72,37 @@ jobs:
             ~/.ivy2/cache
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt', '**/Dependencies.scala') }}
-          
+
+      - name: Initialize project
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: "sbt initialize"
+
+      # Bump service version  
+      - name: Get latest tag
+        id: get-latest-tag
+        uses: actions-ecosystem/action-get-latest-tag@v1
+
+      - name: Bump release version
+        id: bump_version
+        uses: christian-draeger/increment-semantic-version@1.0.2
+        with:
+          current-version: ${{ steps.get-latest-tag.outputs.tag }}
+          version-fragment: 'rc'
+
+      - name: Set VERSION variable
+        run: echo VERSION=${{ steps.bump_version.outputs.next-version }} >> $GITHUB_ENV
+
+      # Bump dependencies
+      - name: Bump grpc
+        run: echo GRPC_VERSION=$(curl -s https://search.maven.org/solrsearch/select\?q\=g:%22io.hydrosphere%22+AND+a:%22serving-grpc-scala_2.13%22\&core\=gav\&rows\=1\&wt\=json | jq -r '.response.docs[].v') >> $GITHUB_ENV
+
+      - name: Find and Replace dependency
+        uses: jacobtomlinson/gha-find-replace@master
+        with:
+          find: "val servingGrpcScala.*"
+          replace: "val servingGrpcScala  = \"${{ env.GRPC_VERSION }}\""
+          include: "Dependencies.scala"
+
+      # Build docker image              
       - name: Build docker image
         run: sbt docker
-
-      
