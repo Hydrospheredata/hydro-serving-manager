@@ -73,6 +73,8 @@ dockerfile in docker := {
   }
 }
 
+resolvers += Resolver.sonatypeRepo("public")
+resolvers += Resolver.sonatypeRepo("releases")
 resolvers += Resolver.bintrayRepo("streamz", "maven")
 resolvers +=
   "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/staging"

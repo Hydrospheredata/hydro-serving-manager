@@ -98,7 +98,6 @@ class DockerDriver[F[_]](
     (mName, mMvId).mapN { (name, mvId) =>
       val host =
         maybeName.getOrElse(Internals.extractIpAddress(c.networkSettings(), config.networkName))
-      val port = DefaultConstants.DEFAULT_APP_PORT.some
       val status = c.state() match {
         case ContainerState.Running(_)    => CloudInstance.Status.Running
         case ContainerState.Created(_)    => CloudInstance.Status.Starting
