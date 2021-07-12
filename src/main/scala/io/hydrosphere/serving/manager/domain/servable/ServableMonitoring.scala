@@ -8,6 +8,7 @@ import io.hydrosphere.serving.manager.domain.clouddriver.docker.DockerEvent
 import io.hydrosphere.serving.manager.domain.clouddriver.k8s.K8sEvent
 import io.hydrosphere.serving.manager.domain.clouddriver.{
   CloudDriver,
+  CloudInstance,
   ServableEvent,
   ServableNotReady,
   ServableReady,
@@ -41,9 +42,14 @@ object ServableMonitoring extends Logging {
         cloudDriver.getEvents
           .evalTap { cloudInstanceEvent =>
             val effect = for {
-              servable  <- OptionT(repo.get(cloudInstanceEvent.instanceName))
+              servable <- OptionT(repo.get(cloudInstanceEvent.instanceName))
+              ci       <- OptionT.liftF(cloudDriver.instance(servable.name))
+              _ = {
+                logger.info(s"servable ${servable}")
+                logger.info(s"cloud instance ${ci}")
+              }
               servEvent <- OptionT.liftF(servableStates.handleEvent(cloudInstanceEvent))
-              _         <- OptionT.liftF(repo.upsert(updatedServable(servable, servEvent)))
+              _         <- OptionT.liftF(repo.upsert(updatedServable(servable, servEvent, ci)))
             } yield ()
 
             effect.value.as(())
@@ -64,16 +70,31 @@ object ServableMonitoring extends Logging {
           .compile
           .drain
 
-      def updatedServable(servable: Servable, servEvent: ServableEvent): Servable =
-        servEvent match {
+      def updatedServable(
+          servable: Servable,
+          servEvent: ServableEvent,
+          ci: Option[CloudInstance]
+      ): Servable = {
+        val servableWithNewStatus = servEvent match {
           case ServableNotReady(message) =>
-            servable.copy(status = NotServing, message = message.some)
+            servable.copy(
+              status = NotServing,
+              message = message.some
+            )
           case ServableReady(message) =>
-            servable.copy(status = Serving, message = message)
+            servable.copy(
+              status = Serving,
+              message = message
+            )
           case ServableStarting =>
-            servable.copy(status = Starting, message = None)
-          case _ => servable
+            servable.copy(
+              status = Starting,
+              message = None
+            )
         }
+
+        servableWithNewStatus.copy(host = ci.flatMap(_.host), port = ci.flatMap(_.port))
+      }
 
       private def streamFinishMessage(msg: String): F[Unit] =
         F.delay(logger.info("Servable monitoring stream was " + msg))
