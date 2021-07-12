@@ -41,7 +41,6 @@ object ServableMonitoring extends Logging {
       def stream: F[Unit] =
         cloudDriver.getEvents
           .evalTap { cloudInstanceEvent =>
-            println(cloudInstanceEvent.toString)
             val effect = for {
               servable <- OptionT(repo.get(cloudInstanceEvent.instanceName))
               ci       <- OptionT.liftF(cloudDriver.instance(servable.name))
