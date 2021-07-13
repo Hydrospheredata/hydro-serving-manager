@@ -65,3 +65,6 @@ project/plugins/project/
 .ensime
 
 .DS_Store
+.dccache
+.vscode
+metals.sbt
