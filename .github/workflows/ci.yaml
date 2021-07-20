@@ -40,16 +40,16 @@ jobs:
       - name: Set VERSION variable
         run: echo VERSION=${{ steps.bump_version.outputs.next-version }} >> $GITHUB_ENV
 
-      #Bump dependencies
-      - name: Bump grpc
-        run: echo GRPC_VERSION=$(curl -s https://search.maven.org/solrsearch/select\?q\=g:%22io.hydrosphere%22+AND+a:%22serving-grpc-scala_2.13%22\&core\=gav\&rows\=1\&wt\=json | jq -r '.response.docs[].v') >> $GITHUB_ENV
+      # #Bump dependencies
+      # - name: Bump grpc
+      #   run: echo GRPC_VERSION=$(curl -s https://search.maven.org/solrsearch/select\?q\=g:%22io.hydrosphere%22+AND+a:%22serving-grpc-scala_2.13%22\&core\=gav\&rows\=1\&wt\=json | jq -r '.response.docs[].v') >> $GITHUB_ENV
 
-      - name: Find and Replace dependency
-        uses: jacobtomlinson/gha-find-replace@master
-        with:
-          find: "val servingGrpcScala.*"
-          replace: "val servingGrpcScala  = \"${{ env.GRPC_VERSION }}\""
-          include: "Dependencies.scala"
+      # - name: Find and Replace dependency
+      #   uses: jacobtomlinson/gha-find-replace@master
+      #   with:
+      #     find: "val servingGrpcScala.*"
+      #     replace: "val servingGrpcScala  = \"${{ env.GRPC_VERSION }}\""
+      #     include: "Dependencies.scala"
 
       - name: Run tests
         run: "sbt test"
@@ -92,16 +92,16 @@ jobs:
       - name: Set VERSION variable
         run: echo VERSION=${{ steps.bump_version.outputs.next-version }} >> $GITHUB_ENV
 
-      # Bump dependencies
-      - name: Bump grpc
-        run: echo GRPC_VERSION=$(curl --silent "https://api.github.com/repos/Hydrospheredata/hydro-serving-protos/releases/latest" | jq -r .tag_name) >> $GITHUB_ENV
+      # # Bump dependencies
+      # - name: Bump grpc
+      #   run: echo GRPC_VERSION=$(curl --silent "https://api.github.com/repos/Hydrospheredata/hydro-serving-protos/releases/latest" | jq -r .tag_name) >> $GITHUB_ENV
 
-      - name: Find and Replace dependency
-        uses: jacobtomlinson/gha-find-replace@master
-        with:
-          find: "val servingGrpcScala.*"
-          replace: "val servingGrpcScala  = \"${{ env.GRPC_VERSION }}\""
-          include: "Dependencies.scala"
+      # - name: Find and Replace dependency
+      #   uses: jacobtomlinson/gha-find-replace@master
+      #   with:
+      #     find: "val servingGrpcScala.*"
+      #     replace: "val servingGrpcScala  = \"${{ env.GRPC_VERSION }}\""
+      #     include: "Dependencies.scala"
 
       # Build docker image              
       - name: Build docker image

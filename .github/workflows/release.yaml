@@ -106,15 +106,16 @@ jobs:
       run: echo VERSION=${{ github.sha }} >> $GITHUB_ENV
 
     # Bump dependencies
-    - name: Bump grpc
-      if: github.event.inputs.grpc_version == ''
-      run: echo GRPC_VERSION=$(curl --silent "https://api.github.com/repos/Hydrospheredata/hydro-serving-protos/releases/latest" | jq -r .tag_name) >> $GITHUB_ENV
+    # - name: Bump grpc
+    #   if: github.event.inputs.grpc_version == ''
+    #   run: echo GRPC_VERSION=$(curl --silent "https://api.github.com/repos/Hydrospheredata/hydro-serving-protos/releases/latest" | jq -r .tag_name) >> $GITHUB_ENV
 
     - name: Set grpc from inputs
       if: github.event.inputs.grpc_version != ''
       run: echo GRPC_VERSION=${{ github.event.inputs.grpc_version }} >> $GITHUB_ENV
 
     - name: Find and Replace dependency
+      if: github.event.inputs.grpc_version != ''
       uses: jacobtomlinson/gha-find-replace@master
       with:
         find: "val servingGrpcScala.*"
