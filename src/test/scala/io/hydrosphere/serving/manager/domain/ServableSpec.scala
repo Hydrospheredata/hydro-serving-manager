@@ -21,6 +21,7 @@ import io.hydrosphere.serving.manager.domain.servable._
 import io.hydrosphere.serving.manager.infrastructure.db.repository.DBServableRepository
 import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.{NameGenerator, RNG}
+import io.hydrosphere.serving.proto.contract.signature.ModelSignature
 import org.mockito.Matchers
 
 import java.time.Instant
@@ -163,6 +164,37 @@ class ServableSpec extends GenericUnitTest {
         .unsafeRunSync()
 
       assert(res.deploymentConfiguration.name == customDC.name)
+    }
+  }
+
+  describe("Servable") {
+    it("should crash when CloudDriver crashes") {
+      ioAssert {
+        val defaultDC = DefaultDeploymentConfiguration(
+          container = None,
+          pod = None,
+          deployment = None,
+          hpa = None
+        ).toDC
+
+        implicit val cd = mock[CloudDriver[IO]]
+        when(cd.run(any[String], anyLong, any[DockerImage], any[DeploymentConfiguration]))
+          .thenReturn(IO.raiseError(new Exception("Can't create container")))
+        implicit val sr = mock[ServableRepository[IO]]
+        when(sr.get(any[String])).thenReturn(IO.pure(None))
+        when(sr.upsert(any[Servable])).thenAnswer[Servable](IO.pure)
+        implicit val appr   = mock[ApplicationRepository[IO]]
+        implicit val mvr    = mock[ModelVersionRepository[IO]]
+        implicit val monr   = mock[MonitoringRepository[IO]]
+        implicit val dcs    = mock[DeploymentConfigurationService[IO]]
+        val servableService = ServableService[IO](defaultDC)
+
+        servableService.deploy(mv, None, Map.empty).map { s =>
+          println(s)
+          assert(s.status == Servable.Status.NotServing)
+          assert(s.message.contains("Can't create container"))
+        }
+      }
     }
   }
 }

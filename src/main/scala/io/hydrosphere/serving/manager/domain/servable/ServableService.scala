@@ -2,12 +2,9 @@ package io.hydrosphere.serving.manager.domain.servable
 
 import cats.data.OptionT
 import cats.effect._
-import cats.effect.concurrent.Deferred
-import cats.effect.implicits._
 import cats.implicits._
 import io.hydrosphere.serving.manager.domain.DomainError
 import io.hydrosphere.serving.manager.domain.application.ApplicationRepository
-import io.hydrosphere.serving.manager.domain.clouddriver.CloudInstance.Status
 import io.hydrosphere.serving.manager.domain.clouddriver._
 import io.hydrosphere.serving.manager.domain.deploy_config.{
   DeploymentConfiguration,
@@ -19,11 +16,9 @@ import io.hydrosphere.serving.manager.domain.model_version.{
   ModelVersionStatus
 }
 import io.hydrosphere.serving.manager.domain.monitoring.{Monitoring, MonitoringRepository}
-import io.hydrosphere.serving.manager.util.{DeferredResult, UUIDGenerator}
+import io.hydrosphere.serving.manager.util.UUIDGenerator
 import io.hydrosphere.serving.manager.util.random.NameGenerator
 import org.apache.logging.log4j.scala.Logging
-
-import scala.util.control.NonFatal
 
 trait ServableService[F[_]] {
   def get(name: String): F[Servable]
@@ -135,13 +130,18 @@ object ServableService extends Logging {
             deploymentConfiguration = deployConfig.getOrElse(defaultDC)
           )
           servable <- servableRepository.upsert(initServable)
-          cloudInstance <- cloudDriver.run(
-            servable.name,
-            servable.modelVersion.id,
-            servable.modelVersion.image,
-            servable.deploymentConfiguration
-          )
-          newServable = servable.copy(host = cloudInstance.host, port = cloudInstance.port)
+          newServable <-
+            cloudDriver
+              .run(
+                servable.name,
+                servable.modelVersion.id,
+                servable.modelVersion.image,
+                servable.deploymentConfiguration
+              )
+              .map(ci => servable.copy(host = ci.host, port = ci.port))
+              .handleError(e =>
+                servable.copy(status = Servable.Status.NotServing, message = e.getMessage.some)
+              )
           updatedServable <- servableRepository.upsert(newServable)
         } yield updatedServable
 
