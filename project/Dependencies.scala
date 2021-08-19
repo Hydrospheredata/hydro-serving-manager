@@ -7,7 +7,7 @@ object Dependencies {
   val postgresqlVersion = "42.2.4"
   val scalaTestVersion  = "3.2.2"
   val awsSdkVersion     = "1.11.312"
-  val servingGrpcScala  = "3.0.0-alpha.10"
+  val servingGrpcScala  = "3.0.0"
   val circeVersion      = "0.13.0"
   val catsV             = "2.2.0"
   val envoyDataPlaneApi = "v1.6.0_1"
