@@ -56,11 +56,11 @@ dockerfile in docker := {
 
   new sbtdocker.Dockerfile {
     // Base image
-    from("openjdk:8u151-jre-alpine")
+    from("openjdk:16-ea-23-jdk-oracle")
 
-    run("apk", "update")
-    run("apk", "add", "jq")
-    run("rm", "-rf", "/var/cache/apk/*")
+    // run("apk", "update")
+    // run("apk", "add", "jq")
+    // run("rm", "-rf", "/var/cache/apk/*")
 
     add(dockerFilesLocation, "/app/")
     // Add all files on the classpath
