@@ -50,25 +50,27 @@ dockerfile in docker := {
   val classpath           = (Compile / dependencyClasspath).value
   val localConfigFile     = baseDirectory.value / "src" / "main" / "resources" / "application.conf"
   val dockerFilesLocation = baseDirectory.value / "src" / "main" / "docker/"
-  val jarTarget           = "/app/manager.jar"
-  val libFolder           = "/app/lib/"
-  val defaultConfigPath   = "/app/config/application.conf"
+  val jarTarget           = "manager.jar"
+  val libFolder           = "./lib/"
+  val defaultConfigPath   = "./config/application.conf"
 
   new sbtdocker.Dockerfile {
     // Base image
-    from("openjdk:8u151-jre-alpine")
+    from("openjdk:17-ea-14-alpine3.13")
 
-    run("apk", "update")
-    run("apk", "add", "jq")
-    run("rm", "-rf", "/var/cache/apk/*")
+    label("maintainer", "support@hydrosphere.io")
 
-    add(dockerFilesLocation, "/app/")
+    run("apk", "update", "apk", "add", "apk-tools=2.12.7-r0", "jq", "&&", "rm", "-rf", "/var/cache/apk/*")
+
+    workDir("/app/")
+
+    copy(dockerFilesLocation, "./")
     // Add all files on the classpath
-    add(classpath.files, libFolder)
+    copy(classpath.files, libFolder)
     // Add the JAR file
-    add(jarFile, jarTarget)
-    add(localConfigFile, defaultConfigPath)
-
+    copy(jarFile, jarTarget)
+    copy(localConfigFile, defaultConfigPath)
+    
     entryPointShell("/app/start.sh")
   }
 }
