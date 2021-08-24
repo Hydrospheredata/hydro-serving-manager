@@ -60,7 +60,9 @@ dockerfile in docker := {
 
     label("maintainer", "support@hydrosphere.io")
 
-    run("apk", "update", "apk", "add", "apk-tools=2.12.7-r0", "jq", "&&", "rm", "-rf", "/var/cache/apk/*")
+    run("apk", "update")
+    run("apk", "add", "apk-tools=2.12.7-r0", "jq")
+    run("rm", "-rf", "/var/cache/apk/*")
 
     workDir("/app/")
 
