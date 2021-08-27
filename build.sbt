@@ -61,7 +61,7 @@ dockerfile in docker := {
     label("maintainer", "support@hydrosphere.io")
 
     run("apk", "update")
-    run("apk", "add", "apk-tools=2.12.7-r0", "jq")
+    run("apk", "add", "apk-tools=2.12.7-r0", "libcrypto1.1=1.1.1l-r0", "libssl1.1=1.1.1l-r0", "openssl=1.1.1l-r0", "jq")
     run("rm", "-rf", "/var/cache/apk/*")
 
     workDir("/app/")
