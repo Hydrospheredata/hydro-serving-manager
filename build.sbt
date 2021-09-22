@@ -56,12 +56,12 @@ dockerfile in docker := {
 
   new sbtdocker.Dockerfile {
     // Base image
-    from("openjdk:17-ea-14-alpine3.13")
+    from("openjdk:8u212-jre-alpine3.9")
 
     label("maintainer", "support@hydrosphere.io")
 
     run("apk", "update")
-    run("apk", "add", "apk-tools>=2.12.7", "libcrypto1.1>=1.1.1", "libssl1.1>=1.1.1", "openssl>=1.1.1", "jq")
+    run("apk", "add", "libcrypto1.1>=1.1.1", "libssl1.1>=1.1.1", "openssl>=1.1.1", "jq")
     run("rm", "-rf", "/var/cache/apk/*")
 
     workDir("/app/")
