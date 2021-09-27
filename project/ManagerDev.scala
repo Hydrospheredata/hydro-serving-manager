@@ -8,7 +8,7 @@ object ManagerDev {
   lazy val cleanDockerEnv = taskKey[Unit]("Stop images")
   lazy val devRun = taskKey[Unit]("Setup environment and ")
 
-  lazy val pgImage = "postgres:9.6-alpine"
+  lazy val pgImage = "postgres:13.4-alpine3.14"
   lazy val pgName = "hs-dev-pg"
 
   lazy val uiImage = "hydrosphere/serving-manager-ui:api-v2"

@@ -7,7 +7,7 @@ import scala.collection.JavaConverters._
 trait DatabaseAccessIT extends IsolatedDockerAccessIT {
 
   def config = ContainerConfig.builder()
-    .image("postgres:9.6-alpine")
+    .image("postgres:13.4-alpine3.14")
     .hostConfig(
       HostConfig.builder().portBindings(
         Map(
