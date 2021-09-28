@@ -2,9 +2,7 @@ package io.hydrosphere.serving.manager.infrastructure.storage.fetchers
 
 import java.nio.file.Path
 import cats.effect.Sync
-import cats.instances.list._
-import cats.syntax.functor._
-import cats.{Monad, Traverse}
+import cats.implicits._
 import io.hydrosphere.serving.manager.domain.contract.Signature
 import io.hydrosphere.serving.manager.infrastructure.storage.StorageOps
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.keras.KerasFetcher
@@ -40,12 +38,20 @@ object ModelFetcher extends Logging {
     * @tparam F
     * @return
     */
-  def combine[F[_]: Monad](fetchers: Seq[ModelFetcher[F]]) =
+  def combine[F[_]: Sync](fetchers: Seq[ModelFetcher[F]]) =
     new ModelFetcher[F] {
       override def fetch(path: Path): F[Option[FetcherResult]] = {
-        val res = Traverse[List].traverse(fetchers.toList)(fetcher => fetcher.fetch(path))
+        val safeFetch = (x: ModelFetcher[F]) =>
+          x.fetch(path).attempt.flatMap { x =>
+            x.fold(
+              ex =>
+                Sync[F].delay(logger.warn("ModelFetcher fail", ex)) >>
+                  none[FetcherResult].pure[F],
+              value => value.pure[F]
+            )
+          }
         for {
-          fetchResults <- res
+          fetchResults <- fetchers.traverse(safeFetch)
         } yield fetchResults.flatten.headOption
       }
     }

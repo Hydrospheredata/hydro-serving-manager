@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import io.hydrosphere.serving.manager.GenericUnitTest
 import io.hydrosphere.serving.manager.domain.contract.DataType.{DT_FLOAT, DT_INT64}
-import io.hydrosphere.serving.manager.domain.contract.{Field, Signature, TensorShape}
+import io.hydrosphere.serving.manager.domain.contract.{DataType, Field, Signature, TensorShape}
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers._
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.keras.KerasFetcher
 import io.hydrosphere.serving.manager.infrastructure.storage.fetchers.spark.SparkModelFetcher
@@ -20,6 +20,22 @@ class FetcherSpecs extends GenericUnitTest {
     val path = getTestResourcePath("test_models")
     val res  = path.resolve(modelName)
     res
+  }
+
+  describe("Combined fetcher") {
+    it("should not fail if underlying fetcher fails") {
+      val successfulFetcher = new ModelFetcher[IO] {
+        override def fetch(path: Path): IO[Option[FetcherResult]] = IO(None)
+      }
+      val failingFetcher = new ModelFetcher[IO] {
+        override def fetch(path: Path): IO[Option[FetcherResult]] =
+          IO.raiseError(new Exception("hello there!"))
+      }
+      val combined = ModelFetcher.combine(successfulFetcher :: failingFetcher :: Nil)
+      ioAssert {
+        combined.fetch(getModel("scikit_model")).map(x => assert(x.isEmpty))
+      }
+    }
   }
 
   describe("Fallback") {
@@ -143,35 +159,33 @@ class FetcherSpecs extends GenericUnitTest {
       }
     }
 
-    //TODO: Invalid
-//    it("should parse functional model from .h5") {
-//      ioAssert {
-//        val expectedSignature = Signature(
-//          "Predict",
-//          NonEmptyList.of(
-//            Field.Tensor("input_7", DT_FLOAT, TensorShape.mat(-1, 784))
-//          ),
-//          NonEmptyList.of(
-//            SignatureBuilder
-//              .simpleTensorModelField("dense_20", PDataType.DT_INVALID, Shape.mat(-1, 10)),
-//            SignatureBuilder
-//              .simpleTensorModelField("dense_21", PDataType.DT_INVALID, Shape.mat(-1, 10))
-//          )
-//        )
-//
-//        val fetcher = new KerasFetcher[IO](ops)
-//        val fres    = fetcher.fetch(getModel("keras_model/functional"))
-//        fres.map { fetchResult =>
-//          assert(fetchResult.isDefined, fetchResult)
-//          val metadata = fetchResult.get
-//          println(metadata)
-//          assert(metadata.modelName === "nonseq_model")
-//          assert(metadata.modelSignature === expectedSignature)
-//          assert(metadata.metadata === Map())
-//        }
-//      }
-//    }
+    it("should parse functional model from .h5") {
+      ioAssert {
+        val expectedSignature = Signature(
+          "Predict",
+          NonEmptyList.of(
+            Field.Tensor("input_7", DT_FLOAT, TensorShape.mat(-1, 784))
+          ),
+          NonEmptyList.of(
+            Field.Tensor("dense_20", DataType.DT_FLOAT, TensorShape.mat(-1, 10)),
+            Field.Tensor("dense_21", DataType.DT_FLOAT, TensorShape.mat(-1, 10))
+          )
+        )
+
+        val fetcher = new KerasFetcher[IO](ops)
+        val fres    = fetcher.fetch(getModel("keras_model/functional"))
+        fres.map { fetchResult =>
+          assert(fetchResult.isDefined, fetchResult)
+          val metadata = fetchResult.get
+          println(metadata)
+          assert(metadata.modelName === "nonseq_model")
+          assert(metadata.modelSignature === expectedSignature)
+          assert(metadata.metadata === Map())
+        }
+      }
+    }
   }
+
   describe("Default fetcher") {
     it("should parse tensorflow model") {
       ioAssert {
