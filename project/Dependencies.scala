@@ -3,7 +3,7 @@ import sbt._
 object Dependencies {
   val akkaVersion       = "2.6.9"
   val akkaHttpVersion   = "10.2.0"
-  val log4j2Version     = "2.13.3"
+  val log4j2Version     = "2.16.0"
   val postgresqlVersion = "42.2.4"
   val scalaTestVersion  = "3.2.2"
   val awsSdkVersion     = "1.11.312"
